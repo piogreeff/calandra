@@ -6,6 +6,7 @@ import {
   themeCookieName,
   type ThemeName,
 } from "./theme";
+import { createDesktopThemeStore } from "./desktop-bridge";
 
 export interface CalandraThemeStore {
   getThemePreference(): Promise<string | null | undefined>;
@@ -32,7 +33,7 @@ export function getBrowserThemePersistenceHost(): ThemePersistenceHost {
     setCookie(cookie: string) {
       document.cookie = cookie;
     },
-    desktopStore: window.__CALANDRA_THEME_STORE__,
+    desktopStore: window.__CALANDRA_THEME_STORE__ ?? createDesktopThemeStore(),
     initialDesktopTheme: window.__CALANDRA_INITIAL_THEME__,
   };
 }

@@ -14,12 +14,20 @@ export type DesktopPoe2PathState =
       paths: DesktopPoe2Paths;
     };
 
+export type DesktopThemeStore = {
+  getThemePreference(): Promise<string | null>;
+  setThemePreference(theme: string): Promise<void>;
+};
+
 type TauriGlobals = {
   __TAURI__?: unknown;
   __TAURI_INTERNALS__?: unknown;
 };
 
-type Invoke = (command: string) => Promise<DesktopPoe2Paths>;
+type Invoke = (
+  command: string,
+  args?: Record<string, unknown>,
+) => Promise<unknown>;
 
 export async function getDesktopPoe2Paths({
   globals = globalThis as TauriGlobals,
@@ -39,7 +47,32 @@ export async function getDesktopPoe2Paths({
 
   return {
     source: "tauri",
-    paths: await invokeCommand("get_default_poe2_paths"),
+    paths: (await invokeCommand("get_default_poe2_paths")) as DesktopPoe2Paths,
+  };
+}
+
+export function createDesktopThemeStore({
+  globals = globalThis as TauriGlobals,
+  invoke,
+}: {
+  globals?: TauriGlobals;
+  invoke?: Invoke;
+} = {}): DesktopThemeStore | undefined {
+  if (!isTauriRuntime(globals)) {
+    return undefined;
+  }
+
+  return {
+    async getThemePreference() {
+      const invokeCommand = invoke ?? (await loadTauriInvoke());
+
+      return (await invokeCommand("get_theme_preference")) as string | null;
+    },
+    async setThemePreference(theme) {
+      const invokeCommand = invoke ?? (await loadTauriInvoke());
+
+      await invokeCommand("set_theme_preference", { theme });
+    },
   };
 }
 
@@ -53,5 +86,5 @@ export function isTauriRuntime(globals: TauriGlobals): boolean {
 async function loadTauriInvoke(): Promise<Invoke> {
   const { invoke } = await import("@tauri-apps/api/core");
 
-  return (command) => invoke<DesktopPoe2Paths>(command);
+  return (command, args) => invoke(command, args);
 }
