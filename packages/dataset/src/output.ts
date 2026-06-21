@@ -1,7 +1,11 @@
-import type { DatasetImportResult, DatasetPublishResult } from "./import";
+import type {
+  DatasetImportResult,
+  DatasetPublishResult,
+  DatasetR2PublishResult,
+} from "./import";
 
 export function formatDatasetCliResult(
-  result: DatasetImportResult | DatasetPublishResult,
+  result: DatasetImportResult | DatasetPublishResult | DatasetR2PublishResult,
 ) {
   return {
     league: result.league,
@@ -20,11 +24,23 @@ export function formatDatasetCliResult(
           sha256: result.sha256,
         }
       : {}),
+    ...(isDatasetR2PublishResult(result)
+      ? {
+          r2Bucket: result.r2Bucket,
+          uploadedObjects: result.uploadedObjects,
+        }
+      : {}),
   };
 }
 
 function isDatasetPublishResult(
-  result: DatasetImportResult | DatasetPublishResult,
+  result: DatasetImportResult | DatasetPublishResult | DatasetR2PublishResult,
 ): result is DatasetPublishResult {
   return "objectKey" in result;
+}
+
+function isDatasetR2PublishResult(
+  result: DatasetImportResult | DatasetPublishResult | DatasetR2PublishResult,
+): result is DatasetR2PublishResult {
+  return "r2Bucket" in result;
 }

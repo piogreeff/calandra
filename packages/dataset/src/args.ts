@@ -3,6 +3,8 @@ export type DatasetCliOptions = {
   manifestPath?: string;
   publishDirectory?: string;
   r2Prefix?: string;
+  r2Bucket?: string;
+  wranglerCommand?: string;
   expectedUniqueCount?: number;
   minimumUniqueImageCoverage?: number;
 };
@@ -23,12 +25,14 @@ export function parseDatasetCliArgs(args: string[]): DatasetCliOptions {
 
   if (!artifactPath) {
     throw new Error(
-      "Usage: pnpm dataset:import -- --artifact <path-to-published-artifact.json> [--publish-dir <dir>]",
+      "Usage: pnpm dataset:import -- --artifact <path-to-published-artifact.json> [--publish-dir <dir>] [--r2-bucket <bucket>]",
     );
   }
 
   const publishDirectory = getFlagValue(args, "--publish-dir");
   const r2Prefix = getFlagValue(args, "--r2-prefix");
+  const r2Bucket = getFlagValue(args, "--r2-bucket");
+  const wranglerCommand = getFlagValue(args, "--wrangler-command");
   const manifestPath = getFlagValue(args, "--manifest");
   const expectedUniqueCount = getOptionalNumberFlag(
     args,
@@ -44,6 +48,8 @@ export function parseDatasetCliArgs(args: string[]): DatasetCliOptions {
     ...(manifestPath ? { manifestPath } : {}),
     ...(publishDirectory ? { publishDirectory } : {}),
     ...(r2Prefix ? { r2Prefix } : {}),
+    ...(r2Bucket ? { r2Bucket } : {}),
+    ...(wranglerCommand ? { wranglerCommand } : {}),
     ...(expectedUniqueCount !== undefined ? { expectedUniqueCount } : {}),
     ...(minimumUniqueImageCoverage !== undefined
       ? { minimumUniqueImageCoverage }

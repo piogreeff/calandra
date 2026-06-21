@@ -4,8 +4,10 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 import {
+  getR2UploadCommands,
   importDatasetArtifact,
   publishDatasetArtifact,
+  publishDatasetArtifactToR2,
   validateImportOptions,
 } from "../src/import";
 
@@ -317,6 +319,116 @@ describe("dataset artifact import", () => {
       sha256: published.sha256,
       counts: { items: 1 },
     });
+  });
+
+  it("publishes an artifact and manifest to R2 with Wrangler commands", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "calandra-dataset-r2-"));
+    const artifactPath = join(directory, "source.json");
+    const publishDirectory = join(directory, "publish");
+    const commands: Array<{ command: string; args: string[] }> = [];
+
+    await writeFile(
+      artifactPath,
+      JSON.stringify({
+        league: "Dawn of the Hunt",
+        patch: "0.2.0",
+        generatedAt: "2026-06-21T00:00:00.000Z",
+        source: "published-artifact",
+        items: [],
+        uniques: [],
+        mods: [],
+        gems: [],
+        economy: [],
+        ladderBuilds: [],
+      }),
+      "utf8",
+    );
+
+    const result = await publishDatasetArtifactToR2({
+      artifactPath,
+      publishDirectory,
+      r2Bucket: "calandra-data",
+      wranglerCommand: "wrangler",
+      runCommand: async (command, args) => {
+        commands.push({ command, args });
+      },
+    });
+
+    expect(result.r2Bucket).toBe("calandra-data");
+    expect(result.uploadedObjects).toEqual([
+      "calandra-data/datasets/Dawn of the Hunt/0.2.0.json",
+      "calandra-data/datasets/Dawn of the Hunt/0.2.0.manifest.json",
+    ]);
+    expect(commands).toEqual([
+      {
+        command: "wrangler",
+        args: [
+          "r2",
+          "object",
+          "put",
+          "calandra-data/datasets/Dawn of the Hunt/0.2.0.json",
+          "--file",
+          join(publishDirectory, "datasets", "Dawn of the Hunt", "0.2.0.json"),
+          "--content-type",
+          "application/json",
+          "--remote",
+        ],
+      },
+      {
+        command: "wrangler",
+        args: [
+          "r2",
+          "object",
+          "put",
+          "calandra-data/datasets/Dawn of the Hunt/0.2.0.manifest.json",
+          "--file",
+          join(
+            publishDirectory,
+            "datasets",
+            "Dawn of the Hunt",
+            "0.2.0.manifest.json",
+          ),
+          "--content-type",
+          "application/json",
+          "--remote",
+        ],
+      },
+    ]);
+  });
+
+  it("builds R2 upload commands for the artifact and manifest", () => {
+    expect(
+      getR2UploadCommands({
+        r2Bucket: "calandra-data",
+        artifactObjectKey: "datasets/Dawn of the Hunt/0.2.0.json",
+        artifactPath: "publish/artifact.json",
+        manifestObjectKey: "datasets/Dawn of the Hunt/0.2.0.manifest.json",
+        manifestPath: "publish/manifest.json",
+      }),
+    ).toEqual([
+      [
+        "r2",
+        "object",
+        "put",
+        "calandra-data/datasets/Dawn of the Hunt/0.2.0.json",
+        "--file",
+        "publish/artifact.json",
+        "--content-type",
+        "application/json",
+        "--remote",
+      ],
+      [
+        "r2",
+        "object",
+        "put",
+        "calandra-data/datasets/Dawn of the Hunt/0.2.0.manifest.json",
+        "--file",
+        "publish/manifest.json",
+        "--content-type",
+        "application/json",
+        "--remote",
+      ],
+    ]);
   });
 
   it("rejects an artifact when the manifest checksum does not match", async () => {

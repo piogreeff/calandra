@@ -29,9 +29,10 @@ The dataset package validates maintainer-published game-data artifacts for self-
 ```bash
 pnpm dataset:import -- --artifact ./data/dawn-0.2.0.json --manifest ./data/dawn-0.2.0.manifest.json
 pnpm dataset:import -- --artifact ./data/dawn-0.2.0.json --publish-dir ./dist/datasets --expected-unique-count 200 --minimum-unique-image-coverage 0.95
+pnpm dataset:publish -- --artifact ./data/dawn-0.2.0.json --r2-bucket calandra-data --expected-unique-count 200 --minimum-unique-image-coverage 0.95
 ```
 
-That path consumes a published artifact only; self-host installs do not run scrapers. With `--manifest`, imports verify counts and SHA-256 before use. With `--publish-dir`, it writes the same `datasets/{league}/{patch}.json` layout that the Worker reads from R2 plus a sibling `datasets/{league}/{patch}.manifest.json` containing counts and a SHA-256 checksum. Maintainer publishing can pass `--expected-unique-count` and `--minimum-unique-image-coverage` to enforce the Phase 1 unique-image gate before an artifact is published. The Worker validates that manifest before serving R2-backed dataset responses.
+That path consumes a published artifact only; self-host installs do not run scrapers. With `--manifest`, imports verify counts and SHA-256 before use. With `--publish-dir`, it writes the same `datasets/{league}/{patch}.json` layout that the Worker reads from R2 plus a sibling `datasets/{league}/{patch}.manifest.json` containing counts and a SHA-256 checksum. Maintainer publishing can pass `--r2-bucket` to upload both remote R2 objects with Wrangler after validation. `--expected-unique-count` and `--minimum-unique-image-coverage` enforce the Phase 1 unique-image gate before an artifact is published. The Worker validates that manifest before serving R2-backed dataset responses.
 
 ## Using it
 

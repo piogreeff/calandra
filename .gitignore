@@ -8,6 +8,7 @@ build/
 .next/
 .next-dev/
 .open-next/
+.wrangler/
 out/
 .turbo/
 *.tsbuildinfo

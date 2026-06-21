@@ -1,5 +1,8 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
+import { spawn } from "node:child_process";
+import { createRequire } from "node:module";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import {
   datasetArtifactSchema,
@@ -7,6 +10,8 @@ import {
   type DatasetArtifact,
   type DatasetManifest,
 } from "@calandra/contract";
+
+const require = createRequire(import.meta.url);
 
 export type DatasetImportOptions = {
   artifactPath: string;
@@ -52,6 +57,26 @@ export type DatasetPublishResult = DatasetImportResult & {
   manifestPath: string;
   sha256: string;
 };
+
+export type DatasetR2PublishOptions = Omit<
+  DatasetPublishOptions,
+  "publishDirectory"
+> & {
+  r2Bucket: string;
+  publishDirectory?: string;
+  wranglerCommand?: string;
+  runCommand?: CommandRunner;
+};
+
+export type DatasetR2PublishResult = DatasetPublishResult & {
+  r2Bucket: string;
+  uploadedObjects: string[];
+};
+
+export type CommandRunner = (
+  command: string,
+  args: string[],
+) => Promise<void>;
 
 export function validateImportOptions(
   options: DatasetImportOptions,
@@ -151,6 +176,46 @@ export async function publishDatasetArtifact(
   };
 }
 
+export async function publishDatasetArtifactToR2(
+  options: DatasetR2PublishOptions,
+): Promise<DatasetR2PublishResult> {
+  if (!options.r2Bucket.trim()) {
+    throw new Error("r2Bucket is required");
+  }
+
+  const publishDirectory =
+    options.publishDirectory ??
+    (await mkdtemp(join(tmpdir(), "calandra-dataset-publish-")));
+  const result = await publishDatasetArtifact({
+    ...options,
+    publishDirectory,
+  });
+  const wranglerInvocation = getWranglerInvocation(options.wranglerCommand);
+  const runCommand = options.runCommand ?? runCommandWithInheritedOutput;
+  const uploadCommands = getR2UploadCommands({
+    r2Bucket: options.r2Bucket,
+    artifactObjectKey: result.objectKey,
+    artifactPath: result.outputPath,
+    manifestObjectKey: result.manifestKey,
+    manifestPath: result.manifestPath,
+  });
+
+  for (const command of uploadCommands) {
+    await runCommand(wranglerInvocation.command, [
+      ...wranglerInvocation.argsPrefix,
+      ...command,
+    ]);
+  }
+
+  return {
+    ...result,
+    r2Bucket: options.r2Bucket,
+    uploadedObjects: uploadCommands.map(
+      (command) => command[command.indexOf("put") + 1] ?? "",
+    ),
+  };
+}
+
 export function getDatasetObjectKey(
   league: string,
   patch: string,
@@ -165,6 +230,45 @@ export function getDatasetManifestKey(
   r2Prefix = "datasets",
 ) {
   return `${r2Prefix}/${league}/${patch}.manifest.json`;
+}
+
+export function getR2UploadCommands({
+  r2Bucket,
+  artifactObjectKey,
+  artifactPath,
+  manifestObjectKey,
+  manifestPath,
+}: {
+  r2Bucket: string;
+  artifactObjectKey: string;
+  artifactPath: string;
+  manifestObjectKey: string;
+  manifestPath: string;
+}) {
+  return [
+    [
+      "r2",
+      "object",
+      "put",
+      `${r2Bucket}/${artifactObjectKey}`,
+      "--file",
+      artifactPath,
+      "--content-type",
+      "application/json",
+      "--remote",
+    ],
+    [
+      "r2",
+      "object",
+      "put",
+      `${r2Bucket}/${manifestObjectKey}`,
+      "--file",
+      manifestPath,
+      "--content-type",
+      "application/json",
+      "--remote",
+    ],
+  ];
 }
 
 function getDatasetCounts(artifact: DatasetArtifact) {
@@ -239,4 +343,39 @@ async function readAndValidateManifest(
   }
 
   return manifest;
+}
+
+function runCommandWithInheritedOutput(command: string, args: string[]) {
+  return new Promise<void>((resolve, reject) => {
+    const child = spawn(command, args, {
+      stdio: "inherit",
+    });
+
+    child.on("error", reject);
+    child.on("exit", (code) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+
+      reject(new Error(`${command} ${args.join(" ")} failed with exit ${code}`));
+    });
+  });
+}
+
+function getWranglerInvocation(wranglerCommand: string | undefined) {
+  if (wranglerCommand) {
+    return { command: wranglerCommand, argsPrefix: [] };
+  }
+
+  return {
+    command: process.execPath,
+    argsPrefix: [
+      join(
+        dirname(require.resolve("wrangler/package.json")),
+        "bin",
+        "wrangler.js",
+      ),
+    ],
+  };
 }

@@ -6,11 +6,15 @@
   "scripts": {
     "build": "tsc --noEmit",
     "import": "tsx src/cli.ts",
+    "publish:r2": "tsx src/cli.ts",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
     "@calandra/contract": "workspace:*"
+  },
+  "devDependencies": {
+    "wrangler": "^4.103.0"
   }
 }
