@@ -36,7 +36,7 @@ packages/contract   Zod + OpenAPI — the API contract (CODEOWNERS-gated)
 packages/parser     item-text + Client.txt parsers
 packages/engine     deterministic upgrade + crafting engine (pure, no LLM)
 packages/dataset    dataset build + publish tooling
-packages/ggg-api    official GGG API client hygiene helpers
+packages/ggg-api    official GGG API hygiene helpers, including token encryption
 packages/ui         shared FlyonUI theme tokens + components
 ```
 

@@ -20,8 +20,36 @@ export const poe2StashOAuthSupport = {
     "Official Account Stashes are currently documented as PoE1 only; do not substitute session-cookie endpoints.",
 } as const;
 
+export const gggOAuthTokenEnvelopeVersion = 1;
+export const gggOAuthTokenEncryptionAlgorithm = "AES-256-GCM";
+
+const gggOAuthTokenIvBytes = 12;
+const gggOAuthTokenKeyBytes = 32;
+
 export type GggOAuthScope =
   (typeof gggOAuthScopes)[keyof typeof gggOAuthScopes];
+
+export type GggOAuthTokenSet = {
+  accessToken: string;
+  tokenType: "bearer";
+  scope: readonly string[];
+  expiresAt: string;
+  refreshToken?: string;
+  sub?: string;
+  username?: string;
+};
+
+export type EncryptedGggOAuthTokenSet = {
+  version: typeof gggOAuthTokenEnvelopeVersion;
+  algorithm: typeof gggOAuthTokenEncryptionAlgorithm;
+  iv: string;
+  ciphertext: string;
+};
+
+export type GggOAuthTokenEncryptionOptions = {
+  key: Uint8Array;
+  crypto?: CryptoProvider;
+};
 
 export type GggApiClientOptions = {
   accessToken: string;
@@ -55,6 +83,29 @@ export type GggHttpResponse = {
   };
   json(): Promise<unknown>;
   text(): Promise<string>;
+};
+
+type CryptoProvider = {
+  getRandomValues<T extends Uint8Array>(array: T): T;
+  subtle: {
+    importKey(
+      format: "raw",
+      keyData: Uint8Array,
+      algorithm: { name: "AES-GCM"; length: 256 },
+      extractable: false,
+      keyUsages: readonly ("encrypt" | "decrypt")[],
+    ): Promise<unknown>;
+    encrypt(
+      algorithm: { name: "AES-GCM"; iv: Uint8Array },
+      key: unknown,
+      data: Uint8Array,
+    ): Promise<ArrayBuffer>;
+    decrypt(
+      algorithm: { name: "AES-GCM"; iv: Uint8Array },
+      key: unknown,
+      data: Uint8Array,
+    ): Promise<ArrayBuffer>;
+  };
 };
 
 export class GggApiConfigurationError extends Error {
@@ -95,6 +146,13 @@ export class GggApiHttpError extends Error {
   }
 }
 
+export class GggOAuthTokenEncryptionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "GggOAuthTokenEncryptionError";
+  }
+}
+
 export function createGggUserAgent({
   appName = "calandra",
   version,
@@ -109,6 +167,131 @@ export function createGggUserAgent({
   const userAgent = `${appName}/${version} (+${appUrl}; ${contact})`;
   assertGggUserAgent(userAgent);
   return userAgent;
+}
+
+export async function encryptGggOAuthTokenSet(
+  tokenSet: GggOAuthTokenSet,
+  options: GggOAuthTokenEncryptionOptions,
+): Promise<EncryptedGggOAuthTokenSet> {
+  assertGggOAuthTokenEncryptionKey(options.key);
+  assertGggOAuthTokenSet(tokenSet);
+
+  const cryptoProvider = getCryptoProvider(options.crypto);
+  const iv = cryptoProvider.getRandomValues(
+    new Uint8Array(gggOAuthTokenIvBytes),
+  );
+  const key = await importGggOAuthTokenEncryptionKey(
+    cryptoProvider,
+    options.key,
+    ["encrypt"],
+  );
+  const plaintext = new TextEncoder().encode(JSON.stringify(tokenSet));
+  const ciphertext = await cryptoProvider.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    plaintext,
+  );
+
+  return {
+    version: gggOAuthTokenEnvelopeVersion,
+    algorithm: gggOAuthTokenEncryptionAlgorithm,
+    iv: base64UrlEncode(iv),
+    ciphertext: base64UrlEncode(new Uint8Array(ciphertext)),
+  };
+}
+
+export async function decryptGggOAuthTokenSet(
+  envelope: EncryptedGggOAuthTokenSet,
+  options: GggOAuthTokenEncryptionOptions,
+): Promise<GggOAuthTokenSet> {
+  assertGggOAuthTokenEncryptionKey(options.key);
+  assertGggOAuthTokenEnvelope(envelope);
+
+  const cryptoProvider = getCryptoProvider(options.crypto);
+  const key = await importGggOAuthTokenEncryptionKey(
+    cryptoProvider,
+    options.key,
+    ["decrypt"],
+  );
+
+  try {
+    const plaintext = await cryptoProvider.subtle.decrypt(
+      { name: "AES-GCM", iv: base64UrlDecode(envelope.iv) },
+      key,
+      base64UrlDecode(envelope.ciphertext),
+    );
+    const tokenSet = JSON.parse(new TextDecoder().decode(plaintext)) as unknown;
+    assertGggOAuthTokenSet(tokenSet);
+    return tokenSet;
+  } catch (error) {
+    if (error instanceof GggOAuthTokenEncryptionError) {
+      throw error;
+    }
+
+    throw new GggOAuthTokenEncryptionError(
+      "Unable to decrypt GGG OAuth token set.",
+    );
+  }
+}
+
+export function assertGggOAuthTokenEncryptionKey(key: Uint8Array): void {
+  if (key.byteLength !== gggOAuthTokenKeyBytes) {
+    throw new GggOAuthTokenEncryptionError(
+      "GGG OAuth token encryption key must be 32 bytes for AES-256-GCM.",
+    );
+  }
+}
+
+export function assertGggOAuthTokenSet(
+  value: unknown,
+): asserts value is GggOAuthTokenSet {
+  if (!isRecord(value)) {
+    throw new GggOAuthTokenEncryptionError(
+      "GGG OAuth token set must be an object.",
+    );
+  }
+
+  if (
+    typeof value.accessToken !== "string" ||
+    value.accessToken.trim().length === 0
+  ) {
+    throw new GggOAuthTokenEncryptionError(
+      "GGG OAuth token set requires an access token.",
+    );
+  }
+
+  if (value.tokenType !== "bearer") {
+    throw new GggOAuthTokenEncryptionError(
+      "GGG OAuth token set must use bearer tokens.",
+    );
+  }
+
+  if (
+    !Array.isArray(value.scope) ||
+    value.scope.some((scope) => typeof scope !== "string" || !scope.trim())
+  ) {
+    throw new GggOAuthTokenEncryptionError(
+      "GGG OAuth token set requires non-empty OAuth scopes.",
+    );
+  }
+
+  if (
+    typeof value.expiresAt !== "string" ||
+    Number.isNaN(Date.parse(value.expiresAt))
+  ) {
+    throw new GggOAuthTokenEncryptionError(
+      "GGG OAuth token set requires an ISO expiresAt timestamp.",
+    );
+  }
+
+  for (const optionalField of ["refreshToken", "sub", "username"] as const) {
+    const fieldValue = value[optionalField];
+    if (fieldValue !== undefined && typeof fieldValue !== "string") {
+      throw new GggOAuthTokenEncryptionError(
+        `GGG OAuth token set field ${optionalField} must be a string.`,
+      );
+    }
+  }
 }
 
 export function assertGggUserAgent(userAgent: string): void {
@@ -300,4 +483,94 @@ function defaultSleep(milliseconds: number) {
   return new Promise<void>((resolve) => {
     setTimeout(resolve, milliseconds);
   });
+}
+
+function getCryptoProvider(cryptoProvider?: CryptoProvider): CryptoProvider {
+  const resolvedProvider =
+    cryptoProvider ??
+    (globalThis as { crypto?: CryptoProvider | undefined }).crypto;
+
+  if (!resolvedProvider?.subtle || !resolvedProvider.getRandomValues) {
+    throw new GggOAuthTokenEncryptionError(
+      "Web Crypto is required for GGG OAuth token encryption.",
+    );
+  }
+
+  return resolvedProvider;
+}
+
+function importGggOAuthTokenEncryptionKey(
+  cryptoProvider: CryptoProvider,
+  key: Uint8Array,
+  keyUsages: readonly ("encrypt" | "decrypt")[],
+) {
+  return cryptoProvider.subtle.importKey(
+    "raw",
+    key,
+    { name: "AES-GCM", length: 256 },
+    false,
+    keyUsages,
+  );
+}
+
+function assertGggOAuthTokenEnvelope(
+  envelope: EncryptedGggOAuthTokenSet,
+): void {
+  if (
+    envelope.version !== gggOAuthTokenEnvelopeVersion ||
+    envelope.algorithm !== gggOAuthTokenEncryptionAlgorithm ||
+    !envelope.iv ||
+    !envelope.ciphertext
+  ) {
+    throw new GggOAuthTokenEncryptionError(
+      "Invalid encrypted GGG OAuth token envelope.",
+    );
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function base64UrlEncode(bytes: Uint8Array): string {
+  const encode = (globalThis as { btoa?: (value: string) => string }).btoa;
+  if (!encode) {
+    throw new GggOAuthTokenEncryptionError(
+      "base64 encoding support is required for GGG OAuth token encryption.",
+    );
+  }
+
+  return encode(bytesToBinaryString(bytes))
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replace(/=+$/, "");
+}
+
+function base64UrlDecode(value: string): Uint8Array {
+  const decode = (globalThis as { atob?: (value: string) => string }).atob;
+  if (!decode) {
+    throw new GggOAuthTokenEncryptionError(
+      "base64 decoding support is required for GGG OAuth token encryption.",
+    );
+  }
+
+  const base64 = value.replaceAll("-", "+").replaceAll("_", "/");
+  const padded = base64.padEnd(
+    base64.length + ((4 - (base64.length % 4)) % 4),
+    "=",
+  );
+  return binaryStringToBytes(decode(padded));
+}
+
+function bytesToBinaryString(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+
+  return binary;
+}
+
+function binaryStringToBytes(value: string): Uint8Array {
+  return Uint8Array.from(value, (character) => character.charCodeAt(0));
 }

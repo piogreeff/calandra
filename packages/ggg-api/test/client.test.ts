@@ -3,13 +3,17 @@ import {
   GggApiConfigurationError,
   GggApiRateLimitError,
   GggApiScopeError,
+  GggOAuthTokenEncryptionError,
   assertGggUserAgent,
   calandraPoe2CharacterScopes,
   createGggApiClient,
   createGggUserAgent,
+  decryptGggOAuthTokenSet,
+  encryptGggOAuthTokenSet,
   getRetryAfterMs,
   gggOAuthScopes,
   poe2StashOAuthSupport,
+  type GggOAuthTokenSet,
   type GggHttpResponse,
 } from "../src/index";
 
@@ -137,6 +141,76 @@ describe("GGG official API client hygiene", () => {
   });
 });
 
+describe("GGG OAuth token encryption", () => {
+  const tokenSet: GggOAuthTokenSet = {
+    accessToken: "access-token-secret",
+    refreshToken: "refresh-token-secret",
+    tokenType: "bearer",
+    scope: [gggOAuthScopes.accountCharacters],
+    expiresAt: "2026-06-21T20:00:00.000Z",
+    sub: "c5b9c286-8d05-47af-be41-67ab10a8c53e",
+    username: "CalandraAccount",
+  };
+
+  it("encrypts tokens into an envelope without plaintext secrets", async () => {
+    const envelope = await encryptGggOAuthTokenSet(tokenSet, {
+      key: encryptionKey(1),
+    });
+
+    expect(envelope).toMatchObject({
+      version: 1,
+      algorithm: "AES-256-GCM",
+    });
+    expect(envelope.iv).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(envelope.ciphertext).not.toContain(tokenSet.accessToken);
+    expect(envelope.ciphertext).not.toContain(tokenSet.refreshToken);
+
+    await expect(
+      decryptGggOAuthTokenSet(envelope, { key: encryptionKey(1) }),
+    ).resolves.toEqual(tokenSet);
+  });
+
+  it("uses a fresh IV for each token encryption", async () => {
+    const first = await encryptGggOAuthTokenSet(tokenSet, {
+      key: encryptionKey(2),
+    });
+    const second = await encryptGggOAuthTokenSet(tokenSet, {
+      key: encryptionKey(2),
+    });
+
+    expect(first.iv).not.toBe(second.iv);
+    expect(first.ciphertext).not.toBe(second.ciphertext);
+  });
+
+  it("rejects non-AES-256 key lengths", async () => {
+    await expect(
+      encryptGggOAuthTokenSet(tokenSet, { key: new Uint8Array(16) }),
+    ).rejects.toThrow(GggOAuthTokenEncryptionError);
+  });
+
+  it("rejects malformed token sets before encryption", async () => {
+    await expect(
+      encryptGggOAuthTokenSet(
+        {
+          ...tokenSet,
+          accessToken: "",
+        },
+        { key: encryptionKey(3) },
+      ),
+    ).rejects.toThrow(GggOAuthTokenEncryptionError);
+  });
+
+  it("does not decrypt with the wrong key", async () => {
+    const envelope = await encryptGggOAuthTokenSet(tokenSet, {
+      key: encryptionKey(4),
+    });
+
+    await expect(
+      decryptGggOAuthTokenSet(envelope, { key: encryptionKey(5) }),
+    ).rejects.toThrow(GggOAuthTokenEncryptionError);
+  });
+});
+
 function jsonResponse(
   status: number,
   body: unknown,
@@ -165,4 +239,8 @@ function headers(values: Record<string, string>): GggHttpResponse["headers"] {
       return normalized.get(name.toLowerCase()) ?? null;
     },
   };
+}
+
+function encryptionKey(seed: number) {
+  return Uint8Array.from({ length: 32 }, (_, index) => (seed + index) % 256);
 }
