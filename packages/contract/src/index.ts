@@ -325,10 +325,25 @@ export const buyVsCraftResponseSchema = z.object({
   estimate: craftingEstimateResponseSchema.omit({ source: true }),
 });
 
+export const datasetSourceKindSchema = z.enum([
+  "game-data",
+  "economy",
+  "ladder",
+  "image",
+]);
+
+export const datasetSourceSchema = z.object({
+  kind: datasetSourceKindSchema,
+  name: z.string().min(1),
+  url: z.string().url(),
+  attribution: z.string().min(1),
+});
+
 export const datasetArtifactSchema = z.object({
   ...versionedCollectionFields,
   generatedAt: z.string().datetime(),
   source: z.literal("published-artifact"),
+  sources: z.array(datasetSourceSchema).min(1),
   items: z.array(itemSchema),
   uniques: z.array(uniqueItemSchema),
   mods: z.array(modSchema),
@@ -351,6 +366,7 @@ export const datasetManifestSchema = z.object({
   generatedAt: z.string().datetime(),
   artifactKey: z.string().min(1),
   sha256: z.string().regex(/^[a-f0-9]{64}$/),
+  sources: z.array(datasetSourceSchema).min(1),
   counts: datasetCountsSchema,
 });
 
@@ -1443,6 +1459,19 @@ export const openApiDocument = {
           ladderBuilds: { type: "integer", minimum: 0 },
         },
       },
+      DatasetSource: {
+        type: "object",
+        required: ["kind", "name", "url", "attribution"],
+        properties: {
+          kind: {
+            type: "string",
+            enum: ["game-data", "economy", "ladder", "image"],
+          },
+          name: { type: "string", minLength: 1 },
+          url: { type: "string", format: "uri" },
+          attribution: { type: "string", minLength: 1 },
+        },
+      },
       DatasetManifest: {
         type: "object",
         required: [
@@ -1451,6 +1480,7 @@ export const openApiDocument = {
           "generatedAt",
           "artifactKey",
           "sha256",
+          "sources",
           "counts",
         ],
         properties: {
@@ -1459,6 +1489,11 @@ export const openApiDocument = {
           generatedAt: { type: "string", format: "date-time" },
           artifactKey: { type: "string", minLength: 1 },
           sha256: { type: "string", pattern: "^[a-f0-9]{64}$" },
+          sources: {
+            type: "array",
+            minItems: 1,
+            items: { $ref: "#/components/schemas/DatasetSource" },
+          },
           counts: { $ref: "#/components/schemas/DatasetCounts" },
         },
       },
@@ -1543,6 +1578,8 @@ export type AcquisitionRecommendation = z.infer<
 >;
 export type BuyVsCraftRequest = z.infer<typeof buyVsCraftRequestSchema>;
 export type BuyVsCraftResponse = z.infer<typeof buyVsCraftResponseSchema>;
+export type DatasetSourceKind = z.infer<typeof datasetSourceKindSchema>;
+export type DatasetSource = z.infer<typeof datasetSourceSchema>;
 export type DatasetArtifact = z.infer<typeof datasetArtifactSchema>;
 export type DatasetCounts = z.infer<typeof datasetCountsSchema>;
 export type DatasetManifest = z.infer<typeof datasetManifestSchema>;

@@ -1,11 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { api } from "../src/index";
 
+const datasetSources = [
+  {
+    kind: "game-data",
+    name: "poe2db.tw",
+    url: "https://poe2db.tw/",
+    attribution:
+      "Game data derived from Path of Exile 2 community references; Path of Exile 2 is property of Grinding Gear Games.",
+  },
+] as const;
+
 const r2Artifact = JSON.stringify({
   league: "Dawn of the Hunt",
   patch: "0.2.0",
   generatedAt: "2026-06-21T00:00:00.000Z",
   source: "published-artifact",
+  sources: datasetSources,
   items: [
     {
       id: "expert-siphoning-wand",
@@ -22,7 +33,7 @@ const r2Artifact = JSON.stringify({
 });
 
 const r2ArtifactSha256 =
-  "f9a02504025955ed0a2352e142921ab4909596ee6b69809837b44d94abe636d0";
+  "33272bd5d8c37deda60f5681e28372a400d207636abdacfbd1e07f2f359bfff8";
 
 describe("api routes", () => {
   const datasetEnv = {
@@ -32,6 +43,7 @@ describe("api routes", () => {
       patch: "0.2.0",
       generatedAt: "2026-06-21T00:00:00.000Z",
       source: "published-artifact",
+      sources: datasetSources,
       items: [
         {
           id: "advanced-altar-robe",
@@ -355,6 +367,7 @@ describe("api routes", () => {
       patch: "0.2.0",
       generatedAt: "2026-06-21T00:00:00.000Z",
       artifactKey: "DATASET_ARTIFACT_JSON",
+      sources: datasetSources,
       counts: {
         items: 1,
         uniques: 1,
@@ -365,6 +378,48 @@ describe("api routes", () => {
       },
     });
     expect(body.sha256).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it("returns dataset source attribution from the manifest endpoint", async () => {
+    const sources = [
+      {
+        kind: "game-data",
+        name: "poe2db.tw",
+        url: "https://poe2db.tw/",
+        attribution:
+          "Game data derived from Path of Exile 2 community references; Path of Exile 2 is property of Grinding Gear Games.",
+      },
+      {
+        kind: "image",
+        name: "Grinding Gear Games CDN",
+        url: "https://web.poecdn.com/",
+        attribution:
+          "Item art is property of Grinding Gear Games and is cached for attribution-preserving display.",
+      },
+    ];
+    const response = await api.request(
+      "/datasets/manifest?league=Dawn%20of%20the%20Hunt&patch=0.2.0",
+      undefined,
+      {
+        APP_URL: "https://calandra.pages.dev",
+        DATASET_ARTIFACT_JSON: JSON.stringify({
+          league: "Dawn of the Hunt",
+          patch: "0.2.0",
+          generatedAt: "2026-06-21T00:00:00.000Z",
+          source: "published-artifact",
+          sources,
+          items: [],
+          uniques: [],
+          mods: [],
+          gems: [],
+          economy: [],
+          ladderBuilds: [],
+        }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ sources });
   });
 
   it("returns one item from the configured dataset artifact", async () => {
@@ -412,6 +467,7 @@ describe("api routes", () => {
                     generatedAt: "2026-06-21T00:00:00.000Z",
                     artifactKey: "datasets/Dawn of the Hunt/0.2.0.json",
                     sha256: r2ArtifactSha256,
+                    sources: datasetSources,
                     counts: {
                       items: 1,
                       uniques: 0,
@@ -465,6 +521,7 @@ describe("api routes", () => {
                       generatedAt: "2026-06-21T00:00:00.000Z",
                       artifactKey: "datasets/Dawn of the Hunt/0.2.0.json",
                       sha256: r2ArtifactSha256,
+                      sources: datasetSources,
                       counts: {
                         items: 1,
                         uniques: 0,
@@ -489,6 +546,7 @@ describe("api routes", () => {
       generatedAt: "2026-06-21T00:00:00.000Z",
       artifactKey: "datasets/Dawn of the Hunt/0.2.0.json",
       sha256: r2ArtifactSha256,
+      sources: datasetSources,
       counts: {
         items: 1,
         uniques: 0,
@@ -518,6 +576,7 @@ describe("api routes", () => {
                       generatedAt: "2026-06-21T00:00:00.000Z",
                       artifactKey: "datasets/Dawn of the Hunt/0.2.0.json",
                       sha256: "0".repeat(64),
+                      sources: datasetSources,
                       counts: {
                         items: 1,
                         uniques: 0,

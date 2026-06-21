@@ -11,6 +11,16 @@ import {
   validateImportOptions,
 } from "../src/import";
 
+const datasetSources = [
+  {
+    kind: "game-data",
+    name: "poe2db.tw",
+    url: "https://poe2db.tw/",
+    attribution:
+      "Game data derived from Path of Exile 2 community references; Path of Exile 2 is property of Grinding Gear Games.",
+  },
+] as const;
+
 describe("dataset artifact import", () => {
   it("loads a published artifact without scraper configuration", async () => {
     const directory = await mkdtemp(join(tmpdir(), "calandra-dataset-"));
@@ -23,6 +33,7 @@ describe("dataset artifact import", () => {
         patch: "0.2.0",
         generatedAt: "2026-06-21T00:00:00.000Z",
         source: "published-artifact",
+        sources: datasetSources,
         items: [
           {
             id: "advanced-altar-robe",
@@ -127,6 +138,7 @@ describe("dataset artifact import", () => {
         patch: "0.2.0",
         generatedAt: "2026-06-21T00:00:00.000Z",
         source: "published-artifact",
+        sources: datasetSources,
         items: [],
         uniques: [],
         mods: [],
@@ -165,6 +177,7 @@ describe("dataset artifact import", () => {
         patch: "0.2.0",
         generatedAt: "2026-06-21T00:00:00.000Z",
         source: "published-artifact",
+        sources: datasetSources,
         items: [],
         uniques: makeUniques(19),
         mods: [],
@@ -202,6 +215,7 @@ describe("dataset artifact import", () => {
         patch: "0.2.0",
         generatedAt: "2026-06-21T00:00:00.000Z",
         source: "published-artifact",
+        sources: datasetSources,
         items: [],
         uniques: makeUniques(18),
         mods: [],
@@ -235,6 +249,7 @@ describe("dataset artifact import", () => {
         patch: "0.2.0",
         generatedAt: "2026-06-21T00:00:00.000Z",
         source: "published-artifact",
+        sources: datasetSources,
         items: [
           {
             id: "expert-siphoning-wand",
@@ -304,6 +319,59 @@ describe("dataset artifact import", () => {
     );
   });
 
+  it("preserves source attribution in published artifacts and manifests", async () => {
+    const directory = await mkdtemp(
+      join(tmpdir(), "calandra-dataset-provenance-"),
+    );
+    const artifactPath = join(directory, "source.json");
+    const publishDirectory = join(directory, "publish");
+    const sources = [
+      {
+        kind: "game-data",
+        name: "poe2db.tw",
+        url: "https://poe2db.tw/",
+        attribution:
+          "Game data derived from Path of Exile 2 community references; Path of Exile 2 is property of Grinding Gear Games.",
+      },
+      {
+        kind: "economy",
+        name: "poe.ninja",
+        url: "https://poe.ninja/poe2",
+        attribution:
+          "Economy prices are derived from poe.ninja's Path of Exile 2 economy dataset.",
+      },
+    ];
+
+    await writeFile(
+      artifactPath,
+      JSON.stringify({
+        league: "Dawn of the Hunt",
+        patch: "0.2.0",
+        generatedAt: "2026-06-21T00:00:00.000Z",
+        source: "published-artifact",
+        sources,
+        items: [],
+        uniques: [],
+        mods: [],
+        gems: [],
+        economy: [],
+        ladderBuilds: [],
+      }),
+      "utf8",
+    );
+
+    const result = await publishDatasetArtifact({
+      artifactPath,
+      publishDirectory,
+    });
+    const published = JSON.parse(await readFile(result.outputPath, "utf8"));
+    const manifest = JSON.parse(await readFile(result.manifestPath, "utf8"));
+
+    expect(result.artifact.sources).toEqual(sources);
+    expect(published.sources).toEqual(sources);
+    expect(manifest.sources).toEqual(sources);
+  });
+
   it("validates a published artifact against its manifest during import", async () => {
     const directory = await mkdtemp(
       join(tmpdir(), "calandra-dataset-verified-"),
@@ -318,6 +386,7 @@ describe("dataset artifact import", () => {
         patch: "0.2.0",
         generatedAt: "2026-06-21T00:00:00.000Z",
         source: "published-artifact",
+        sources: datasetSources,
         items: [
           {
             id: "expert-siphoning-wand",
@@ -347,6 +416,7 @@ describe("dataset artifact import", () => {
     expect(imported.manifest).toMatchObject({
       artifactKey: "datasets/Dawn of the Hunt/0.2.0.json",
       sha256: published.sha256,
+      sources: datasetSources,
       counts: { items: 1 },
     });
   });
@@ -364,6 +434,7 @@ describe("dataset artifact import", () => {
         patch: "0.2.0",
         generatedAt: "2026-06-21T00:00:00.000Z",
         source: "published-artifact",
+        sources: datasetSources,
         items: [],
         uniques: [],
         mods: [],
@@ -475,6 +546,7 @@ describe("dataset artifact import", () => {
         patch: "0.2.0",
         generatedAt: "2026-06-21T00:00:00.000Z",
         source: "published-artifact",
+        sources: datasetSources,
         items: [],
         uniques: [],
         mods: [],
@@ -492,6 +564,7 @@ describe("dataset artifact import", () => {
         generatedAt: "2026-06-21T00:00:00.000Z",
         artifactKey: "datasets/Dawn of the Hunt/0.2.0.json",
         sha256: "0".repeat(64),
+        sources: datasetSources,
         counts: {
           items: 0,
           uniques: 0,

@@ -158,6 +158,7 @@ export async function publishDatasetArtifact(
         generatedAt: result.generatedAt,
         artifactKey: objectKey,
         sha256,
+        sources: result.artifact.sources,
         counts: result.counts,
       },
       null,
@@ -336,6 +337,10 @@ async function readAndValidateManifest(
     manifest.generatedAt !== artifact.generatedAt
   ) {
     throw new Error("Dataset manifest version mismatch");
+  }
+
+  if (JSON.stringify(manifest.sources) !== JSON.stringify(artifact.sources)) {
+    throw new Error("Dataset manifest source attribution mismatch");
   }
 
   if (JSON.stringify(manifest.counts) !== JSON.stringify(counts)) {

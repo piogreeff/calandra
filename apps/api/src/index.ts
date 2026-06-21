@@ -701,6 +701,12 @@ async function validateDatasetManifest({
     );
   }
 
+  if (JSON.stringify(manifest.sources) !== JSON.stringify(artifact.sources)) {
+    throw new DatasetManifestValidationError(
+      "Dataset manifest source attribution mismatch",
+    );
+  }
+
   const counts = getDatasetCounts(artifact);
 
   if (JSON.stringify(manifest.counts) !== JSON.stringify(counts)) {
@@ -723,6 +729,7 @@ async function buildInlineDatasetManifest({
     generatedAt: artifact.generatedAt,
     artifactKey: "DATASET_ARTIFACT_JSON",
     sha256: await sha256Hex(artifactRaw),
+    sources: artifact.sources,
     counts: getDatasetCounts(artifact),
   };
 }

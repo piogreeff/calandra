@@ -5,6 +5,16 @@ import {
   getDashboardSnapshots,
 } from "../src/lib/read-api";
 
+const datasetSources = [
+  {
+    kind: "game-data",
+    name: "poe2db.tw",
+    url: "https://poe2db.tw/",
+    attribution:
+      "Game data derived from Path of Exile 2 community references; Path of Exile 2 is property of Grinding Gear Games.",
+  },
+] as const;
+
 describe("dashboard read API client", () => {
   it("loads dashboard data from the typed read API", async () => {
     const fetchImplementation = vi.fn(async (input: RequestInfo | URL) => {
@@ -51,6 +61,7 @@ describe("dashboard read API client", () => {
           artifactKey: "datasets/Dawn of the Hunt/0.2.0.json",
           sha256:
             "9aaa78cdba510700b430fad2090832dbf9d6b9a9408ef27a1beb110ff5a171af",
+          sources: datasetSources,
           counts: {
             items: 1,
             uniques: 1,

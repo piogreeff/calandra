@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
+import { type DatasetSource } from "@calandra/contract";
 import { formatDatasetCliResult } from "../src/output";
+
+const datasetSources: DatasetSource[] = [
+  {
+    kind: "game-data",
+    name: "poe2db.tw",
+    url: "https://poe2db.tw/",
+    attribution:
+      "Game data derived from Path of Exile 2 community references; Path of Exile 2 is property of Grinding Gear Games.",
+  },
+];
 
 describe("dataset CLI output", () => {
   it("includes publish manifest fields when present", () => {
@@ -21,6 +32,7 @@ describe("dataset CLI output", () => {
           patch: "0.2.0",
           generatedAt: "2026-06-21T00:00:00.000Z",
           source: "published-artifact",
+          sources: datasetSources,
           items: [],
           uniques: [],
           mods: [],
@@ -61,6 +73,7 @@ describe("dataset CLI output", () => {
           patch: "0.2.0",
           generatedAt: "2026-06-21T00:00:00.000Z",
           source: "published-artifact",
+          sources: datasetSources,
           items: [],
           uniques: [],
           mods: [],
@@ -104,6 +117,7 @@ describe("dataset CLI output", () => {
           patch: "0.2.0",
           generatedAt: "2026-06-21T00:00:00.000Z",
           source: "published-artifact",
+          sources: datasetSources,
           items: [],
           uniques: [],
           mods: [],

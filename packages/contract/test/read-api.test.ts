@@ -24,6 +24,16 @@ import {
   uniqueCollectionSchema,
 } from "../src/index";
 
+const datasetSources = [
+  {
+    kind: "game-data",
+    name: "poe2db.tw",
+    url: "https://poe2db.tw/",
+    attribution:
+      "Game data derived from Path of Exile 2 community references; Path of Exile 2 is property of Grinding Gear Games.",
+  },
+] as const;
+
 describe("phase 1 read API contract", () => {
   it("models a published dataset artifact keyed by league and patch", () => {
     const artifact = datasetArtifactSchema.parse({
@@ -31,6 +41,7 @@ describe("phase 1 read API contract", () => {
       patch: "0.2.0",
       generatedAt: "2026-06-21T00:00:00.000Z",
       source: "published-artifact",
+      sources: datasetSources,
       items: [],
       uniques: [],
       mods: [],
@@ -58,6 +69,55 @@ describe("phase 1 read API contract", () => {
     ).toThrow();
   });
 
+  it("requires published dataset artifacts to carry source attribution", () => {
+    expect(() =>
+      datasetArtifactSchema.parse({
+        league: "Dawn of the Hunt",
+        patch: "0.2.0",
+        generatedAt: "2026-06-21T00:00:00.000Z",
+        source: "published-artifact",
+        items: [],
+        uniques: [],
+        mods: [],
+        gems: [],
+        economy: [],
+        ladderBuilds: [],
+      }),
+    ).toThrow();
+
+    const artifact = datasetArtifactSchema.parse({
+      league: "Dawn of the Hunt",
+      patch: "0.2.0",
+      generatedAt: "2026-06-21T00:00:00.000Z",
+      source: "published-artifact",
+      sources: [
+        {
+          kind: "game-data",
+          name: "poe2db.tw",
+          url: "https://poe2db.tw/",
+          attribution:
+            "Game data derived from Path of Exile 2 community references; Path of Exile 2 is property of Grinding Gear Games.",
+        },
+        {
+          kind: "image",
+          name: "Grinding Gear Games CDN",
+          url: "https://web.poecdn.com/",
+          attribution:
+            "Item art is property of Grinding Gear Games and is cached for attribution-preserving display.",
+        },
+      ],
+      items: [],
+      uniques: [],
+      mods: [],
+      gems: [],
+      economy: [],
+      ladderBuilds: [],
+    });
+
+    expect(artifact.sources).toHaveLength(2);
+    expect(artifact.sources[0]?.kind).toBe("game-data");
+  });
+
   it("models a published dataset manifest with counts and checksum", () => {
     const manifest = datasetManifestSchema.parse({
       league: "Dawn of the Hunt",
@@ -66,6 +126,15 @@ describe("phase 1 read API contract", () => {
       artifactKey: "datasets/Dawn of the Hunt/0.2.0.json",
       sha256:
         "f9a02504025955ed0a2352e142921ab4909596ee6b69809837b44d94abe636d0",
+      sources: [
+        {
+          kind: "economy",
+          name: "poe.ninja",
+          url: "https://poe.ninja/poe2",
+          attribution:
+            "Economy prices are derived from poe.ninja's Path of Exile 2 economy dataset.",
+        },
+      ],
       counts: {
         items: 1,
         uniques: 0,
@@ -77,6 +146,7 @@ describe("phase 1 read API contract", () => {
     });
 
     expect(manifest.artifactKey).toBe("datasets/Dawn of the Hunt/0.2.0.json");
+    expect(manifest.sources[0]?.name).toBe("poe.ninja");
   });
 
   it("keeps unique image attribution explicit without bundling assets", () => {

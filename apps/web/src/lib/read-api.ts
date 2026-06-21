@@ -88,6 +88,15 @@ const fallbackDataset: DashboardDataset = {
     generatedAt: "2026-06-21T13:15:00.000Z",
     artifactKey: "fallback/demo-dataset.json",
     sha256: "0".repeat(64),
+    sources: [
+      {
+        kind: "game-data",
+        name: "Calandra demo dataset",
+        url: "https://calandra.pages.dev",
+        attribution:
+          "Fallback demo rows are synthetic and do not bundle Path of Exile 2 game data or art.",
+      },
+    ],
     counts: {
       items: 2,
       uniques: 1,
