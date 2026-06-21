@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { getDashboardDataset } from "../src/lib/read-api";
+import {
+  getDashboardDataset,
+  getDashboardSnapshots,
+} from "../src/lib/read-api";
 
 describe("dashboard read API client", () => {
   it("loads dashboard data from the typed read API", async () => {
@@ -98,5 +101,52 @@ describe("dashboard read API client", () => {
     expect(dataset.items.length).toBeGreaterThan(0);
     expect(dataset.prices.length).toBeGreaterThan(0);
     expect(dataset.manifest.artifactKey).toBe("fallback/demo-dataset.json");
+  });
+
+  it("loads account snapshot restore metadata from the typed API", async () => {
+    const fetchImplementation = vi.fn(async () =>
+      Response.json({
+        source: "snapshot-store",
+        account: "example",
+        snapshots: [
+          {
+            account: "example",
+            snapshotId: "snapshot-2026-06-21T10-00-00Z",
+            objectKey: "snapshots/example/snapshot-2026-06-21T10-00-00Z.json",
+            uploadedAt: "2026-06-21T10:01:00.000Z",
+            size: 512,
+          },
+        ],
+      }),
+    );
+
+    const snapshots = await getDashboardSnapshots(
+      "example",
+      "https://calandra-api.piogreeff.workers.dev",
+      fetchImplementation,
+    );
+
+    expect(fetchImplementation).toHaveBeenCalledWith(
+      "https://calandra-api.piogreeff.workers.dev/snapshots/example",
+    );
+    expect(snapshots.source).toBe("api");
+    expect(snapshots.account).toBe("example");
+    expect(snapshots.snapshots[0]?.snapshotId).toBe(
+      "snapshot-2026-06-21T10-00-00Z",
+    );
+  });
+
+  it("falls back to empty snapshot restore metadata when the API is unavailable", async () => {
+    const snapshots = await getDashboardSnapshots(
+      "example",
+      "https://calandra-api.piogreeff.workers.dev",
+      vi.fn(async () => new Response(null, { status: 503 })),
+    );
+
+    expect(snapshots).toEqual({
+      source: "fallback",
+      account: "example",
+      snapshots: [],
+    });
   });
 });

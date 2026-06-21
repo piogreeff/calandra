@@ -22,6 +22,9 @@ describe("home dashboard", () => {
     expect(html).toContain("Published R2 artifact");
     expect(html).toContain("Dataset manifest");
     expect(html).toContain("9aaa78cdba51");
+    expect(html).toContain("Snapshot restore");
+    expect(html).toContain("snapshot-2026-06-21T10-00-00Z");
+    expect(html).toContain("512 B");
   });
 });
 
@@ -83,6 +86,22 @@ function mockDashboardFetch() {
           economy: 1,
           ladderBuilds: 0,
         },
+      });
+    }
+
+    if (url.includes("/snapshots/example")) {
+      return Response.json({
+        source: "snapshot-store",
+        account: "example",
+        snapshots: [
+          {
+            account: "example",
+            snapshotId: "snapshot-2026-06-21T10-00-00Z",
+            objectKey: "snapshots/example/snapshot-2026-06-21T10-00-00Z.json",
+            uploadedAt: "2026-06-21T10:01:00.000Z",
+            size: 512,
+          },
+        ],
       });
     }
 

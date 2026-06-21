@@ -1,8 +1,10 @@
 import {
+  accountSnapshotListResponseSchema,
   datasetManifestSchema,
   economyCollectionSchema,
   itemCollectionSchema,
   uniqueCollectionSchema,
+  type AccountSnapshotListItem,
   type DatasetManifest,
   type EconomyPrice,
   type Item,
@@ -23,6 +25,12 @@ export type DashboardDataset = {
   items: Array<Item | UniqueItem>;
   prices: EconomyPrice[];
   manifest: DatasetManifest;
+};
+
+export type DashboardSnapshots = {
+  source: "api" | "fallback";
+  account: string;
+  snapshots: AccountSnapshotListItem[];
 };
 
 const fallbackDataset: DashboardDataset = {
@@ -81,6 +89,14 @@ const fallbackDataset: DashboardDataset = {
   },
 };
 
+function fallbackSnapshots(account: string): DashboardSnapshots {
+  return {
+    source: "fallback",
+    account,
+    snapshots: [],
+  };
+}
+
 export async function getDashboardDataset(
   apiBaseUrl = defaultApiBaseUrl,
   fetchImplementation: typeof fetch = fetch,
@@ -121,6 +137,30 @@ export async function getDashboardDataset(
     };
   } catch {
     return fallbackDataset;
+  }
+}
+
+export async function getDashboardSnapshots(
+  account: string,
+  apiBaseUrl = defaultApiBaseUrl,
+  fetchImplementation: typeof fetch = fetch,
+): Promise<DashboardSnapshots> {
+  try {
+    const snapshotList = accountSnapshotListResponseSchema.parse(
+      await fetchJson(
+        fetchImplementation,
+        `${apiBaseUrl}/snapshots/${encodeURIComponent(account)}`,
+        (value) => value,
+      ),
+    );
+
+    return {
+      source: "api",
+      account: snapshotList.account,
+      snapshots: snapshotList.snapshots,
+    };
+  } catch {
+    return fallbackSnapshots(account);
   }
 }
 

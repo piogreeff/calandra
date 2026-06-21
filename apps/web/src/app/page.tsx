@@ -8,6 +8,7 @@ import {
   Hammer,
   History,
   KeyRound,
+  RotateCcw,
   Search,
   Settings,
   ShieldCheck,
@@ -22,6 +23,7 @@ import {
   dashboardDatasetVersion,
   defaultApiBaseUrl,
   getDashboardDataset,
+  getDashboardSnapshots,
 } from "../lib/read-api";
 
 const navItems = [
@@ -77,15 +79,22 @@ const advisorPreview = {
 } satisfies UpgradeAdvisorResponse;
 
 export default async function Home() {
-  const dataset = await getDashboardDataset();
+  const [dataset, snapshotList] = await Promise.all([
+    getDashboardDataset(),
+    getDashboardSnapshots("example"),
+  ]);
   const endpointLabel = new URL(defaultApiBaseUrl).hostname;
   const datasetSource =
     dataset.source === "api" ? "Published R2 artifact" : "Demo fallback";
+  const snapshotSource =
+    snapshotList.source === "api" ? "Snapshot store" : "Awaiting first sync";
   const totalDatasetRecords = Object.values(dataset.manifest.counts).reduce(
     (sum, count) => sum + count,
     0,
   );
   const shortChecksum = dataset.manifest.sha256.slice(0, 12);
+  const latestSnapshot =
+    snapshotList.snapshots[snapshotList.snapshots.length - 1];
 
   return (
     <main className="min-h-screen">
@@ -280,17 +289,17 @@ export default async function Home() {
                 >
                   <div className="space-y-3">
                     {dataset.prices.map((price) => (
-                        <div
-                          key={price.id}
-                          className="flex items-center justify-between border-b border-base-300/60 pb-3 last:border-0 last:pb-0"
-                        >
-                          <span className="text-sm text-base-content/70">
-                            {price.name}
-                          </span>
-                          <span className="font-semibold text-base-content">
-                            {price.chaosEquivalent}
-                          </span>
-                        </div>
+                      <div
+                        key={price.id}
+                        className="flex items-center justify-between border-b border-base-300/60 pb-3 last:border-0 last:pb-0"
+                      >
+                        <span className="text-sm text-base-content/70">
+                          {price.name}
+                        </span>
+                        <span className="font-semibold text-base-content">
+                          {price.chaosEquivalent}
+                        </span>
+                      </div>
                     ))}
                   </div>
                 </Panel>
@@ -344,6 +353,56 @@ export default async function Home() {
                     </article>
                   ))}
                 </div>
+              </Panel>
+
+              <Panel
+                title="Snapshot restore"
+                icon={<History className="size-4" aria-hidden="true" />}
+              >
+                <div className="mb-3 flex items-center justify-between gap-3 rounded-md border border-base-300/70 bg-base-100/45 p-3">
+                  <span className="text-sm text-base-content/65">
+                    {snapshotSource}
+                  </span>
+                  <span className="rounded-md bg-base-300/70 px-2 py-1 text-xs font-semibold text-base-content">
+                    {snapshotList.snapshots.length}
+                  </span>
+                </div>
+                {latestSnapshot ? (
+                  <article className="rounded-md border border-base-300/70 bg-base-100/45 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs uppercase text-base-content/55">
+                          {snapshotList.account}
+                        </p>
+                        <h3 className="mt-1 break-all text-sm font-semibold text-base-content">
+                          {latestSnapshot.snapshotId}
+                        </h3>
+                      </div>
+                      <RotateCcw
+                        className="size-4 shrink-0 text-primary"
+                        aria-hidden="true"
+                      />
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                      <div className="rounded-md bg-base-200/80 p-2">
+                        <p className="text-xs text-base-content/55">Uploaded</p>
+                        <p className="truncate font-medium text-base-content">
+                          {formatSnapshotTimestamp(latestSnapshot.uploadedAt)}
+                        </p>
+                      </div>
+                      <div className="rounded-md bg-base-200/80 p-2">
+                        <p className="text-xs text-base-content/55">Size</p>
+                        <p className="font-medium text-base-content">
+                          {formatBytes(latestSnapshot.size)}
+                        </p>
+                      </div>
+                    </div>
+                  </article>
+                ) : (
+                  <p className="rounded-md border border-base-300/70 bg-base-100/45 p-3 text-sm text-base-content/70">
+                    No account snapshots stored yet.
+                  </p>
+                )}
               </Panel>
 
               <Panel
@@ -406,6 +465,26 @@ function formatCategory(category: string) {
     .split("-")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function formatSnapshotTimestamp(value: string | undefined) {
+  if (!value) {
+    return "Pending";
+  }
+
+  return value.replace("T", " ").replace(".000Z", "Z");
+}
+
+function formatBytes(value: number | undefined) {
+  if (value === undefined) {
+    return "Unknown";
+  }
+
+  if (value < 1024) {
+    return `${value} B`;
+  }
+
+  return `${(value / 1024).toFixed(1)} KB`;
 }
 
 function Panel({
