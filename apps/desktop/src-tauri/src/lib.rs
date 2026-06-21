@@ -17,6 +17,13 @@ pub struct BuildFileWritePlan {
     pub content: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClientLogAppendResult {
+    pub cursor_offset: usize,
+    pub content: String,
+}
+
 #[derive(Debug, Default, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct DesktopSettings {
@@ -59,6 +66,14 @@ fn write_build_file(
     )
 }
 
+#[tauri::command]
+fn read_client_log_append(
+    client_log_path: String,
+    offset: usize,
+) -> Result<ClientLogAppendResult, String> {
+    read_client_log_append_from_path(client_log_path, offset)
+}
+
 pub fn resolve_default_poe2_paths(home_directory: impl AsRef<Path>) -> Poe2Paths {
     let game_directory = home_directory
         .as_ref()
@@ -81,6 +96,7 @@ pub fn run() {
             get_default_poe2_paths,
             get_theme_preference,
             set_theme_preference,
+            read_client_log_append,
             write_build_file
         ])
         .run(tauri::generate_context!())
@@ -135,6 +151,31 @@ fn read_desktop_settings(path: &Path) -> Result<DesktopSettings, String> {
 
     serde_json::from_str(&contents)
         .map_err(|error| format!("Unable to parse desktop settings: {error}"))
+}
+
+fn read_client_log_append_from_path(
+    client_log_path: String,
+    offset: usize,
+) -> Result<ClientLogAppendResult, String> {
+    let path = PathBuf::from(client_log_path);
+    if !is_poe2_client_txt_path(&path) {
+        return Err("Client.txt read path must be the PoE2 Client.txt file".to_string());
+    }
+
+    let content = std::fs::read_to_string(&path)
+        .map_err(|error| format!("Unable to read Client.txt: {error}"))?;
+    let starting_offset = if offset <= content.len() && content.is_char_boundary(offset) {
+        offset
+    } else {
+        0
+    };
+    let appended_content = &content[starting_offset..];
+    let complete_length = complete_line_length(appended_content);
+
+    Ok(ClientLogAppendResult {
+        cursor_offset: starting_offset + complete_length,
+        content: appended_content[..complete_length].to_string(),
+    })
 }
 
 fn write_build_file_to_path(
@@ -211,13 +252,33 @@ fn normalize_build_file_name(file_name: &str) -> Result<String, String> {
 }
 
 fn is_build_planner_directory(path: &Path) -> bool {
+    path_has_suffix(path, &["path of exile 2", "buildplanner"])
+}
+
+fn is_poe2_client_txt_path(path: &Path) -> bool {
+    path_has_suffix(path, &["path of exile 2", "client.txt"])
+}
+
+fn path_has_suffix(path: &Path, suffix: &[&str]) -> bool {
     let components = path
         .components()
         .filter_map(|component| component.as_os_str().to_str())
         .map(|component| component.to_ascii_lowercase())
         .collect::<Vec<_>>();
 
-    components.ends_with(&["path of exile 2".to_string(), "buildplanner".to_string()])
+    components.ends_with(
+        &suffix
+            .iter()
+            .map(|component| component.to_string())
+            .collect::<Vec<_>>(),
+    )
+}
+
+fn complete_line_length(content: &str) -> usize {
+    content
+        .rfind('\n')
+        .map(|last_newline_index| last_newline_index + 1)
+        .unwrap_or(0)
 }
 
 fn path_to_string(path: PathBuf) -> String {
@@ -361,6 +422,66 @@ mod tests {
         );
 
         let _ = std::fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    #[test]
+    fn reads_only_complete_appended_client_log_content() {
+        let path = unique_settings_path("client-log-append")
+            .parent()
+            .unwrap()
+            .join("Path of Exile 2")
+            .join("Client.txt");
+        let before =
+            "2026/06/21 13:52:10 12345678 abc [INFO Client 1234] : You have entered Clearfell.\n";
+        let complete =
+            "2026/06/21 13:52:11 12345679 abc [INFO Client 1234] : You have entered The Riverbank.\n";
+        let partial = "2026/06/21 13:52:12 12345680 abc [INFO Client 1234] : You have entered ";
+
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, format!("{before}{complete}{partial}")).unwrap();
+
+        let result =
+            read_client_log_append_from_path(path_to_string(path.clone()), before.len()).unwrap();
+
+        assert_eq!(result.cursor_offset, before.len() + complete.len());
+        assert_eq!(result.content, complete);
+
+        let _ = std::fs::remove_dir_all(path.parent().unwrap().parent().unwrap());
+    }
+
+    #[test]
+    fn resets_client_log_cursor_after_truncation() {
+        let path = unique_settings_path("client-log-rotated")
+            .parent()
+            .unwrap()
+            .join("Path of Exile 2")
+            .join("Client.txt");
+        let content =
+            "2026/06/21 13:52:11 12345679 abc [INFO Client 1234] : You have entered The Riverbank.\n";
+
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, content).unwrap();
+
+        let result = read_client_log_append_from_path(path_to_string(path.clone()), 200).unwrap();
+
+        assert_eq!(result.cursor_offset, content.len());
+        assert_eq!(result.content, content);
+
+        let _ = std::fs::remove_dir_all(path.parent().unwrap().parent().unwrap());
+    }
+
+    #[test]
+    fn rejects_client_log_reads_outside_poe2_client_txt() {
+        let error = read_client_log_append_from_path(
+            r"C:\Users\Pio\Documents\secret\Client.txt".to_string(),
+            0,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            "Client.txt read path must be the PoE2 Client.txt file"
+        );
     }
 
     fn unique_settings_path(name: &str) -> PathBuf {

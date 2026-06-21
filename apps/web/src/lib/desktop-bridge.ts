@@ -33,6 +33,16 @@ export type DesktopBuildFileWritePlan = {
   content: string;
 };
 
+export type DesktopClientLogAppendRequest = {
+  clientLogPath: string;
+  offset: number;
+};
+
+export type DesktopClientLogAppendResult = {
+  cursorOffset: number;
+  content: string;
+};
+
 type TauriGlobals = {
   __TAURI__?: unknown;
   __TAURI_INTERNALS__?: unknown;
@@ -110,6 +120,28 @@ export async function writeDesktopBuildFile(
     "write_build_file",
     request,
   )) as DesktopBuildFileWritePlan;
+}
+
+export async function readDesktopClientLogAppend(
+  request: DesktopClientLogAppendRequest,
+  {
+    globals = globalThis as TauriGlobals,
+    invoke,
+  }: {
+    globals?: TauriGlobals;
+    invoke?: Invoke;
+  } = {},
+): Promise<DesktopClientLogAppendResult> {
+  if (!isTauriRuntime(globals)) {
+    throw new Error("Client.txt reads require the Calandra desktop shell");
+  }
+
+  const invokeCommand = invoke ?? (await loadTauriInvoke());
+
+  return (await invokeCommand(
+    "read_client_log_append",
+    request,
+  )) as DesktopClientLogAppendResult;
 }
 
 export function isTauriRuntime(globals: TauriGlobals): boolean {

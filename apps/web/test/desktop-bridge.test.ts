@@ -3,6 +3,7 @@ import {
   createDesktopThemeStore,
   getDesktopPoe2Paths,
   isTauriRuntime,
+  readDesktopClientLogAppend,
   writeDesktopBuildFile,
 } from "../src/lib/desktop-bridge";
 
@@ -128,6 +129,37 @@ describe("desktop bridge", () => {
         },
       ),
     ).rejects.toThrow(".build export requires the Calandra desktop shell");
+  });
+
+  it("reads appended Client.txt content through the Tauri desktop command", async () => {
+    const invoke = vi.fn(async () => ({
+      cursorOffset: 91,
+      content:
+        "2026/06/21 13:52:11 12345679 abc [INFO Client 1234] : You have entered The Riverbank.\n",
+    }));
+
+    await expect(
+      readDesktopClientLogAppend(
+        {
+          clientLogPath:
+            "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2\\Client.txt",
+          offset: 0,
+        },
+        {
+          globals: { __TAURI_INTERNALS__: {} },
+          invoke,
+        },
+      ),
+    ).resolves.toMatchObject({
+      cursorOffset: 91,
+      content:
+        "2026/06/21 13:52:11 12345679 abc [INFO Client 1234] : You have entered The Riverbank.\n",
+    });
+    expect(invoke).toHaveBeenCalledWith("read_client_log_append", {
+      clientLogPath:
+        "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2\\Client.txt",
+      offset: 0,
+    });
   });
 
   it("detects both Tauri runtime global shapes", () => {
