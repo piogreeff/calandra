@@ -1,14 +1,19 @@
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { win32 } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   BuildFileWriteRejectedError,
   ClipboardCaptureRejectedError,
   LocalBackupRejectedError,
   captureClipboardItemText,
+  copyLocalConfigBackup,
   createInitialClientLogCursor,
   getDefaultPoe2Paths,
   planLocalConfigBackup,
   planBuildFileWrite,
   readClientLogAppend,
+  writeBuildFile,
 } from "../src/index";
 
 describe("desktop core helpers", () => {
@@ -197,6 +202,30 @@ Item Level: 67
     ).toThrow(BuildFileWriteRejectedError);
   });
 
+  it("writes a user-initiated .build file inside BuildPlanner", async () => {
+    const root = await createTempWindowsTree();
+    const buildPlannerDirectory = win32.join(root, "BuildPlanner");
+
+    try {
+      const plan = await writeBuildFile({
+        buildPlannerDirectory,
+        fileName: "Storm Monk",
+        content: "[build]\nname=Storm Monk\n",
+        actionId: "advisor-export-005",
+        userInitiated: true,
+      });
+
+      expect(plan.outputPath).toBe(
+        win32.join(buildPlannerDirectory, "Storm Monk.build"),
+      );
+      await expect(readFile(plan.outputPath, "utf8")).resolves.toBe(
+        "[build]\nname=Storm Monk\n",
+      );
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("plans a user-initiated local config backup inside the selected backup root", () => {
     const plan = planLocalConfigBackup({
       gameDirectory: "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2",
@@ -290,4 +319,68 @@ Item Level: 67
       }),
     ).toThrow(LocalBackupRejectedError);
   });
+
+  it("copies local config backups into a timestamped backup tree", async () => {
+    const root = await createTempWindowsTree();
+    const gameDirectory = win32.join(root, "Path of Exile 2");
+    const backupDirectory = win32.join(root, "Calandra Backups");
+    const filterPath = win32.join(gameDirectory, "NeverSink.filter");
+    const buildPath = win32.join(
+      gameDirectory,
+      "BuildPlanner",
+      "Storm Monk.build",
+    );
+    const overlayPath = win32.join(gameDirectory, "Calandra", "overlay.json");
+
+    try {
+      await mkdir(win32.dirname(filterPath), { recursive: true });
+      await mkdir(win32.dirname(buildPath), { recursive: true });
+      await mkdir(win32.dirname(overlayPath), { recursive: true });
+      await writeFile(filterPath, "filter", "utf8");
+      await writeFile(buildPath, "[build]\n", "utf8");
+      await writeFile(overlayPath, '{"opacity":0.8}\n', "utf8");
+
+      const plan = await copyLocalConfigBackup({
+        gameDirectory,
+        backupDirectory,
+        actionId: "backup-003",
+        capturedAt: "2026-06-21T15:00:00.000Z",
+        userInitiated: true,
+        files: [
+          { kind: "loot-filter", sourcePath: filterPath },
+          { kind: "build-file", sourcePath: buildPath },
+          { kind: "overlay-config", sourcePath: overlayPath },
+        ],
+      });
+
+      expect(plan.backupRoot).toBe(
+        win32.join(
+          backupDirectory,
+          "Path of Exile 2",
+          "2026-06-21T15-00-00-000Z",
+        ),
+      );
+      await expect(
+        readFile(win32.join(plan.backupRoot, "NeverSink.filter"), "utf8"),
+      ).resolves.toBe("filter");
+      await expect(
+        readFile(
+          win32.join(plan.backupRoot, "BuildPlanner", "Storm Monk.build"),
+          "utf8",
+        ),
+      ).resolves.toBe("[build]\n");
+      await expect(
+        readFile(
+          win32.join(plan.backupRoot, "Calandra", "overlay.json"),
+          "utf8",
+        ),
+      ).resolves.toBe('{"opacity":0.8}\n');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 });
+
+async function createTempWindowsTree() {
+  return mkdtemp(win32.join(tmpdir(), "calandra-desktop-"));
+}

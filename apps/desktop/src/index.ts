@@ -1,3 +1,4 @@
+import { copyFile, mkdir, writeFile } from "node:fs/promises";
 import { win32 } from "node:path";
 import {
   parseClientLogText,
@@ -205,6 +206,17 @@ export function planBuildFileWrite(
   };
 }
 
+export async function writeBuildFile(
+  request: BuildFileWriteRequest,
+): Promise<BuildFileWritePlan> {
+  const plan = planBuildFileWrite(request);
+
+  await mkdir(win32.dirname(plan.outputPath), { recursive: true });
+  await writeFile(plan.outputPath, plan.content, "utf8");
+
+  return plan;
+}
+
 export function planLocalConfigBackup(
   request: LocalBackupRequest,
 ): LocalBackupPlan {
@@ -262,6 +274,19 @@ export function planLocalConfigBackup(
     backupRoot,
     entries,
   };
+}
+
+export async function copyLocalConfigBackup(
+  request: LocalBackupRequest,
+): Promise<LocalBackupPlan> {
+  const plan = planLocalConfigBackup(request);
+
+  for (const entry of plan.entries) {
+    await mkdir(win32.dirname(entry.destinationPath), { recursive: true });
+    await copyFile(entry.sourcePath, entry.destinationPath);
+  }
+
+  return plan;
 }
 
 function completeLineLength(content: string): number {
