@@ -228,6 +228,7 @@ dependencies = [
 name = "calandra-desktop"
 version = "0.0.0"
 dependencies = [
+ "serde",
  "tauri",
  "tauri-build",
 ]

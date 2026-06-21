@@ -39,4 +39,4 @@ jobs:
           cache: pnpm
       - uses: dtolnay/rust-toolchain@stable
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @calandra/desktop run check:tauri
+      - run: pnpm --filter @calandra/desktop run test:tauri
