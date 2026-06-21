@@ -3,12 +3,14 @@ import {
   accountSnapshotListResponseSchema,
   accountSnapshotStoredDiffRequestSchema,
   datasetManifestSchema,
+  datasetSearchResponseSchema,
   economyCollectionSchema,
   itemCollectionSchema,
   uniqueCollectionSchema,
   type AccountSnapshotDiff,
   type AccountSnapshotListItem,
   type DatasetManifest,
+  type DatasetSearchResponse,
   type EconomyPrice,
   type Item,
   type UniqueItem,
@@ -41,6 +43,10 @@ export type DashboardSnapshotDiff = {
   reason: "ready" | "insufficient-snapshots" | "unavailable";
   account: string;
   diff: AccountSnapshotDiff | null;
+};
+
+export type DashboardSearchResults = DatasetSearchResponse & {
+  source: "api" | "fallback";
 };
 
 const fallbackDataset: DashboardDataset = {
@@ -195,6 +201,37 @@ export async function getDashboardSnapshots(
   }
 }
 
+export async function getDashboardSearch(
+  query: string,
+  apiBaseUrl = defaultApiBaseUrl,
+  fetchImplementation: typeof fetch = fetch,
+): Promise<DashboardSearchResults> {
+  const normalizedQuery = query.trim();
+
+  if (!normalizedQuery) {
+    return fallbackSearchResults("");
+  }
+
+  try {
+    const params = new URLSearchParams({
+      ...dashboardDatasetVersion,
+      q: normalizedQuery,
+    });
+    const results = await fetchJson(
+      fetchImplementation,
+      `${apiBaseUrl}/search?${params.toString()}`,
+      datasetSearchResponseSchema.parse,
+    );
+
+    return {
+      source: "api",
+      ...results,
+    };
+  } catch {
+    return fallbackSearchResults(normalizedQuery);
+  }
+}
+
 export async function getDashboardSnapshotDiff(
   account: string,
   snapshots: AccountSnapshotListItem[],
@@ -235,6 +272,18 @@ export async function getDashboardSnapshotDiff(
   } catch {
     return fallbackSnapshotDiff(account, "unavailable");
   }
+}
+
+function fallbackSearchResults(query: string): DashboardSearchResults {
+  return {
+    source: "fallback",
+    ...dashboardDatasetVersion,
+    query,
+    items: [],
+    uniques: [],
+    mods: [],
+    gems: [],
+  };
 }
 
 async function fetchJson<T>(

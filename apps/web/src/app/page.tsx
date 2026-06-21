@@ -9,7 +9,6 @@ import {
   History,
   KeyRound,
   RotateCcw,
-  Search,
   Settings,
   ShieldCheck,
   Sparkles,
@@ -18,6 +17,7 @@ import {
 } from "lucide-react";
 import type { UpgradeAdvisorResponse } from "@calandra/contract";
 import { defaultTheme } from "../lib/theme";
+import { DatasetSearchPanel } from "../components/DatasetSearchPanel";
 import { ThemeSelector } from "../components/ThemeSelector";
 import {
   dashboardDatasetVersion,
@@ -235,60 +235,12 @@ export default async function Home() {
 
               <section className="grid grid-cols-[minmax(0,1fr)] gap-4 2xl:grid-cols-[minmax(0,1fr)_18rem]">
                 <div className="min-w-0 rounded-lg border border-base-300/70 bg-base-200/72">
-                  <div className="flex flex-col gap-3 border-b border-base-300/70 p-4 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <h2 className="text-base font-semibold">
-                        Patch-versioned item database
-                      </h2>
-                      <p className="mt-1 text-sm text-base-content/60">
-                        {datasetSource} via /openapi.json
-                      </p>
-                    </div>
-                    <label className="input input-sm flex min-h-9 items-center gap-2 md:w-64">
-                      <Search
-                        className="size-4 text-base-content/45"
-                        aria-hidden="true"
-                      />
-                      <input
-                        type="search"
-                        className="grow"
-                        placeholder="Search bases, uniques, mods"
-                      />
-                    </label>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="table table-sm">
-                      <thead>
-                        <tr>
-                          <th>Item</th>
-                          <th>Type</th>
-                          <th>Rarity</th>
-                          <th>Level</th>
-                          <th>Source</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {dataset.items.map((item) => (
-                          <tr key={item.id}>
-                            <td className="font-medium text-base-content">
-                              {item.name}
-                            </td>
-                            <td>{formatCategory(item.category)}</td>
-                            <td>
-                              <span className="inline-flex items-center gap-2">
-                                <span
-                                  className={`size-2.5 rounded-full rarity-${item.rarity}`}
-                                />
-                                {item.rarity}
-                              </span>
-                            </td>
-                            <td>{dashboardDatasetVersion.patch}</td>
-                            <td>{datasetSource}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <DatasetSearchPanel
+                    initialItems={dataset.items}
+                    datasetSource={datasetSource}
+                    patch={dashboardDatasetVersion.patch}
+                    apiBaseUrl={defaultApiBaseUrl}
+                  />
                 </div>
 
                 <Panel
@@ -593,13 +545,6 @@ export default async function Home() {
       </div>
     </main>
   );
-}
-
-function formatCategory(category: string) {
-  return category
-    .split("-")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
 }
 
 function formatSnapshotTimestamp(value: string | undefined) {

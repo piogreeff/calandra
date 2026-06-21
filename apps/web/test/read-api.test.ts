@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   getDashboardDataset,
+  getDashboardSearch,
   getDashboardSnapshotDiff,
   getDashboardSnapshots,
 } from "../src/lib/read-api";
@@ -113,6 +114,84 @@ describe("dashboard read API client", () => {
     expect(dataset.items.length).toBeGreaterThan(0);
     expect(dataset.prices.length).toBeGreaterThan(0);
     expect(dataset.manifest.artifactKey).toBe("fallback/demo-dataset.json");
+  });
+
+  it("loads grouped dataset search results from the typed search endpoint", async () => {
+    const fetchImplementation = vi.fn(async () =>
+      Response.json({
+        league: "Dawn of the Hunt",
+        patch: "0.2.0",
+        query: "demo",
+        items: [
+          {
+            id: "calandra-demo-wand",
+            name: "Calandra Demo Wand",
+            category: "wand",
+            rarity: "magic",
+          },
+        ],
+        uniques: [
+          {
+            id: "calandra-demo-amulet",
+            name: "Calandra Demo Amulet",
+            category: "amulet",
+            rarity: "unique",
+            iconUrl: "https://calandra.pages.dev/demo-unique-placeholder.png",
+            iconAttribution:
+              "Placeholder demo icon URL; no game art is bundled or served by this artifact.",
+          },
+        ],
+        mods: [
+          {
+            id: "demo-life-prefix",
+            name: "+# to maximum Life",
+            domain: "item",
+            minItemLevel: 1,
+          },
+        ],
+        gems: [
+          {
+            id: "demo-spark",
+            name: "Spark",
+            kind: "skill",
+            level: 1,
+          },
+        ],
+      }),
+    );
+
+    const results = await getDashboardSearch(
+      "demo",
+      "https://calandra-api.piogreeff.workers.dev",
+      fetchImplementation,
+    );
+
+    expect(fetchImplementation).toHaveBeenCalledWith(
+      "https://calandra-api.piogreeff.workers.dev/search?league=Dawn+of+the+Hunt&patch=0.2.0&q=demo",
+    );
+    expect(results.source).toBe("api");
+    expect(results.items[0]?.name).toBe("Calandra Demo Wand");
+    expect(results.uniques[0]?.name).toBe("Calandra Demo Amulet");
+    expect(results.mods[0]?.id).toBe("demo-life-prefix");
+    expect(results.gems[0]?.name).toBe("Spark");
+  });
+
+  it("returns empty fallback search results for blank or unavailable searches", async () => {
+    const blank = await getDashboardSearch(
+      "   ",
+      "https://calandra-api.piogreeff.workers.dev",
+      vi.fn(),
+    );
+    const unavailable = await getDashboardSearch(
+      "demo",
+      "https://calandra-api.piogreeff.workers.dev",
+      vi.fn(async () => new Response(null, { status: 503 })),
+    );
+
+    expect(blank).toMatchObject({ source: "fallback", query: "" });
+    expect(unavailable).toMatchObject({ source: "fallback", query: "demo" });
+    expect(blank.items).toEqual([]);
+    expect(unavailable.gems).toEqual([]);
   });
 
   it("loads account snapshot restore metadata from the typed API", async () => {

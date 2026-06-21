@@ -391,6 +391,42 @@ describe("api routes", () => {
     });
   });
 
+  it("allows browser read access to the dataset search endpoint", async () => {
+    const response = await api.request(
+      "/search?league=Dawn%20of%20the%20Hunt&patch=0.2.0&q=life",
+      {
+        headers: {
+          origin: "http://127.0.0.1:3010",
+        },
+      },
+      datasetEnv,
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("access-control-allow-origin")).toBe("*");
+    expect(response.headers.get("vary")).toContain("Origin");
+  });
+
+  it("answers browser preflight requests before route handlers run", async () => {
+    const response = await api.request(
+      "/search?league=Dawn%20of%20the%20Hunt&patch=0.2.0&q=life",
+      {
+        method: "OPTIONS",
+        headers: {
+          origin: "http://127.0.0.1:3010",
+          "access-control-request-method": "GET",
+        },
+      },
+      datasetEnv,
+    );
+
+    expect(response.status).toBe(204);
+    expect(response.headers.get("access-control-allow-origin")).toBe("*");
+    expect(response.headers.get("access-control-allow-methods")).toBe(
+      "GET, POST, OPTIONS",
+    );
+  });
+
   it("requires a non-empty dataset search query", async () => {
     const response = await api.request(
       "/search?league=Dawn%20of%20the%20Hunt&patch=0.2.0&q=%20",

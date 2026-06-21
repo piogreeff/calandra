@@ -47,6 +47,18 @@ type Bindings = {
 
 export const api = new Hono<{ Bindings: Bindings }>();
 
+api.use("*", async (context, next) => {
+  for (const [name, value] of Object.entries(getCorsHeaders())) {
+    context.header(name, value);
+  }
+
+  if (context.req.method === "OPTIONS") {
+    return context.body(null, 204);
+  }
+
+  await next();
+});
+
 api.onError((error, context) => {
   if (error instanceof DatasetManifestValidationError) {
     return context.json(
@@ -891,6 +903,15 @@ function getDatasetSearchQuery(context: Context<{ Bindings: Bindings }>) {
   }
 
   return { ok: true as const, league: version.league, patch: version.patch, q };
+}
+
+function getCorsHeaders() {
+  return {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    Vary: "Origin",
+  };
 }
 
 type DatasetBucket = {
