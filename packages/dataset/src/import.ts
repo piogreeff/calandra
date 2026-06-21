@@ -159,6 +159,13 @@ export async function publishDatasetArtifact(
         artifactKey: objectKey,
         sha256,
         sources: result.artifact.sources,
+        ...(result.uniqueImageCoverage
+          ? {
+              qualityGates: {
+                uniqueImageCoverage: result.uniqueImageCoverage,
+              },
+            }
+          : {}),
         counts: result.counts,
       },
       null,
@@ -311,6 +318,26 @@ function getUniqueImageCoverage(
   return coverage;
 }
 
+function validateUniqueImageCoverageGate(
+  artifact: DatasetArtifact,
+  coverage: UniqueImageCoverage | undefined,
+) {
+  if (!coverage) {
+    return;
+  }
+
+  const ratio =
+    coverage.expected === 0 ? 1 : coverage.resolved / coverage.expected;
+
+  if (
+    coverage.resolved !== artifact.uniques.length ||
+    coverage.ratio !== ratio ||
+    coverage.ratio < coverage.minimum
+  ) {
+    throw new Error("Dataset manifest unique image coverage mismatch");
+  }
+}
+
 function formatPercent(value: number) {
   return `${(value * 100).toFixed(2)}%`;
 }
@@ -342,6 +369,11 @@ async function readAndValidateManifest(
   if (JSON.stringify(manifest.sources) !== JSON.stringify(artifact.sources)) {
     throw new Error("Dataset manifest source attribution mismatch");
   }
+
+  validateUniqueImageCoverageGate(
+    artifact,
+    manifest.qualityGates?.uniqueImageCoverage,
+  );
 
   if (JSON.stringify(manifest.counts) !== JSON.stringify(counts)) {
     throw new Error("Dataset manifest counts mismatch");

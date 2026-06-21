@@ -465,12 +465,20 @@ describe("api routes", () => {
                     league: "Dawn of the Hunt",
                     patch: "0.2.0",
                     generatedAt: "2026-06-21T00:00:00.000Z",
-                    artifactKey: "datasets/Dawn of the Hunt/0.2.0.json",
-                    sha256: r2ArtifactSha256,
-                    sources: datasetSources,
-                    counts: {
-                      items: 1,
-                      uniques: 0,
+        artifactKey: "datasets/Dawn of the Hunt/0.2.0.json",
+        sha256: r2ArtifactSha256,
+        sources: datasetSources,
+        qualityGates: {
+          uniqueImageCoverage: {
+            resolved: 0,
+            expected: 0,
+            ratio: 1,
+            minimum: 0.95,
+          },
+        },
+        counts: {
+          items: 1,
+          uniques: 0,
                       mods: 0,
                       gems: 0,
                       economy: 0,
@@ -522,6 +530,14 @@ describe("api routes", () => {
                       artifactKey: "datasets/Dawn of the Hunt/0.2.0.json",
                       sha256: r2ArtifactSha256,
                       sources: datasetSources,
+                      qualityGates: {
+                        uniqueImageCoverage: {
+                          resolved: 0,
+                          expected: 0,
+                          ratio: 1,
+                          minimum: 0.95,
+                        },
+                      },
                       counts: {
                         items: 1,
                         uniques: 0,
@@ -547,6 +563,14 @@ describe("api routes", () => {
       artifactKey: "datasets/Dawn of the Hunt/0.2.0.json",
       sha256: r2ArtifactSha256,
       sources: datasetSources,
+      qualityGates: {
+        uniqueImageCoverage: {
+          resolved: 0,
+          expected: 0,
+          ratio: 1,
+          minimum: 0.95,
+        },
+      },
       counts: {
         items: 1,
         uniques: 0,

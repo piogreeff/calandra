@@ -97,6 +97,8 @@ export default async function Home() {
     (sum, count) => sum + count,
     0,
   );
+  const uniqueImageCoverage =
+    dataset.manifest.qualityGates?.uniqueImageCoverage;
   const shortChecksum = dataset.manifest.sha256.slice(0, 12);
   const latestSnapshot =
     snapshotList.snapshots[snapshotList.snapshots.length - 1];
@@ -517,6 +519,27 @@ export default async function Home() {
                       {shortChecksum}
                     </span>
                   </div>
+                  {uniqueImageCoverage ? (
+                    <div className="space-y-2 border-t border-base-300/60 pt-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-base-content/60">
+                          Unique images
+                        </span>
+                        <span className="font-semibold text-base-content">
+                          {formatCoveragePercent(uniqueImageCoverage.ratio)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3 text-xs">
+                        <span className="text-base-content/55">
+                          Resolved / expected
+                        </span>
+                        <span className="font-medium text-base-content/75">
+                          {uniqueImageCoverage.resolved} /{" "}
+                          {uniqueImageCoverage.expected}
+                        </span>
+                      </div>
+                    </div>
+                  ) : null}
                   <div className="space-y-2 border-t border-base-300/60 pt-3">
                     <p className="text-xs font-medium uppercase text-base-content/55">
                       Source attribution
@@ -597,6 +620,10 @@ function formatBytes(value: number | undefined) {
   }
 
   return `${(value / 1024).toFixed(1)} KB`;
+}
+
+function formatCoveragePercent(value: number) {
+  return `${(value * 100).toFixed(1)}%`;
 }
 
 function formatLevelDelta(delta: number) {

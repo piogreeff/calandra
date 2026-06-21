@@ -372,6 +372,55 @@ describe("dataset artifact import", () => {
     expect(manifest.sources).toEqual(sources);
   });
 
+  it("writes unique image coverage quality gates into published manifests", async () => {
+    const directory = await mkdtemp(
+      join(tmpdir(), "calandra-dataset-quality-"),
+    );
+    const artifactPath = join(directory, "source.json");
+    const publishDirectory = join(directory, "publish");
+
+    await writeFile(
+      artifactPath,
+      JSON.stringify({
+        league: "Dawn of the Hunt",
+        patch: "0.2.0",
+        generatedAt: "2026-06-21T00:00:00.000Z",
+        source: "published-artifact",
+        sources: datasetSources,
+        items: [],
+        uniques: makeUniques(19),
+        mods: [],
+        gems: [],
+        economy: [],
+        ladderBuilds: [],
+      }),
+      "utf8",
+    );
+
+    const result = await publishDatasetArtifact({
+      artifactPath,
+      publishDirectory,
+      expectedUniqueCount: 20,
+      minimumUniqueImageCoverage: 0.95,
+    });
+    const manifest = JSON.parse(await readFile(result.manifestPath, "utf8"));
+
+    expect(result.uniqueImageCoverage).toEqual({
+      resolved: 19,
+      expected: 20,
+      ratio: 0.95,
+      minimum: 0.95,
+    });
+    expect(manifest.qualityGates).toEqual({
+      uniqueImageCoverage: {
+        resolved: 19,
+        expected: 20,
+        ratio: 0.95,
+        minimum: 0.95,
+      },
+    });
+  });
+
   it("validates a published artifact against its manifest during import", async () => {
     const directory = await mkdtemp(
       join(tmpdir(), "calandra-dataset-verified-"),

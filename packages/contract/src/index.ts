@@ -361,12 +361,24 @@ export const datasetCountsSchema = z.object({
   ladderBuilds: z.number().int().nonnegative(),
 });
 
+export const uniqueImageCoverageSchema = z.object({
+  resolved: z.number().int().nonnegative(),
+  expected: z.number().int().nonnegative(),
+  ratio: z.number().min(0).max(1),
+  minimum: z.number().min(0).max(1),
+});
+
+export const datasetQualityGatesSchema = z.object({
+  uniqueImageCoverage: uniqueImageCoverageSchema.optional(),
+});
+
 export const datasetManifestSchema = z.object({
   ...versionedCollectionFields,
   generatedAt: z.string().datetime(),
   artifactKey: z.string().min(1),
   sha256: z.string().regex(/^[a-f0-9]{64}$/),
   sources: z.array(datasetSourceSchema).min(1),
+  qualityGates: datasetQualityGatesSchema.optional(),
   counts: datasetCountsSchema,
 });
 
@@ -1472,6 +1484,24 @@ export const openApiDocument = {
           attribution: { type: "string", minLength: 1 },
         },
       },
+      UniqueImageCoverage: {
+        type: "object",
+        required: ["resolved", "expected", "ratio", "minimum"],
+        properties: {
+          resolved: { type: "integer", minimum: 0 },
+          expected: { type: "integer", minimum: 0 },
+          ratio: { type: "number", minimum: 0, maximum: 1 },
+          minimum: { type: "number", minimum: 0, maximum: 1 },
+        },
+      },
+      DatasetQualityGates: {
+        type: "object",
+        properties: {
+          uniqueImageCoverage: {
+            $ref: "#/components/schemas/UniqueImageCoverage",
+          },
+        },
+      },
       DatasetManifest: {
         type: "object",
         required: [
@@ -1494,6 +1524,7 @@ export const openApiDocument = {
             minItems: 1,
             items: { $ref: "#/components/schemas/DatasetSource" },
           },
+          qualityGates: { $ref: "#/components/schemas/DatasetQualityGates" },
           counts: { $ref: "#/components/schemas/DatasetCounts" },
         },
       },
@@ -1582,4 +1613,6 @@ export type DatasetSourceKind = z.infer<typeof datasetSourceKindSchema>;
 export type DatasetSource = z.infer<typeof datasetSourceSchema>;
 export type DatasetArtifact = z.infer<typeof datasetArtifactSchema>;
 export type DatasetCounts = z.infer<typeof datasetCountsSchema>;
+export type UniqueImageCoverage = z.infer<typeof uniqueImageCoverageSchema>;
+export type DatasetQualityGates = z.infer<typeof datasetQualityGatesSchema>;
 export type DatasetManifest = z.infer<typeof datasetManifestSchema>;

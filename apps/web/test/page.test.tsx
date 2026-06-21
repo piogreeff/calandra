@@ -32,6 +32,9 @@ describe("home dashboard", () => {
     expect(html).toContain("Published R2 artifact");
     expect(html).toContain("Dataset manifest");
     expect(html).toContain("9aaa78cdba51");
+    expect(html).toContain("Unique images");
+    expect(html).toContain("95.0%");
+    expect(html).toContain("19 / 20");
     expect(html).toContain("Source attribution");
     expect(html).toContain("poe2db.tw");
     expect(html).toContain(
@@ -102,6 +105,14 @@ function mockDashboardFetch() {
         sha256:
           "9aaa78cdba510700b430fad2090832dbf9d6b9a9408ef27a1beb110ff5a171af",
         sources: datasetSources,
+        qualityGates: {
+          uniqueImageCoverage: {
+            resolved: 19,
+            expected: 20,
+            ratio: 0.95,
+            minimum: 0.95,
+          },
+        },
         counts: {
           items: 1,
           uniques: 0,

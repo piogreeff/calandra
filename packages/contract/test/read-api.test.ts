@@ -135,6 +135,14 @@ describe("phase 1 read API contract", () => {
             "Economy prices are derived from poe.ninja's Path of Exile 2 economy dataset.",
         },
       ],
+      qualityGates: {
+        uniqueImageCoverage: {
+          resolved: 19,
+          expected: 20,
+          ratio: 0.95,
+          minimum: 0.95,
+        },
+      },
       counts: {
         items: 1,
         uniques: 0,
@@ -147,6 +155,7 @@ describe("phase 1 read API contract", () => {
 
     expect(manifest.artifactKey).toBe("datasets/Dawn of the Hunt/0.2.0.json");
     expect(manifest.sources[0]?.name).toBe("poe.ninja");
+    expect(manifest.qualityGates?.uniqueImageCoverage?.ratio).toBe(0.95);
   });
 
   it("keeps unique image attribution explicit without bundling assets", () => {
@@ -267,6 +276,10 @@ describe("phase 1 read API contract", () => {
       openApiDocument.components.schemas.Gem.properties.attributeRequirements,
     ).toBeDefined();
     expect(openApiDocument.components.schemas.DatasetManifest).toBeDefined();
+    expect(
+      openApiDocument.components.schemas.DatasetManifest.properties
+        .qualityGates,
+    ).toEqual({ $ref: "#/components/schemas/DatasetQualityGates" });
   });
 
   it("models deterministic upgrade advisor requests and responses", () => {

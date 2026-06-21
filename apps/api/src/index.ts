@@ -13,6 +13,7 @@ import {
   datasetManifestSchema,
   type DatasetArtifact,
   type DatasetManifest,
+  type UniqueImageCoverage,
   economyCollectionSchema,
   gemCollectionSchema,
   itemCollectionSchema,
@@ -707,6 +708,11 @@ async function validateDatasetManifest({
     );
   }
 
+  validateUniqueImageCoverageGate(
+    artifact,
+    manifest.qualityGates?.uniqueImageCoverage,
+  );
+
   const counts = getDatasetCounts(artifact);
 
   if (JSON.stringify(manifest.counts) !== JSON.stringify(counts)) {
@@ -743,6 +749,28 @@ function getDatasetCounts(artifact: DatasetArtifact) {
     economy: artifact.economy.length,
     ladderBuilds: artifact.ladderBuilds.length,
   };
+}
+
+function validateUniqueImageCoverageGate(
+  artifact: DatasetArtifact,
+  coverage: UniqueImageCoverage | undefined,
+) {
+  if (!coverage) {
+    return;
+  }
+
+  const ratio =
+    coverage.expected === 0 ? 1 : coverage.resolved / coverage.expected;
+
+  if (
+    coverage.resolved !== artifact.uniques.length ||
+    coverage.ratio !== ratio ||
+    coverage.ratio < coverage.minimum
+  ) {
+    throw new DatasetManifestValidationError(
+      "Dataset manifest unique image coverage mismatch",
+    );
+  }
 }
 
 function findPriceMatch(
