@@ -6,6 +6,7 @@ import {
   GggOAuthTokenEncryptionError,
   assertGggUserAgent,
   calandraPoe2CharacterScopes,
+  capturePoe2CharacterSnapshot,
   createGggApiClient,
   createGggOAuthAuthorizationUrl,
   createGggOAuthPkcePair,
@@ -458,6 +459,137 @@ describe("GGG official API client hygiene", () => {
       name: "GggApiRateLimitError",
       retryAfterMs: 1000,
     } satisfies Partial<GggApiRateLimitError>);
+  });
+
+  it("captures a contract-valid source-agnostic account snapshot from official PoE2 characters", async () => {
+    const client = {
+      listPoe2Characters: vi.fn(async () => ({
+        characters: [{ name: "CalandraTest" }],
+      })),
+      getPoe2Character: vi.fn(async (name: string) => ({
+        character: {
+          id: "character-1",
+          name,
+          class: "Deadeye",
+          level: "73",
+          league: "Dawn of the Hunt",
+          equipment: [
+            {
+              inventoryId: "Weapon",
+              typeLine: "Expert Siphoning Wand",
+              rarity: "rare",
+              id: "item-1",
+            },
+            {
+              slot: "gloves",
+              name: "Duskthread Grips",
+              rarity: "unique",
+            },
+          ],
+          passiveSkillIds: ["keystone-1"],
+        },
+      })),
+    };
+
+    await expect(
+      capturePoe2CharacterSnapshot({
+        account: "CalandraAccount",
+        id: "snapshot-2026-06-21T18-00-00Z",
+        capturedAt: "2026-06-21T18:00:00.000Z",
+        client,
+      }),
+    ).resolves.toEqual({
+      id: "snapshot-2026-06-21T18-00-00Z",
+      account: "CalandraAccount",
+      capturedAt: "2026-06-21T18:00:00.000Z",
+      source: "official-poe2-character",
+      capabilities: { characters: true, stashes: false },
+      characters: [
+        {
+          id: "character-1",
+          name: "CalandraTest",
+          className: "Deadeye",
+          level: 73,
+          league: "Dawn of the Hunt",
+          equipment: [
+            {
+              slot: "Weapon",
+              name: "Expert Siphoning Wand",
+              itemId: "item-1",
+              rarity: "rare",
+            },
+            {
+              slot: "gloves",
+              name: "Duskthread Grips",
+              rarity: "unique",
+            },
+          ],
+          passiveSkillIds: ["keystone-1"],
+        },
+      ],
+    });
+
+    expect(client.getPoe2Character).toHaveBeenCalledWith("CalandraTest");
+  });
+
+  it("uses detailed list entries directly when they already include equipment", async () => {
+    const client = {
+      listPoe2Characters: vi.fn(async () => ({
+        characters: [
+          {
+            name: "AlreadyDetailed",
+            ascendancyClass: "Infernalist",
+            level: 82,
+            league: "Dawn of the Hunt",
+            items: [{ inventoryId: "Ring", typeLine: "Ruby Ring" }],
+          },
+        ],
+      })),
+      getPoe2Character: vi.fn(),
+    };
+
+    await expect(
+      capturePoe2CharacterSnapshot({
+        account: "CalandraAccount",
+        capturedAt: "2026-06-21T18:00:00.000Z",
+        client,
+      }),
+    ).resolves.toMatchObject({
+      id: "snapshot-2026-06-21T18-00-00-000Z",
+      characters: [
+        {
+          id: "AlreadyDetailed",
+          className: "Infernalist",
+          equipment: [{ slot: "Ring", name: "Ruby Ring" }],
+        },
+      ],
+    });
+
+    expect(client.getPoe2Character).not.toHaveBeenCalled();
+  });
+
+  it("rejects official character payloads that cannot satisfy the snapshot contract", async () => {
+    const client = {
+      listPoe2Characters: vi.fn(async () => ({
+        characters: [{ name: "BrokenCharacter" }],
+      })),
+      getPoe2Character: vi.fn(async () => ({
+        character: {
+          name: "BrokenCharacter",
+          level: 73,
+          league: "Dawn of the Hunt",
+          equipment: [],
+        },
+      })),
+    };
+
+    await expect(
+      capturePoe2CharacterSnapshot({
+        account: "CalandraAccount",
+        capturedAt: "2026-06-21T18:00:00.000Z",
+        client,
+      }),
+    ).rejects.toThrow(GggApiConfigurationError);
   });
 });
 

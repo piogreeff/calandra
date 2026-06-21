@@ -149,7 +149,11 @@ importers:
 
   packages/engine: {}
 
-  packages/ggg-api: {}
+  packages/ggg-api:
+    dependencies:
+      '@calandra/contract':
+        specifier: workspace:*
+        version: link:../contract
 
   packages/parser:
     dependencies:

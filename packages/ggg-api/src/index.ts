@@ -1,3 +1,11 @@
+import {
+  accountSnapshotSchema,
+  type AccountSnapshot,
+  type AccountSnapshotCharacter,
+  type AccountSnapshotGearItem,
+  type Rarity,
+} from "@calandra/contract";
+
 export const gggApiBaseUrl = "https://api.pathofexile.com";
 export const gggOAuthAuthorizeUrl =
   "https://www.pathofexile.com/oauth/authorize";
@@ -167,6 +175,18 @@ export type GggOAuthRefreshTokenOptions = {
   fetch: GggOAuthFetchLike;
   tokenUrl?: string;
   now?: Date;
+};
+
+export type GggPoe2CharacterSnapshotClient = {
+  listPoe2Characters(): Promise<unknown>;
+  getPoe2Character(name: string): Promise<unknown>;
+};
+
+export type CapturePoe2CharacterSnapshotOptions = {
+  account: string;
+  client: GggPoe2CharacterSnapshotClient;
+  capturedAt?: string | Date;
+  id?: string;
 };
 
 export type GggOAuthFetchLike = (
@@ -593,6 +613,49 @@ export function createGggApiClient(options: GggApiClientOptions) {
   };
 }
 
+export async function capturePoe2CharacterSnapshot(
+  options: CapturePoe2CharacterSnapshotOptions,
+): Promise<AccountSnapshot> {
+  const account = assertNonEmptyString(
+    options.account,
+    "Snapshot account is required.",
+  );
+  const capturedAt = toSnapshotIsoTimestamp(options.capturedAt ?? new Date());
+  const id =
+    options.id ??
+    `snapshot-${capturedAt.replaceAll(":", "-").replaceAll(".", "-")}`;
+  const characterSummaries = extractOfficialCharacterArray(
+    await options.client.listPoe2Characters(),
+  );
+  const characters = await Promise.all(
+    characterSummaries.map(async (summary, index) => {
+      if (hasOfficialEquipment(summary)) {
+        return toSnapshotCharacter(summary, index);
+      }
+
+      const name = getRequiredString(
+        unwrapOfficialCharacter(summary),
+        ["name"],
+        `Official PoE2 character summary ${index + 1} is missing a name.`,
+      );
+
+      return toSnapshotCharacter(
+        await options.client.getPoe2Character(name),
+        index,
+      );
+    }),
+  );
+
+  return accountSnapshotSchema.parse({
+    id,
+    account,
+    capturedAt,
+    source: "official-poe2-character",
+    capabilities: { characters: true, stashes: false },
+    characters,
+  });
+}
+
 export function getRetryAfterMs(headers: GggHttpResponse["headers"]): number {
   const retryAfter = headers.get("retry-after");
   const parsedRetryAfter = retryAfter ? Number.parseInt(retryAfter, 10) : 0;
@@ -671,6 +734,260 @@ async function readErrorBody(response: GggHttpResponse) {
   } catch {
     return response.text();
   }
+}
+
+function extractOfficialCharacterArray(value: unknown): unknown[] {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (isRecord(value) && Array.isArray(value.characters)) {
+    return value.characters;
+  }
+
+  if (isRecord(value) && Array.isArray(value.entries)) {
+    return value.entries;
+  }
+
+  throw new GggApiConfigurationError(
+    "Official PoE2 character list response must contain a characters array.",
+  );
+}
+
+function toSnapshotCharacter(
+  value: unknown,
+  index: number,
+): AccountSnapshotCharacter {
+  const character = unwrapOfficialCharacter(value);
+  const name = getRequiredString(
+    character,
+    ["name"],
+    `Official PoE2 character ${index + 1} is missing a name.`,
+  );
+  const className = getRequiredString(
+    character,
+    ["className", "class", "ascendancyClass"],
+    `Official PoE2 character ${name} is missing a class name.`,
+  );
+  const league = getRequiredString(
+    character,
+    ["league"],
+    `Official PoE2 character ${name} is missing a league.`,
+  );
+  const level = getRequiredPositiveInteger(
+    character.level,
+    `Official PoE2 character ${name} is missing a positive level.`,
+  );
+  const equipment = getOfficialEquipment(character).map((item, itemIndex) =>
+    toSnapshotGearItem(item, name, itemIndex),
+  );
+  const passiveSkillIds = getOptionalStringArray(character, [
+    "passiveSkillIds",
+    "passives",
+    "passive_skills",
+  ]);
+  const snapshotCharacter: AccountSnapshotCharacter = {
+    id: getOptionalString(character, ["id", "characterId"]) ?? name,
+    name,
+    className,
+    level,
+    league,
+    equipment,
+  };
+
+  if (passiveSkillIds) {
+    snapshotCharacter.passiveSkillIds = passiveSkillIds;
+  }
+
+  return snapshotCharacter;
+}
+
+function toSnapshotGearItem(
+  value: unknown,
+  characterName: string,
+  index: number,
+): AccountSnapshotGearItem {
+  if (!isRecord(value)) {
+    throw new GggApiConfigurationError(
+      `Official PoE2 equipment item ${index + 1} for ${characterName} must be an object.`,
+    );
+  }
+
+  const slot = getRequiredString(
+    value,
+    ["slot", "inventoryId", "inventory_id"],
+    `Official PoE2 equipment item ${index + 1} for ${characterName} is missing a slot.`,
+  );
+  const name = getRequiredString(
+    value,
+    ["name", "typeLine", "type_line"],
+    `Official PoE2 equipment item ${index + 1} for ${characterName} is missing a name.`,
+  );
+  const item: AccountSnapshotGearItem = { slot, name };
+  const itemId = getOptionalString(value, ["itemId", "id"]);
+  const rarity = normalizeRarity(getOptionalString(value, ["rarity"]));
+  const stats = getOptionalNumberRecord(value, ["stats", "properties"]);
+
+  if (itemId) {
+    item.itemId = itemId;
+  }
+
+  if (rarity) {
+    item.rarity = rarity;
+  }
+
+  if (stats) {
+    item.stats = stats;
+  }
+
+  return item;
+}
+
+function unwrapOfficialCharacter(value: unknown): Record<string, unknown> {
+  if (isRecord(value) && isRecord(value.character)) {
+    return value.character;
+  }
+
+  if (isRecord(value) && isRecord(value.data)) {
+    return value.data;
+  }
+
+  if (isRecord(value)) {
+    return value;
+  }
+
+  throw new GggApiConfigurationError(
+    "Official PoE2 character response must be an object.",
+  );
+}
+
+function hasOfficialEquipment(value: unknown): boolean {
+  const character = unwrapOfficialCharacter(value);
+
+  return (
+    Array.isArray(character.equipment) ||
+    Array.isArray(character.items) ||
+    Array.isArray(character.inventory)
+  );
+}
+
+function getOfficialEquipment(character: Record<string, unknown>): unknown[] {
+  for (const field of ["equipment", "items", "inventory"] as const) {
+    const value = character[field];
+    if (Array.isArray(value)) {
+      return value;
+    }
+  }
+
+  return [];
+}
+
+function getRequiredString(
+  record: Record<string, unknown>,
+  fields: readonly string[],
+  message: string,
+): string {
+  const value = getOptionalString(record, fields);
+  if (!value) {
+    throw new GggApiConfigurationError(message);
+  }
+
+  return value;
+}
+
+function getOptionalString(
+  record: Record<string, unknown>,
+  fields: readonly string[],
+): string | undefined {
+  for (const field of fields) {
+    const value = record[field];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+
+  return undefined;
+}
+
+function getRequiredPositiveInteger(value: unknown, message: string): number {
+  const numberValue =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number.parseInt(value, 10)
+        : Number.NaN;
+
+  if (!Number.isInteger(numberValue) || numberValue <= 0) {
+    throw new GggApiConfigurationError(message);
+  }
+
+  return numberValue;
+}
+
+function getOptionalStringArray(
+  record: Record<string, unknown>,
+  fields: readonly string[],
+): string[] | undefined {
+  for (const field of fields) {
+    const value = record[field];
+    if (Array.isArray(value)) {
+      const strings = value
+        .filter((entry): entry is string => typeof entry === "string")
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+
+      return strings.length > 0 ? strings : undefined;
+    }
+  }
+
+  return undefined;
+}
+
+function getOptionalNumberRecord(
+  record: Record<string, unknown>,
+  fields: readonly string[],
+): Record<string, number> | undefined {
+  for (const field of fields) {
+    const value = record[field];
+    if (!isRecord(value)) {
+      continue;
+    }
+
+    const stats = Object.fromEntries(
+      Object.entries(value).filter(
+        (entry): entry is [string, number] => typeof entry[1] === "number",
+      ),
+    );
+
+    return Object.keys(stats).length > 0 ? stats : undefined;
+  }
+
+  return undefined;
+}
+
+function normalizeRarity(value: string | undefined): Rarity | undefined {
+  const normalized = value?.trim().toLowerCase();
+
+  return normalized === "normal" ||
+    normalized === "magic" ||
+    normalized === "rare" ||
+    normalized === "unique" ||
+    normalized === "gem" ||
+    normalized === "currency"
+    ? normalized
+    : undefined;
+}
+
+function toSnapshotIsoTimestamp(value: string | Date): string {
+  const date = value instanceof Date ? value : new Date(value);
+
+  if (Number.isNaN(date.valueOf())) {
+    throw new GggApiConfigurationError(
+      "Snapshot capturedAt must be a valid date.",
+    );
+  }
+
+  return date.toISOString();
 }
 
 async function requestGggOAuthToken({
