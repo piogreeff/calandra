@@ -81,6 +81,11 @@ export default async function Home() {
   const endpointLabel = new URL(defaultApiBaseUrl).hostname;
   const datasetSource =
     dataset.source === "api" ? "Published R2 artifact" : "Demo fallback";
+  const totalDatasetRecords = Object.values(dataset.manifest.counts).reduce(
+    (sum, count) => sum + count,
+    0,
+  );
+  const shortChecksum = dataset.manifest.sha256.slice(0, 12);
 
   return (
     <main className="min-h-screen">
@@ -338,6 +343,32 @@ export default async function Home() {
                       </div>
                     </article>
                   ))}
+                </div>
+              </Panel>
+
+              <Panel
+                title="Dataset manifest"
+                icon={<Database className="size-4" aria-hidden="true" />}
+              >
+                <div className="space-y-3 text-sm">
+                  <div className="flex items-center justify-between gap-3 border-b border-base-300/60 pb-3">
+                    <span className="text-base-content/60">Records</span>
+                    <span className="font-semibold text-base-content">
+                      {totalDatasetRecords}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 border-b border-base-300/60 pb-3">
+                    <span className="text-base-content/60">Artifact</span>
+                    <span className="max-w-40 truncate text-right font-medium text-base-content">
+                      {dataset.manifest.artifactKey}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-base-content/60">SHA-256</span>
+                    <span className="font-mono text-xs text-base-content">
+                      {shortChecksum}
+                    </span>
+                  </div>
                 </div>
               </Panel>
 

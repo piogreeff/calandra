@@ -328,6 +328,26 @@ export const openApiDocument = {
         },
       },
     },
+    "/datasets/manifest": {
+      get: {
+        operationId: "getDatasetManifest",
+        summary: "Get the validated manifest for one published dataset",
+        parameters: versionedQueryParameters,
+        responses: {
+          "200": {
+            description: "Dataset manifest with counts and checksum",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/DatasetManifest" },
+              },
+            },
+          },
+          "404": {
+            description: "Dataset manifest not found for league and patch",
+          },
+        },
+      },
+    },
     "/advisor/upgrades": {
       post: {
         operationId: "rankUpgradeCandidates",
@@ -569,6 +589,37 @@ export const openApiDocument = {
             type: "array",
             items: { $ref: "#/components/schemas/UpgradeAdvisorResult" },
           },
+        },
+      },
+      DatasetCounts: {
+        type: "object",
+        required: ["items", "uniques", "mods", "gems", "economy", "ladderBuilds"],
+        properties: {
+          items: { type: "integer", minimum: 0 },
+          uniques: { type: "integer", minimum: 0 },
+          mods: { type: "integer", minimum: 0 },
+          gems: { type: "integer", minimum: 0 },
+          economy: { type: "integer", minimum: 0 },
+          ladderBuilds: { type: "integer", minimum: 0 },
+        },
+      },
+      DatasetManifest: {
+        type: "object",
+        required: [
+          "league",
+          "patch",
+          "generatedAt",
+          "artifactKey",
+          "sha256",
+          "counts",
+        ],
+        properties: {
+          league: { type: "string", minLength: 1 },
+          patch: { type: "string", minLength: 1 },
+          generatedAt: { type: "string", format: "date-time" },
+          artifactKey: { type: "string", minLength: 1 },
+          sha256: { type: "string", pattern: "^[a-f0-9]{64}$" },
+          counts: { $ref: "#/components/schemas/DatasetCounts" },
         },
       },
     },

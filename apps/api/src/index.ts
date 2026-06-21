@@ -169,6 +169,25 @@ api.get("/builds/ladder", async (context) => {
   );
 });
 
+api.get("/datasets/manifest", async (context) => {
+  const version = getVersionedQuery(context);
+  if (!version.ok) return context.json(version.body, 400);
+  const manifest = await getMatchingDatasetManifest(context, version);
+
+  if (!manifest) {
+    return context.json(
+      {
+        error: "dataset manifest not found",
+        league: version.league,
+        patch: version.patch,
+      },
+      404,
+    );
+  }
+
+  return context.json(datasetManifestSchema.parse(manifest));
+});
+
 async function getMatchingArtifact(
   context: Context<{ Bindings: Bindings }>,
   version: { league: string; patch: string },
@@ -184,6 +203,58 @@ async function getMatchingArtifact(
   }
 
   return artifact;
+}
+
+async function getMatchingDatasetManifest(
+  context: Context<{ Bindings: Bindings }>,
+  version: { league: string; patch: string },
+) {
+  const raw = context.env.DATASET_ARTIFACT_JSON;
+
+  if (raw) {
+    const artifact = parseDatasetArtifact(raw);
+
+    if (
+      artifact.league !== version.league ||
+      artifact.patch !== version.patch
+    ) {
+      return undefined;
+    }
+
+    return buildInlineDatasetManifest({ artifact, artifactRaw: raw });
+  }
+
+  const objectKey = getDatasetObjectKey(context, version);
+  const object = await context.env.DATA_BUCKET?.get(objectKey);
+
+  if (!object) {
+    return undefined;
+  }
+
+  const artifactRaw = await object.text();
+  const artifact = parseDatasetArtifact(artifactRaw);
+
+  if (
+    artifact.league !== version.league ||
+    artifact.patch !== version.patch
+  ) {
+    return undefined;
+  }
+
+  const manifestObject = await context.env.DATA_BUCKET?.get(
+    getDatasetManifestKey(context, version),
+  );
+
+  if (!manifestObject) {
+    throw new DatasetManifestValidationError("Dataset manifest missing");
+  }
+
+  const manifest = datasetManifestSchema.parse(
+    JSON.parse((await manifestObject.text()).replace(/^\uFEFF/, "")),
+  );
+  await validateDatasetManifest({ artifact, artifactRaw, manifest, objectKey });
+
+  return manifest;
 }
 
 async function getDatasetArtifact(
@@ -280,7 +351,34 @@ async function validateDatasetManifest({
     );
   }
 
-  const counts = {
+  const counts = getDatasetCounts(artifact);
+
+  if (JSON.stringify(manifest.counts) !== JSON.stringify(counts)) {
+    throw new DatasetManifestValidationError(
+      "Dataset manifest counts mismatch",
+    );
+  }
+}
+
+async function buildInlineDatasetManifest({
+  artifact,
+  artifactRaw,
+}: {
+  artifact: DatasetArtifact;
+  artifactRaw: string;
+}): Promise<DatasetManifest> {
+  return {
+    league: artifact.league,
+    patch: artifact.patch,
+    generatedAt: artifact.generatedAt,
+    artifactKey: "DATASET_ARTIFACT_JSON",
+    sha256: await sha256Hex(artifactRaw),
+    counts: getDatasetCounts(artifact),
+  };
+}
+
+function getDatasetCounts(artifact: DatasetArtifact) {
+  return {
     items: artifact.items.length,
     uniques: artifact.uniques.length,
     mods: artifact.mods.length,
@@ -288,12 +386,6 @@ async function validateDatasetManifest({
     economy: artifact.economy.length,
     ladderBuilds: artifact.ladderBuilds.length,
   };
-
-  if (JSON.stringify(manifest.counts) !== JSON.stringify(counts)) {
-    throw new DatasetManifestValidationError(
-      "Dataset manifest counts mismatch",
-    );
-  }
 }
 
 async function sha256Hex(value: string) {

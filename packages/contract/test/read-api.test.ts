@@ -153,6 +153,8 @@ describe("phase 1 read API contract", () => {
     expect(openApiDocument.paths["/gems"]).toBeDefined();
     expect(openApiDocument.paths["/economy/{league}"]).toBeDefined();
     expect(openApiDocument.paths["/builds/ladder"]).toBeDefined();
+    expect(openApiDocument.paths["/datasets/manifest"]).toBeDefined();
+    expect(openApiDocument.components.schemas.DatasetManifest).toBeDefined();
   });
 
   it("models deterministic upgrade advisor requests and responses", () => {

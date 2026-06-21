@@ -39,6 +39,25 @@ describe("dashboard read API client", () => {
         });
       }
 
+      if (url.includes("/datasets/manifest?")) {
+        return Response.json({
+          league: "Dawn of the Hunt",
+          patch: "0.2.0",
+          generatedAt: "2026-06-21T13:15:00.000Z",
+          artifactKey: "datasets/Dawn of the Hunt/0.2.0.json",
+          sha256:
+            "9aaa78cdba510700b430fad2090832dbf9d6b9a9408ef27a1beb110ff5a171af",
+          counts: {
+            items: 1,
+            uniques: 1,
+            mods: 0,
+            gems: 0,
+            economy: 1,
+            ladderBuilds: 0,
+          },
+        });
+      }
+
       return Response.json({
         league: "Dawn of the Hunt",
         patch: "0.2.0",
@@ -64,6 +83,9 @@ describe("dashboard read API client", () => {
       "calandra-demo-amulet",
     ]);
     expect(dataset.prices[0]?.chaosEquivalent).toBe(142);
+    expect(dataset.manifest.artifactKey).toBe(
+      "datasets/Dawn of the Hunt/0.2.0.json",
+    );
   });
 
   it("falls back to demo rows when the temporary API is unavailable", async () => {
@@ -75,5 +97,6 @@ describe("dashboard read API client", () => {
     expect(dataset.source).toBe("fallback");
     expect(dataset.items.length).toBeGreaterThan(0);
     expect(dataset.prices.length).toBeGreaterThan(0);
+    expect(dataset.manifest.artifactKey).toBe("fallback/demo-dataset.json");
   });
 });

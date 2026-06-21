@@ -166,6 +166,23 @@ describe("api routes", () => {
     );
   });
 
+  it("returns 404 before a dataset manifest is published", async () => {
+    const response = await api.request(
+      "/datasets/manifest?league=Dawn%20of%20the%20Hunt&patch=0.2.0",
+      undefined,
+      {
+        APP_URL: "https://calandra.pages.dev",
+      },
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({
+      error: "dataset manifest not found",
+      league: "Dawn of the Hunt",
+      patch: "0.2.0",
+    });
+  });
+
   it("returns 404 for an item missing from the selected league and patch", async () => {
     const response = await api.request(
       "/items/missing?league=Dawn%20of%20the%20Hunt&patch=0.2.0",
@@ -280,6 +297,32 @@ describe("api routes", () => {
     );
   });
 
+  it("synthesizes a manifest for an inline dev dataset artifact", async () => {
+    const response = await api.request(
+      "/datasets/manifest?league=Dawn%20of%20the%20Hunt&patch=0.2.0",
+      undefined,
+      datasetEnv,
+    );
+    const body = (await response.json()) as { sha256: string };
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      league: "Dawn of the Hunt",
+      patch: "0.2.0",
+      generatedAt: "2026-06-21T00:00:00.000Z",
+      artifactKey: "DATASET_ARTIFACT_JSON",
+      counts: {
+        items: 1,
+        uniques: 1,
+        mods: 1,
+        gems: 1,
+        economy: 1,
+        ladderBuilds: 1,
+      },
+    });
+    expect(body.sha256).toMatch(/^[a-f0-9]{64}$/);
+  });
+
   it("returns one item from the configured dataset artifact", async () => {
     await expectJson(
       "/items/advanced-altar-robe?league=Dawn%20of%20the%20Hunt&patch=0.2.0",
@@ -358,6 +401,59 @@ describe("api routes", () => {
       "datasets/Dawn of the Hunt/0.2.0.json",
       "datasets/Dawn of the Hunt/0.2.0.manifest.json",
     ]);
+  });
+
+  it("serves a validated R2 dataset manifest", async () => {
+    const response = await api.request(
+      "/datasets/manifest?league=Dawn%20of%20the%20Hunt&patch=0.2.0",
+      undefined,
+      {
+        APP_URL: "https://calandra.pages.dev",
+        DATASET_R2_PREFIX: "datasets",
+        DATA_BUCKET: {
+          async get(key: string) {
+            return {
+              async text() {
+                return key.endsWith(".manifest.json")
+                  ? JSON.stringify({
+                      league: "Dawn of the Hunt",
+                      patch: "0.2.0",
+                      generatedAt: "2026-06-21T00:00:00.000Z",
+                      artifactKey: "datasets/Dawn of the Hunt/0.2.0.json",
+                      sha256: r2ArtifactSha256,
+                      counts: {
+                        items: 1,
+                        uniques: 0,
+                        mods: 0,
+                        gems: 0,
+                        economy: 0,
+                        ladderBuilds: 0,
+                      },
+                    })
+                  : r2Artifact;
+              },
+            };
+          },
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      league: "Dawn of the Hunt",
+      patch: "0.2.0",
+      generatedAt: "2026-06-21T00:00:00.000Z",
+      artifactKey: "datasets/Dawn of the Hunt/0.2.0.json",
+      sha256: r2ArtifactSha256,
+      counts: {
+        items: 1,
+        uniques: 0,
+        mods: 0,
+        gems: 0,
+        economy: 0,
+        ladderBuilds: 0,
+      },
+    });
   });
 
   it("rejects an R2 artifact when its manifest checksum does not match", async () => {

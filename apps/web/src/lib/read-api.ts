@@ -1,7 +1,9 @@
 import {
+  datasetManifestSchema,
   economyCollectionSchema,
   itemCollectionSchema,
   uniqueCollectionSchema,
+  type DatasetManifest,
   type EconomyPrice,
   type Item,
   type UniqueItem,
@@ -20,6 +22,7 @@ export type DashboardDataset = {
   source: "api" | "fallback";
   items: Array<Item | UniqueItem>;
   prices: EconomyPrice[];
+  manifest: DatasetManifest;
 };
 
 const fallbackDataset: DashboardDataset = {
@@ -61,6 +64,21 @@ const fallbackDataset: DashboardDataset = {
       updatedAt: "2026-06-21T13:15:00.000Z",
     },
   ],
+  manifest: {
+    league: dashboardDatasetVersion.league,
+    patch: dashboardDatasetVersion.patch,
+    generatedAt: "2026-06-21T13:15:00.000Z",
+    artifactKey: "fallback/demo-dataset.json",
+    sha256: "0".repeat(64),
+    counts: {
+      items: 2,
+      uniques: 1,
+      mods: 0,
+      gems: 0,
+      economy: 2,
+      ladderBuilds: 0,
+    },
+  },
 };
 
 export async function getDashboardDataset(
@@ -69,7 +87,7 @@ export async function getDashboardDataset(
 ): Promise<DashboardDataset> {
   try {
     const query = new URLSearchParams(dashboardDatasetVersion);
-    const [itemCollection, uniqueCollection, economyCollection] =
+    const [itemCollection, uniqueCollection, economyCollection, manifest] =
       await Promise.all([
         fetchJson(
           fetchImplementation,
@@ -88,12 +106,18 @@ export async function getDashboardDataset(
           )}?patch=${encodeURIComponent(dashboardDatasetVersion.patch)}`,
           economyCollectionSchema.parse,
         ),
+        fetchJson(
+          fetchImplementation,
+          `${apiBaseUrl}/datasets/manifest?${query.toString()}`,
+          datasetManifestSchema.parse,
+        ),
       ]);
 
     return {
       source: "api",
       items: [...itemCollection.items, ...uniqueCollection.uniques],
       prices: economyCollection.prices,
+      manifest,
     };
   } catch {
     return fallbackDataset;
