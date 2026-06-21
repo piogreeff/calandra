@@ -18,6 +18,11 @@ import {
 import type { UpgradeAdvisorResponse } from "@calandra/contract";
 import { defaultTheme } from "../lib/theme";
 import { ThemeSelector } from "../components/ThemeSelector";
+import {
+  dashboardDatasetVersion,
+  defaultApiBaseUrl,
+  getDashboardDataset,
+} from "../lib/read-api";
 
 const navItems = [
   { label: "Overview", icon: Gauge, current: true },
@@ -27,37 +32,6 @@ const navItems = [
   { label: "Economy", icon: Activity },
   { label: "Snapshots", icon: History },
   { label: "Settings", icon: Settings },
-];
-
-const items = [
-  {
-    name: "Advanced Altar Robe",
-    type: "Body Armour",
-    rarity: "normal",
-    level: 64,
-    source: "Dataset pending",
-  },
-  {
-    name: "Expert Siphoning Wand",
-    type: "Wand",
-    rarity: "magic",
-    level: 72,
-    source: "Dataset pending",
-  },
-  {
-    name: "Vaal Reliquary Key",
-    type: "Currency",
-    rarity: "currency",
-    level: 1,
-    source: "Economy cache",
-  },
-  {
-    name: "Choir of the Storm",
-    type: "Amulet",
-    rarity: "unique",
-    level: 52,
-    source: "Image unresolved",
-  },
 ];
 
 const advisorPreview = {
@@ -102,7 +76,12 @@ const advisorPreview = {
   ],
 } satisfies UpgradeAdvisorResponse;
 
-export default function Home() {
+export default async function Home() {
+  const dataset = await getDashboardDataset();
+  const endpointLabel = new URL(defaultApiBaseUrl).hostname;
+  const datasetSource =
+    dataset.source === "api" ? "Published R2 artifact" : "Demo fallback";
+
   return (
     <main className="min-h-screen">
       <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[16rem_minmax(0,1fr)]">
@@ -152,15 +131,14 @@ export default function Home() {
                 Overview
               </h1>
               <p className="mt-1 text-sm text-base-content/65">
-                Dawn of the Hunt - Patch 0.2.0
+                {dashboardDatasetVersion.league} - Patch{" "}
+                {dashboardDatasetVersion.patch}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <div className="inline-flex min-h-9 max-w-full min-w-0 items-center gap-2 rounded-md border border-success/35 bg-success/10 px-3 text-sm text-success">
                 <Activity className="size-4" aria-hidden="true" />
-                <span className="break-all">
-                  calandra-api.piogreeff.workers.dev
-                </span>
+                <span className="break-all">{endpointLabel}</span>
               </div>
               <div className="inline-flex min-h-9 max-w-full min-w-0 items-center gap-2 rounded-md border border-warning/35 bg-warning/10 px-3 text-sm text-warning">
                 <Database className="size-4" aria-hidden="true" />
@@ -241,7 +219,7 @@ export default function Home() {
                         Patch-versioned item database
                       </h2>
                       <p className="mt-1 text-sm text-base-content/60">
-                        OpenAPI /openapi.json
+                        {datasetSource} via /openapi.json
                       </p>
                     </div>
                     <label className="input input-sm flex min-h-9 items-center gap-2 md:w-64">
@@ -268,12 +246,12 @@ export default function Home() {
                         </tr>
                       </thead>
                       <tbody>
-                        {items.map((item) => (
-                          <tr key={item.name}>
+                        {dataset.items.map((item) => (
+                          <tr key={item.id}>
                             <td className="font-medium text-base-content">
                               {item.name}
                             </td>
-                            <td>{item.type}</td>
+                            <td>{formatCategory(item.category)}</td>
                             <td>
                               <span className="inline-flex items-center gap-2">
                                 <span
@@ -282,8 +260,8 @@ export default function Home() {
                                 {item.rarity}
                               </span>
                             </td>
-                            <td>{item.level}</td>
-                            <td>{item.source}</td>
+                            <td>{dashboardDatasetVersion.patch}</td>
+                            <td>{datasetSource}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -296,21 +274,19 @@ export default function Home() {
                   icon={<Activity className="size-4" aria-hidden="true" />}
                 >
                   <div className="space-y-3">
-                    {["Exalted Orb", "Divine Orb", "Greater Jeweller"].map(
-                      (label, index) => (
+                    {dataset.prices.map((price) => (
                         <div
-                          key={label}
+                          key={price.id}
                           className="flex items-center justify-between border-b border-base-300/60 pb-3 last:border-0 last:pb-0"
                         >
                           <span className="text-sm text-base-content/70">
-                            {label}
+                            {price.name}
                           </span>
                           <span className="font-semibold text-base-content">
-                            {[1, 142, 18][index]}
+                            {price.chaosEquivalent}
                           </span>
                         </div>
-                      ),
-                    )}
+                    ))}
                   </div>
                 </Panel>
               </section>
@@ -392,6 +368,13 @@ export default function Home() {
       </div>
     </main>
   );
+}
+
+function formatCategory(category: string) {
+  return category
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function Panel({
