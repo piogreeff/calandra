@@ -1,4 +1,6 @@
 import {
+  accountSnapshotDiffRequestSchema,
+  accountSnapshotDiffSchema,
   buyVsCraftRequestSchema,
   buyVsCraftResponseSchema,
   craftingEstimateRequestSchema,
@@ -16,6 +18,7 @@ export type CalandraMcpToolName =
   | "recommend_upgrade"
   | "estimate_crafting"
   | "compare_buy_vs_craft"
+  | "diff_snapshots"
   | "get_economy";
 
 export interface CalandraMcpTool {
@@ -134,6 +137,19 @@ export function listCalandraMcpTools(): CalandraMcpTool[] {
       },
     },
     {
+      name: "diff_snapshots",
+      description:
+        "Compare two Calandra account snapshots with the deterministic engine.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          before: { type: "object" },
+          after: { type: "object" },
+        },
+        required: ["before", "after"],
+      },
+    },
+    {
       name: "get_economy",
       description: "Fetch Calandra's economy prices for one league and patch.",
       inputSchema: {
@@ -175,6 +191,10 @@ export function createCalandraMcpServer(options: CalandraMcpServerOptions) {
         case "compare_buy_vs_craft":
           return jsonToolResult(
             await compareBuyVsCraft(apiBaseUrl, fetchImplementation, input),
+          );
+        case "diff_snapshots":
+          return jsonToolResult(
+            await diffSnapshots(apiBaseUrl, fetchImplementation, input),
           );
         case "get_economy":
           return jsonToolResult(
@@ -275,6 +295,22 @@ async function compareBuyVsCraft(
         body: JSON.stringify(request),
       },
     ),
+  );
+}
+
+async function diffSnapshots(
+  apiBaseUrl: string,
+  fetchImplementation: FetchLike,
+  input: unknown,
+) {
+  const request = accountSnapshotDiffRequestSchema.parse(input);
+
+  return accountSnapshotDiffSchema.parse(
+    await fetchJson(fetchImplementation, `${apiBaseUrl}/snapshots/diff`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(request),
+    }),
   );
 }
 

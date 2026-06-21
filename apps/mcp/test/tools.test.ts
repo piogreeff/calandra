@@ -9,6 +9,7 @@ describe("Calandra MCP tools", () => {
       "recommend_upgrade",
       "estimate_crafting",
       "compare_buy_vs_craft",
+      "diff_snapshots",
       "get_economy",
     ]);
   });
@@ -364,6 +365,124 @@ describe("Calandra MCP tools", () => {
         expectedAttempts: 4,
         expectedCostChaos: 8,
       },
+    });
+  });
+
+  it("routes account snapshot diffs to the deterministic snapshot endpoint", async () => {
+    const fetch = vi.fn(async () =>
+      jsonResponse({
+        beforeSnapshotId: "snapshot-before",
+        afterSnapshotId: "snapshot-after",
+        beforeCapturedAt: "2026-06-21T10:00:00.000Z",
+        afterCapturedAt: "2026-06-21T11:00:00.000Z",
+        characterChanges: [
+          {
+            id: "character-1",
+            name: "CalandraTest",
+            type: "changed",
+            beforeLevel: 72,
+            afterLevel: 73,
+            levelDelta: 1,
+            equipmentChanges: [
+              {
+                type: "changed",
+                slot: "gloves",
+                beforeName: "Frayed Mail Mitts",
+                afterName: "Duskthread Grips",
+              },
+            ],
+          },
+        ],
+        stashChanges: [],
+      }),
+    );
+    const server = createCalandraMcpServer({
+      apiBaseUrl: "https://calandra-api.workers.dev",
+      fetch,
+    });
+    const request = {
+      before: {
+        id: "snapshot-before",
+        account: "example",
+        capturedAt: "2026-06-21T10:00:00.000Z",
+        source: "official-poe2-character",
+        capabilities: { characters: true, stashes: false },
+        characters: [
+          {
+            id: "character-1",
+            name: "CalandraTest",
+            className: "Deadeye",
+            level: 72,
+            league: "Dawn of the Hunt",
+            equipment: [
+              {
+                slot: "gloves",
+                name: "Frayed Mail Mitts",
+                stats: { life: 40 },
+              },
+            ],
+          },
+        ],
+      },
+      after: {
+        id: "snapshot-after",
+        account: "example",
+        capturedAt: "2026-06-21T11:00:00.000Z",
+        source: "official-poe2-character",
+        capabilities: { characters: true, stashes: false },
+        characters: [
+          {
+            id: "character-1",
+            name: "CalandraTest",
+            className: "Deadeye",
+            level: 73,
+            league: "Dawn of the Hunt",
+            equipment: [
+              {
+                slot: "gloves",
+                name: "Duskthread Grips",
+                stats: { life: 65 },
+              },
+            ],
+          },
+        ],
+      },
+    };
+
+    const result = await server.callTool("diff_snapshots", request);
+
+    expect(fetch).toHaveBeenCalledWith(
+      "https://calandra-api.workers.dev/snapshots/diff",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(request),
+      },
+    );
+    expect(parseToolJson(result)).toEqual({
+      beforeSnapshotId: "snapshot-before",
+      afterSnapshotId: "snapshot-after",
+      beforeCapturedAt: "2026-06-21T10:00:00.000Z",
+      afterCapturedAt: "2026-06-21T11:00:00.000Z",
+      characterChanges: [
+        {
+          id: "character-1",
+          name: "CalandraTest",
+          type: "changed",
+          beforeLevel: 72,
+          afterLevel: 73,
+          levelDelta: 1,
+          equipmentChanges: [
+            {
+              type: "changed",
+              slot: "gloves",
+              beforeName: "Frayed Mail Mitts",
+              afterName: "Duskthread Grips",
+            },
+          ],
+        },
+      ],
+      stashChanges: [],
     });
   });
 
