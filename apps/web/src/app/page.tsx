@@ -15,9 +15,8 @@ import {
   Swords,
   WalletCards,
 } from "lucide-react";
-import { cookies } from "next/headers";
 import type { UpgradeAdvisorResponse } from "@calandra/contract";
-import { resolveTheme, themeCookieName } from "../lib/theme";
+import { defaultTheme } from "../lib/theme";
 import { ThemeSelector } from "../components/ThemeSelector";
 
 const navItems = [
@@ -103,10 +102,7 @@ const advisorPreview = {
   ],
 } satisfies UpgradeAdvisorResponse;
 
-export default async function Home() {
-  const cookieStore = await cookies();
-  const theme = resolveTheme(cookieStore.get(themeCookieName)?.value);
-
+export default function Home() {
   return (
     <main className="min-h-screen">
       <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[16rem_minmax(0,1fr)]">
@@ -162,13 +158,15 @@ export default async function Home() {
             <div className="flex flex-wrap items-center gap-2">
               <div className="inline-flex min-h-9 max-w-full min-w-0 items-center gap-2 rounded-md border border-success/35 bg-success/10 px-3 text-sm text-success">
                 <Activity className="size-4" aria-hidden="true" />
-                <span className="break-all">calandra-api.workers.dev</span>
+                <span className="break-all">
+                  calandra-api.piogreeff.workers.dev
+                </span>
               </div>
               <div className="inline-flex min-h-9 max-w-full min-w-0 items-center gap-2 rounded-md border border-warning/35 bg-warning/10 px-3 text-sm text-warning">
                 <Database className="size-4" aria-hidden="true" />
                 <span className="break-all">calandra.pages.dev</span>
               </div>
-              <ThemeSelector selectedTheme={theme} />
+              <ThemeSelector selectedTheme={defaultTheme} />
             </div>
           </header>
 

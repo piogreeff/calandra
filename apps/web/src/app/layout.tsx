@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
 import Script from "next/script";
 import "./globals.css";
-import { defaultTheme, resolveTheme, themeCookieName } from "../lib/theme";
+import { defaultTheme, themeCookieName } from "../lib/theme";
 import { FlyonuiScript } from "../components/FlyonuiScript";
 
 export const metadata: Metadata = {
@@ -12,12 +11,9 @@ export const metadata: Metadata = {
   applicationName: "Calandra"
 };
 
-export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const cookieStore = await cookies();
-  const theme = resolveTheme(cookieStore.get(themeCookieName)?.value);
-
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" data-theme={theme} suppressHydrationWarning>
+    <html lang="en" data-theme={defaultTheme} suppressHydrationWarning>
       <body className="calandra-shell overflow-x-hidden text-base-content antialiased">
         <Script id="calandra-theme-init" strategy="beforeInteractive">
           {`

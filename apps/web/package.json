@@ -7,6 +7,12 @@
     "dev": "cross-env NEXT_DIST_DIR=.next-dev next dev",
     "start": "next start",
     "build": "next build",
+    "build:static": "cross-env NEXT_OUTPUT=export next build",
+    "deploy": "pnpm run build:static && wrangler pages deploy apps/web/out --project-name=calandra --branch=main --commit-dirty=true --cwd ../..",
+    "preview:worker": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "deploy:worker": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "upload:worker": "opennextjs-cloudflare build && opennextjs-cloudflare upload",
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
@@ -20,12 +26,14 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "^1.19.11",
     "@tailwindcss/postcss": "^4.0.0",
     "@testing-library/react": "^16.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "cross-env": "^7.0.3",
     "postcss": "^8.4.0",
-    "tailwindcss": "^4.0.0"
+    "tailwindcss": "^4.0.0",
+    "wrangler": "^4.103.0"
   }
 }

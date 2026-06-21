@@ -34,7 +34,7 @@ pnpm dataset:import -- --artifact ./data/dawn-0.2.0.json --manifest ./data/dawn-
 pnpm dev                    # run the backend + web locally
 ```
 
-Until a permanent domain is purchased, the default hosted URLs use Cloudflare temporary domains: `https://calandra.pages.dev` for the app and `https://calandra-api.workers.dev` for the API. Replace those in `.env` once the real domain is available.
+Until a permanent domain is purchased, the default hosted URLs use Cloudflare temporary domains: `https://calandra.pages.dev` for the app and `https://calandra-api.piogreeff.workers.dev` for the API. Replace those in `.env` once the real domain is available.
 
 ## Configuration
 

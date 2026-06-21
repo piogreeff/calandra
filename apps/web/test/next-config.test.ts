@@ -13,4 +13,13 @@ describe("next config", () => {
       typedRoutes: true,
     });
   });
+
+  it("enables static export only for the temporary Pages deploy path", () => {
+    expect(resolveNextConfig({ NEXT_OUTPUT: "export" })).toMatchObject({
+      output: "export",
+    });
+    expect(resolveNextConfig({ NEXT_OUTPUT: "standalone" })).not.toHaveProperty(
+      "output",
+    );
+  });
 });

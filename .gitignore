@@ -7,6 +7,7 @@ dist/
 build/
 .next/
 .next-dev/
+.open-next/
 out/
 .turbo/
 *.tsbuildinfo
@@ -19,6 +20,7 @@ target/
 # Env / secrets
 .env
 .env.*
+.dev.vars
 !.env.example
 
 # Local data / dataset artifacts

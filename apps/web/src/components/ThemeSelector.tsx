@@ -1,12 +1,26 @@
 "use client";
 
 import { Palette } from "lucide-react";
-import { useTransition } from "react";
-import { setThemePreference } from "../app/actions";
-import { availableThemes, type ThemeName } from "../lib/theme";
+import { useEffect, useState } from "react";
+import {
+  availableThemes,
+  isThemeName,
+  resolveTheme,
+  themeCookieName,
+  type ThemeName,
+} from "../lib/theme";
 
 export function ThemeSelector({ selectedTheme }: { selectedTheme: ThemeName }) {
-  const [isPending, startTransition] = useTransition();
+  const [theme, setTheme] = useState<ThemeName>(selectedTheme);
+
+  useEffect(() => {
+    const match = document.cookie.match(
+      new RegExp(`(?:^|; )${themeCookieName}=([^;]+)`),
+    );
+    const cookieTheme = match ? decodeURIComponent(match[1] ?? "") : undefined;
+
+    setTheme(resolveTheme(cookieTheme));
+  }, []);
 
   return (
     <label className="inline-flex min-h-9 items-center gap-2 rounded-md border border-base-300 bg-base-200 px-3 text-sm text-base-content/75">
@@ -14,15 +28,17 @@ export function ThemeSelector({ selectedTheme }: { selectedTheme: ThemeName }) {
       <span className="sr-only">Theme</span>
       <select
         className="bg-transparent text-sm outline-none"
-        defaultValue={selectedTheme}
+        value={theme}
         aria-label="Theme"
-        disabled={isPending}
         onChange={(event) => {
-          const theme = event.currentTarget.value as ThemeName;
-          document.documentElement.setAttribute("data-theme", theme);
-          startTransition(() => {
-            void setThemePreference(theme);
-          });
+          const selected = event.currentTarget.value;
+          if (!isThemeName(selected)) return;
+
+          document.documentElement.setAttribute("data-theme", selected);
+          document.cookie = `${themeCookieName}=${encodeURIComponent(
+            selected,
+          )}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
+          setTheme(selected);
         }}
       >
         {availableThemes.map((theme) => (
