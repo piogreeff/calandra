@@ -7,6 +7,8 @@ import {
   assertGggUserAgent,
   calandraPoe2CharacterScopes,
   createGggApiClient,
+  createGggOAuthAuthorizationUrl,
+  createGggOAuthPkcePair,
   createGggUserAgent,
   decryptGggOAuthTokenSet,
   encryptGggOAuthTokenSet,
@@ -15,6 +17,7 @@ import {
   poe2CurrencyExchangeSupport,
   poe2ItemTradeSearchSupport,
   poe2StashOAuthSupport,
+  type GggOAuthPkcePair,
   type GggOAuthTokenSet,
   type GggHttpResponse,
 } from "../src/index";
@@ -46,6 +49,85 @@ describe("GGG official API client hygiene", () => {
       supported: false,
       requiredScope: gggOAuthScopes.accountStashes,
     });
+  });
+
+  it("generates a PKCE verifier and S256 challenge for OAuth authorization", async () => {
+    const pkce = await createGggOAuthPkcePair({
+      crypto: deterministicPkceCrypto(),
+    });
+
+    expect(pkce.codeVerifier).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(pkce.codeChallenge).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(pkce.codeChallenge).not.toBe(pkce.codeVerifier);
+    expect(pkce.codeChallengeMethod).toBe("S256");
+  });
+
+  it("builds an OAuth authorization URL for the temporary hosted app domain", () => {
+    const authorizationUrl = createGggOAuthAuthorizationUrl({
+      clientId: "calandra-client-id",
+      redirectUri: "https://calandra.pages.dev/auth/ggg/callback",
+      scopes: calandraPoe2CharacterScopes,
+      state: "state-123",
+      pkce: testPkce,
+    });
+    const url = new URL(authorizationUrl);
+
+    expect(`${url.origin}${url.pathname}`).toBe(
+      "https://www.pathofexile.com/oauth/authorize",
+    );
+    expect(url.searchParams.get("client_id")).toBe("calandra-client-id");
+    expect(url.searchParams.get("response_type")).toBe("code");
+    expect(url.searchParams.get("scope")).toBe("account:characters");
+    expect(url.searchParams.get("state")).toBe("state-123");
+    expect(url.searchParams.get("redirect_uri")).toBe(
+      "https://calandra.pages.dev/auth/ggg/callback",
+    );
+    expect(url.searchParams.get("code_challenge")).toBe("challenge");
+    expect(url.searchParams.get("code_challenge_method")).toBe("S256");
+  });
+
+  it("allows a local loopback redirect for the desktop public-client flow", () => {
+    const authorizationUrl = createGggOAuthAuthorizationUrl({
+      clientId: "calandra-desktop-client",
+      redirectUri: "http://127.0.0.1:17633/callback",
+      scopes: calandraPoe2CharacterScopes,
+      state: "desktop-state",
+      pkce: testPkce,
+    });
+
+    expect(new URL(authorizationUrl).searchParams.get("redirect_uri")).toBe(
+      "http://127.0.0.1:17633/callback",
+    );
+  });
+
+  it("rejects unsupported OAuth redirects and malformed authorization state", () => {
+    expect(() =>
+      createGggOAuthAuthorizationUrl({
+        clientId: "calandra-client-id",
+        redirectUri: "http://example.com/callback",
+        scopes: calandraPoe2CharacterScopes,
+        state: "state-123",
+        pkce: testPkce,
+      }),
+    ).toThrow(GggApiConfigurationError);
+    expect(() =>
+      createGggOAuthAuthorizationUrl({
+        clientId: "calandra-client-id",
+        redirectUri: "https://calandra.pages.dev/auth/ggg/callback",
+        scopes: [],
+        state: "state-123",
+        pkce: testPkce,
+      }),
+    ).toThrow(GggApiConfigurationError);
+    expect(() =>
+      createGggOAuthAuthorizationUrl({
+        clientId: "calandra-client-id",
+        redirectUri: "https://calandra.pages.dev/auth/ggg/callback",
+        scopes: calandraPoe2CharacterScopes,
+        state: " ",
+        pkce: testPkce,
+      }),
+    ).toThrow(GggApiConfigurationError);
   });
 
   it("enables official PoE2 currency exchange history and disables item trade-search", () => {
@@ -282,6 +364,12 @@ describe("GGG OAuth token encryption", () => {
   });
 });
 
+const testPkce: GggOAuthPkcePair = {
+  codeVerifier: "verifier",
+  codeChallenge: "challenge",
+  codeChallengeMethod: "S256",
+};
+
 function jsonResponse(
   status: number,
   body: unknown,
@@ -314,4 +402,21 @@ function headers(values: Record<string, string>): GggHttpResponse["headers"] {
 
 function encryptionKey(seed: number) {
   return Uint8Array.from({ length: 32 }, (_, index) => (seed + index) % 256);
+}
+
+function deterministicPkceCrypto() {
+  return {
+    getRandomValues<T extends Uint8Array>(array: T): T {
+      for (let index = 0; index < array.length; index += 1) {
+        array[index] = index;
+      }
+
+      return array;
+    },
+    subtle: {
+      digest(algorithm: "SHA-256", data: Uint8Array) {
+        return crypto.subtle.digest(algorithm, data);
+      },
+    },
+  };
 }

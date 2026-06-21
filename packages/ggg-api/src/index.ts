@@ -1,4 +1,6 @@
 export const gggApiBaseUrl = "https://api.pathofexile.com";
+export const gggOAuthAuthorizeUrl =
+  "https://www.pathofexile.com/oauth/authorize";
 export const gggPoe2Realm = "poe2";
 
 export const gggOAuthScopes = {
@@ -123,6 +125,27 @@ type CryptoProvider = {
   };
 };
 
+type PkceCryptoProvider = {
+  getRandomValues<T extends Uint8Array>(array: T): T;
+  subtle: {
+    digest(algorithm: "SHA-256", data: Uint8Array): Promise<ArrayBuffer>;
+  };
+};
+
+export type GggOAuthPkcePair = {
+  codeVerifier: string;
+  codeChallenge: string;
+  codeChallengeMethod: "S256";
+};
+
+export type GggOAuthAuthorizationUrlOptions = {
+  clientId: string;
+  redirectUri: string;
+  scopes: readonly GggOAuthScope[];
+  state: string;
+  pkce: GggOAuthPkcePair;
+};
+
 export class GggApiConfigurationError extends Error {
   constructor(message: string) {
     super(message);
@@ -182,6 +205,59 @@ export function createGggUserAgent({
   const userAgent = `${appName}/${version} (+${appUrl}; ${contact})`;
   assertGggUserAgent(userAgent);
   return userAgent;
+}
+
+export async function createGggOAuthPkcePair(options?: {
+  crypto?: PkceCryptoProvider;
+}): Promise<GggOAuthPkcePair> {
+  const cryptoProvider = getPkceCryptoProvider(options?.crypto);
+  const verifierBytes = cryptoProvider.getRandomValues(new Uint8Array(32));
+  const codeVerifier = base64UrlEncode(verifierBytes);
+  const digest = await cryptoProvider.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(codeVerifier),
+  );
+
+  return {
+    codeVerifier,
+    codeChallenge: base64UrlEncode(new Uint8Array(digest)),
+    codeChallengeMethod: "S256",
+  };
+}
+
+export function createGggOAuthAuthorizationUrl(
+  options: GggOAuthAuthorizationUrlOptions,
+) {
+  const clientId = options.clientId.trim();
+  const state = options.state.trim();
+
+  if (!clientId) {
+    throw new GggApiConfigurationError("GGG OAuth client id is required.");
+  }
+
+  if (!state) {
+    throw new GggApiConfigurationError("GGG OAuth state is required.");
+  }
+
+  if (options.scopes.length === 0) {
+    throw new GggApiConfigurationError(
+      "GGG OAuth authorization requires at least one scope.",
+    );
+  }
+
+  assertGggOAuthRedirectUri(options.redirectUri);
+  assertGggOAuthPkcePair(options.pkce);
+
+  const url = new URL(gggOAuthAuthorizeUrl);
+  url.searchParams.set("client_id", clientId);
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("scope", options.scopes.join(" "));
+  url.searchParams.set("state", state);
+  url.searchParams.set("redirect_uri", options.redirectUri);
+  url.searchParams.set("code_challenge", options.pkce.codeChallenge);
+  url.searchParams.set("code_challenge_method", options.pkce.codeChallengeMethod);
+
+  return url.toString();
 }
 
 export async function encryptGggOAuthTokenSet(
@@ -519,6 +595,57 @@ function getCryptoProvider(cryptoProvider?: CryptoProvider): CryptoProvider {
   }
 
   return resolvedProvider;
+}
+
+function getPkceCryptoProvider(
+  cryptoProvider?: PkceCryptoProvider,
+): PkceCryptoProvider {
+  const resolvedProvider =
+    cryptoProvider ??
+    (globalThis as { crypto?: PkceCryptoProvider | undefined }).crypto;
+
+  if (!resolvedProvider?.subtle?.digest || !resolvedProvider.getRandomValues) {
+    throw new GggApiConfigurationError(
+      "Web Crypto is required for GGG OAuth PKCE.",
+    );
+  }
+
+  return resolvedProvider;
+}
+
+function assertGggOAuthRedirectUri(redirectUri: string): void {
+  let url: URL;
+
+  try {
+    url = new URL(redirectUri);
+  } catch {
+    throw new GggApiConfigurationError(
+      "GGG OAuth redirect URI must be a valid URL.",
+    );
+  }
+
+  const isHttps = url.protocol === "https:";
+  const isLoopbackHttp =
+    url.protocol === "http:" &&
+    ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname);
+
+  if (!isHttps && !isLoopbackHttp) {
+    throw new GggApiConfigurationError(
+      "GGG OAuth redirect URI must be HTTPS or a local loopback HTTP URL.",
+    );
+  }
+}
+
+function assertGggOAuthPkcePair(pkce: GggOAuthPkcePair): void {
+  if (
+    !pkce.codeVerifier.trim() ||
+    !pkce.codeChallenge.trim() ||
+    pkce.codeChallengeMethod !== "S256"
+  ) {
+    throw new GggApiConfigurationError(
+      "GGG OAuth PKCE requires a verifier, S256 challenge, and S256 method.",
+    );
+  }
 }
 
 function importGggOAuthTokenEncryptionKey(

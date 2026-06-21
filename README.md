@@ -32,7 +32,7 @@ pnpm --filter @calandra/mcp stdio
 
 Set `CALANDRA_API_BASE_URL` to point the MCP server at a self-hosted API; if unset it uses the temporary hosted Worker at `https://calandra-api.piogreeff.workers.dev`.
 
-Official GGG API calls should go through `packages/ggg-api`, which enforces Calandra's descriptive `User-Agent`, OAuth scope checks, `429`/rate-limit backoff, and AES-GCM token-at-rest encryption for future character snapshot work.
+Official GGG API calls should go through `packages/ggg-api`, which builds PKCE authorization URLs, enforces Calandra's descriptive `User-Agent`, OAuth scope checks, `429`/rate-limit backoff, and AES-GCM token-at-rest encryption for future character snapshot work.
 
 The dataset package validates maintainer-published game-data artifacts for self-host imports:
 
