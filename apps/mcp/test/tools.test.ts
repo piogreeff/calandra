@@ -10,6 +10,7 @@ describe("Calandra MCP tools", () => {
       "estimate_crafting",
       "compare_buy_vs_craft",
       "diff_snapshots",
+      "check_price",
       "get_economy",
     ]);
   });
@@ -483,6 +484,80 @@ describe("Calandra MCP tools", () => {
         },
       ],
       stashChanges: [],
+    });
+  });
+
+  it("routes parsed item price checks to the deterministic price endpoint", async () => {
+    const fetch = vi.fn(async () =>
+      jsonResponse({
+        source: "published-dataset",
+        league: "Dawn of the Hunt",
+        patch: "0.2.0",
+        item: {
+          id: "divine-orb",
+          name: "Divine Orb",
+          category: "currency",
+          rarity: "currency",
+        },
+        price: {
+          id: "divine-orb",
+          name: "Divine Orb",
+          chaosEquivalent: 142,
+          updatedAt: "2026-06-21T00:00:00.000Z",
+        },
+        matchedBy: "id",
+      }),
+    );
+    const server = createCalandraMcpServer({
+      apiBaseUrl: "https://calandra-api.workers.dev",
+      fetch,
+    });
+
+    const result = await server.callTool("check_price", {
+      league: "Dawn of the Hunt",
+      patch: "0.2.0",
+      item: {
+        id: "divine-orb",
+        name: "Divine Orb",
+        category: "currency",
+        rarity: "currency",
+      },
+    });
+
+    expect(fetch).toHaveBeenCalledWith(
+      "https://calandra-api.workers.dev/price/check",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          league: "Dawn of the Hunt",
+          patch: "0.2.0",
+          item: {
+            id: "divine-orb",
+            name: "Divine Orb",
+            category: "currency",
+            rarity: "currency",
+          },
+        }),
+      },
+    );
+    expect(parseToolJson(result)).toEqual({
+      source: "published-dataset",
+      league: "Dawn of the Hunt",
+      patch: "0.2.0",
+      item: {
+        id: "divine-orb",
+        name: "Divine Orb",
+        category: "currency",
+        rarity: "currency",
+      },
+      price: {
+        id: "divine-orb",
+        name: "Divine Orb",
+        chaosEquivalent: 142,
+        updatedAt: "2026-06-21T00:00:00.000Z",
+      },
+      matchedBy: "id",
     });
   });
 

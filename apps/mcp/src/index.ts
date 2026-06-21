@@ -7,6 +7,8 @@ import {
   craftingEstimateResponseSchema,
   economyCollectionSchema,
   itemCollectionSchema,
+  priceCheckRequestSchema,
+  priceCheckResponseSchema,
   upgradeAdvisorRequestSchema,
   upgradeAdvisorResponseSchema,
 } from "@calandra/contract";
@@ -19,6 +21,7 @@ export type CalandraMcpToolName =
   | "estimate_crafting"
   | "compare_buy_vs_craft"
   | "diff_snapshots"
+  | "check_price"
   | "get_economy";
 
 export interface CalandraMcpTool {
@@ -150,6 +153,19 @@ export function listCalandraMcpTools(): CalandraMcpTool[] {
       },
     },
     {
+      name: "check_price",
+      description:
+        "Check a parsed item against Calandra's patch-versioned economy data.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          ...versionedToolProperties,
+          item: { type: "object" },
+        },
+        required: ["league", "patch", "item"],
+      },
+    },
+    {
       name: "get_economy",
       description: "Fetch Calandra's economy prices for one league and patch.",
       inputSchema: {
@@ -195,6 +211,10 @@ export function createCalandraMcpServer(options: CalandraMcpServerOptions) {
         case "diff_snapshots":
           return jsonToolResult(
             await diffSnapshots(apiBaseUrl, fetchImplementation, input),
+          );
+        case "check_price":
+          return jsonToolResult(
+            await checkPrice(apiBaseUrl, fetchImplementation, input),
           );
         case "get_economy":
           return jsonToolResult(
@@ -307,6 +327,22 @@ async function diffSnapshots(
 
   return accountSnapshotDiffSchema.parse(
     await fetchJson(fetchImplementation, `${apiBaseUrl}/snapshots/diff`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(request),
+    }),
+  );
+}
+
+async function checkPrice(
+  apiBaseUrl: string,
+  fetchImplementation: FetchLike,
+  input: unknown,
+) {
+  const request = priceCheckRequestSchema.parse(input);
+
+  return priceCheckResponseSchema.parse(
+    await fetchJson(fetchImplementation, `${apiBaseUrl}/price/check`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(request),
