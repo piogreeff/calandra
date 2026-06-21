@@ -12,11 +12,14 @@ import {
   createGggUserAgent,
   decryptGggOAuthTokenSet,
   encryptGggOAuthTokenSet,
+  exchangeGggOAuthAuthorizationCode,
   getRetryAfterMs,
   gggOAuthScopes,
   poe2CurrencyExchangeSupport,
   poe2ItemTradeSearchSupport,
   poe2StashOAuthSupport,
+  refreshGggOAuthToken,
+  type GggOAuthFetchLike,
   type GggOAuthPkcePair,
   type GggOAuthTokenSet,
   type GggHttpResponse,
@@ -128,6 +131,170 @@ describe("GGG official API client hygiene", () => {
         pkce: testPkce,
       }),
     ).toThrow(GggApiConfigurationError);
+  });
+
+  it("exchanges an OAuth authorization code for a normalized token set", async () => {
+    const fetch = vi.fn<
+      Parameters<GggOAuthFetchLike>,
+      ReturnType<GggOAuthFetchLike>
+    >(async () =>
+      jsonResponse(200, {
+        access_token: "access-token",
+        expires_in: 3600,
+        token_type: "bearer",
+        scope: "account:characters",
+        username: "CalandraAccount",
+        sub: "c5b9c286-8d05-47af-be41-67ab10a8c53e",
+        refresh_token: "refresh-token",
+      }),
+    );
+
+    await expect(
+      exchangeGggOAuthAuthorizationCode({
+        clientId: "calandra-client-id",
+        redirectUri: "https://calandra.pages.dev/auth/ggg/callback",
+        code: "authorization-code",
+        codeVerifier: "verifier",
+        scopes: calandraPoe2CharacterScopes,
+        fetch,
+        now: new Date("2026-06-21T15:00:00.000Z"),
+      }),
+    ).resolves.toEqual({
+      accessToken: "access-token",
+      expiresAt: "2026-06-21T16:00:00.000Z",
+      tokenType: "bearer",
+      scope: ["account:characters"],
+      username: "CalandraAccount",
+      sub: "c5b9c286-8d05-47af-be41-67ab10a8c53e",
+      refreshToken: "refresh-token",
+    });
+
+    const request = fetch.mock.calls[0];
+    if (!request) {
+      throw new Error("Expected an OAuth token request.");
+    }
+    expect(request[0]).toBe("https://www.pathofexile.com/oauth/token");
+    expect(request[1]).toMatchObject({
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/x-www-form-urlencoded",
+      },
+    });
+    expect(new URLSearchParams(request[1].body).toString()).toBe(
+      new URLSearchParams({
+        client_id: "calandra-client-id",
+        grant_type: "authorization_code",
+        code: "authorization-code",
+        redirect_uri: "https://calandra.pages.dev/auth/ggg/callback",
+        code_verifier: "verifier",
+        scope: "account:characters",
+      }).toString(),
+    );
+  });
+
+  it("refreshes an OAuth token without requiring a client secret", async () => {
+    const fetch = vi.fn<
+      Parameters<GggOAuthFetchLike>,
+      ReturnType<GggOAuthFetchLike>
+    >(async () =>
+      jsonResponse(200, {
+        access_token: "next-access-token",
+        expires_in: 600,
+        token_type: "bearer",
+        scope: "account:characters",
+      }),
+    );
+
+    await expect(
+      refreshGggOAuthToken({
+        clientId: "calandra-public-client",
+        refreshToken: "refresh-token",
+        fetch,
+        now: new Date("2026-06-21T15:00:00.000Z"),
+      }),
+    ).resolves.toMatchObject({
+      accessToken: "next-access-token",
+      expiresAt: "2026-06-21T15:10:00.000Z",
+      scope: ["account:characters"],
+    });
+
+    const request = fetch.mock.calls[0];
+    if (!request) {
+      throw new Error("Expected an OAuth token request.");
+    }
+    expect(new URLSearchParams(request[1].body).toString()).toBe(
+      new URLSearchParams({
+        client_id: "calandra-public-client",
+        grant_type: "refresh_token",
+        refresh_token: "refresh-token",
+      }).toString(),
+    );
+  });
+
+  it("sends a client secret when a confidential OAuth client is configured", async () => {
+    const fetch = vi.fn<
+      Parameters<GggOAuthFetchLike>,
+      ReturnType<GggOAuthFetchLike>
+    >(async () =>
+      jsonResponse(200, {
+        access_token: "access-token",
+        expires_in: 3600,
+        token_type: "bearer",
+        scope: "account:characters",
+      }),
+    );
+
+    await exchangeGggOAuthAuthorizationCode({
+      clientId: "calandra-confidential-client",
+      clientSecret: "client-secret",
+      redirectUri: "https://calandra.pages.dev/auth/ggg/callback",
+      code: "authorization-code",
+      codeVerifier: "verifier",
+      fetch,
+      now: new Date("2026-06-21T15:00:00.000Z"),
+    });
+
+    const request = fetch.mock.calls[0];
+    if (!request) {
+      throw new Error("Expected an OAuth token request.");
+    }
+    expect(new URLSearchParams(request[1].body).get("client_secret")).toBe(
+      "client-secret",
+    );
+  });
+
+  it("rejects OAuth token endpoint errors and malformed token responses", async () => {
+    await expect(
+      exchangeGggOAuthAuthorizationCode({
+        clientId: "calandra-client-id",
+        redirectUri: "https://calandra.pages.dev/auth/ggg/callback",
+        code: "authorization-code",
+        codeVerifier: "verifier",
+        fetch: vi.fn(async () =>
+          jsonResponse(400, { error: "invalid_grant" }),
+        ),
+      }),
+    ).rejects.toMatchObject({
+      name: "GggApiHttpError",
+      status: 400,
+      body: { error: "invalid_grant" },
+    });
+
+    await expect(
+      refreshGggOAuthToken({
+        clientId: "calandra-client-id",
+        refreshToken: "refresh-token",
+        fetch: vi.fn(async () =>
+          jsonResponse(200, {
+            access_token: "access-token",
+            expires_in: 3600,
+            token_type: "bearer",
+            scope: "",
+          }),
+        ),
+      }),
+    ).rejects.toThrow(GggOAuthTokenEncryptionError);
   });
 
   it("enables official PoE2 currency exchange history and disables item trade-search", () => {

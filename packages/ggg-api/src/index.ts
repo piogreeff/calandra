@@ -1,6 +1,7 @@
 export const gggApiBaseUrl = "https://api.pathofexile.com";
 export const gggOAuthAuthorizeUrl =
   "https://www.pathofexile.com/oauth/authorize";
+export const gggOAuthTokenUrl = "https://www.pathofexile.com/oauth/token";
 export const gggPoe2Realm = "poe2";
 
 export const gggOAuthScopes = {
@@ -146,6 +147,37 @@ export type GggOAuthAuthorizationUrlOptions = {
   pkce: GggOAuthPkcePair;
 };
 
+export type GggOAuthAuthorizationCodeExchangeOptions = {
+  clientId: string;
+  clientSecret?: string;
+  redirectUri: string;
+  code: string;
+  codeVerifier: string;
+  scopes?: readonly GggOAuthScope[];
+  fetch: GggOAuthFetchLike;
+  tokenUrl?: string;
+  now?: Date;
+};
+
+export type GggOAuthRefreshTokenOptions = {
+  clientId: string;
+  clientSecret?: string;
+  refreshToken: string;
+  scopes?: readonly GggOAuthScope[];
+  fetch: GggOAuthFetchLike;
+  tokenUrl?: string;
+  now?: Date;
+};
+
+export type GggOAuthFetchLike = (
+  url: string,
+  init: {
+    method: "POST";
+    headers: Record<string, string>;
+    body: string;
+  },
+) => Promise<GggHttpResponse>;
+
 export class GggApiConfigurationError extends Error {
   constructor(message: string) {
     super(message);
@@ -260,6 +292,69 @@ export function createGggOAuthAuthorizationUrl(
   return url.toString();
 }
 
+export async function exchangeGggOAuthAuthorizationCode(
+  options: GggOAuthAuthorizationCodeExchangeOptions,
+): Promise<GggOAuthTokenSet> {
+  const clientId = assertNonEmptyString(
+    options.clientId,
+    "GGG OAuth client id is required.",
+  );
+  const code = assertNonEmptyString(
+    options.code,
+    "GGG OAuth authorization code is required.",
+  );
+  const codeVerifier = assertNonEmptyString(
+    options.codeVerifier,
+    "GGG OAuth code verifier is required.",
+  );
+  assertGggOAuthRedirectUri(options.redirectUri);
+
+  return requestGggOAuthToken({
+    fetch: options.fetch,
+    tokenUrl: options.tokenUrl,
+    now: options.now,
+    fields: {
+      client_id: clientId,
+      ...(options.clientSecret
+        ? { client_secret: options.clientSecret }
+        : {}),
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: options.redirectUri,
+      code_verifier: codeVerifier,
+      ...(options.scopes ? { scope: options.scopes.join(" ") } : {}),
+    },
+  });
+}
+
+export async function refreshGggOAuthToken(
+  options: GggOAuthRefreshTokenOptions,
+): Promise<GggOAuthTokenSet> {
+  const clientId = assertNonEmptyString(
+    options.clientId,
+    "GGG OAuth client id is required.",
+  );
+  const refreshToken = assertNonEmptyString(
+    options.refreshToken,
+    "GGG OAuth refresh token is required.",
+  );
+
+  return requestGggOAuthToken({
+    fetch: options.fetch,
+    tokenUrl: options.tokenUrl,
+    now: options.now,
+    fields: {
+      client_id: clientId,
+      ...(options.clientSecret
+        ? { client_secret: options.clientSecret }
+        : {}),
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+      ...(options.scopes ? { scope: options.scopes.join(" ") } : {}),
+    },
+  });
+}
+
 export async function encryptGggOAuthTokenSet(
   tokenSet: GggOAuthTokenSet,
   options: GggOAuthTokenEncryptionOptions,
@@ -359,6 +454,7 @@ export function assertGggOAuthTokenSet(
 
   if (
     !Array.isArray(value.scope) ||
+    value.scope.length === 0 ||
     value.scope.some((scope) => typeof scope !== "string" || !scope.trim())
   ) {
     throw new GggOAuthTokenEncryptionError(
@@ -577,10 +673,118 @@ async function readErrorBody(response: GggHttpResponse) {
   }
 }
 
+async function requestGggOAuthToken({
+  fetch,
+  tokenUrl,
+  now = new Date(),
+  fields,
+}: {
+  fetch: GggOAuthFetchLike;
+  tokenUrl?: string | undefined;
+  now?: Date | undefined;
+  fields: Record<string, string>;
+}) {
+  const response = await fetch(tokenUrl ?? gggOAuthTokenUrl, {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams(fields).toString(),
+  });
+
+  if (!response.ok) {
+    throw new GggApiHttpError(
+      `GGG OAuth token request failed with HTTP ${response.status}.`,
+      response.status,
+      await readErrorBody(response),
+    );
+  }
+
+  return toGggOAuthTokenSet(await response.json(), now);
+}
+
+function toGggOAuthTokenSet(value: unknown, now: Date): GggOAuthTokenSet {
+  if (!isRecord(value)) {
+    throw new GggApiConfigurationError(
+      "GGG OAuth token response must be an object.",
+    );
+  }
+
+  const accessToken = assertNonEmptyString(
+    value.access_token,
+    "GGG OAuth token response requires an access token.",
+  );
+  const tokenType = assertNonEmptyString(
+    value.token_type,
+    "GGG OAuth token response requires a token type.",
+  ).toLowerCase();
+  if (tokenType !== "bearer") {
+    throw new GggApiConfigurationError(
+      "GGG OAuth token response must use bearer tokens.",
+    );
+  }
+
+  const expiresIn =
+    typeof value.expires_in === "number" ? value.expires_in : Number.NaN;
+  if (!Number.isFinite(expiresIn) || expiresIn < 0) {
+    throw new GggApiConfigurationError(
+      "GGG OAuth token response requires a non-negative expires_in value.",
+    );
+  }
+
+  const scope = parseOAuthScope(value.scope);
+  const refreshToken =
+    typeof value.refresh_token === "string" && value.refresh_token.trim()
+      ? value.refresh_token
+      : undefined;
+  const sub =
+    typeof value.sub === "string" && value.sub.trim() ? value.sub : undefined;
+  const username =
+    typeof value.username === "string" && value.username.trim()
+      ? value.username
+      : undefined;
+  const tokenSet: GggOAuthTokenSet = {
+    accessToken,
+    tokenType: "bearer",
+    scope,
+    expiresAt: new Date(now.getTime() + expiresIn * 1000).toISOString(),
+    ...(refreshToken ? { refreshToken } : {}),
+    ...(sub ? { sub } : {}),
+    ...(username ? { username } : {}),
+  };
+
+  assertGggOAuthTokenSet(tokenSet);
+  return tokenSet;
+}
+
+function parseOAuthScope(value: unknown) {
+  if (typeof value === "string") {
+    return value
+      .split(/\s+/)
+      .map((scope) => scope.trim())
+      .filter(Boolean);
+  }
+
+  if (Array.isArray(value)) {
+    return value.filter((scope): scope is string => typeof scope === "string");
+  }
+
+  return [];
+}
+
 function defaultSleep(milliseconds: number) {
   return new Promise<void>((resolve) => {
     setTimeout(resolve, milliseconds);
   });
+}
+
+function assertNonEmptyString(value: unknown, message: string) {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new GggApiConfigurationError(message);
+  }
+
+  return value.trim();
 }
 
 function getCryptoProvider(cryptoProvider?: CryptoProvider): CryptoProvider {
