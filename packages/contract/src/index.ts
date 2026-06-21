@@ -99,6 +99,21 @@ export const economyCollectionSchema = z.object({
   prices: z.array(economyPriceSchema),
 });
 
+export const priceCheckMatchTypeSchema = z.enum(["id", "name"]);
+
+export const priceCheckRequestSchema = z.object({
+  ...versionedCollectionFields,
+  item: itemSchema,
+});
+
+export const priceCheckResponseSchema = z.object({
+  source: z.literal("published-dataset"),
+  ...versionedCollectionFields,
+  item: itemSchema,
+  price: economyPriceSchema.nullable(),
+  matchedBy: priceCheckMatchTypeSchema.nullable(),
+});
+
 export const ladderBuildSchema = z.object({
   id: z.string().min(1),
   account: z.string().min(1),
@@ -468,6 +483,33 @@ export const openApiDocument = {
         },
       },
     },
+    "/price/check": {
+      post: {
+        operationId: "checkItemPrice",
+        summary: "Check a parsed item against patch-versioned economy data",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/PriceCheckRequest" },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Deterministic price check result",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/PriceCheckResponse" },
+              },
+            },
+          },
+          "400": {
+            description: "Invalid price check request",
+          },
+        },
+      },
+    },
     "/builds/ladder": {
       get: {
         operationId: "listLadderBuilds",
@@ -772,6 +814,34 @@ export const openApiDocument = {
           prices: {
             type: "array",
             items: { $ref: "#/components/schemas/EconomyPrice" },
+          },
+        },
+      },
+      PriceCheckRequest: {
+        type: "object",
+        required: ["league", "patch", "item"],
+        properties: {
+          league: { type: "string", minLength: 1 },
+          patch: { type: "string", minLength: 1 },
+          item: { $ref: "#/components/schemas/Item" },
+        },
+      },
+      PriceCheckResponse: {
+        type: "object",
+        required: ["source", "league", "patch", "item", "price", "matchedBy"],
+        properties: {
+          source: { type: "string", enum: ["published-dataset"] },
+          league: { type: "string", minLength: 1 },
+          patch: { type: "string", minLength: 1 },
+          item: { $ref: "#/components/schemas/Item" },
+          price: {
+            nullable: true,
+            allOf: [{ $ref: "#/components/schemas/EconomyPrice" }],
+          },
+          matchedBy: {
+            type: "string",
+            enum: ["id", "name"],
+            nullable: true,
           },
         },
       },
@@ -1193,6 +1263,9 @@ export type Gem = z.infer<typeof gemSchema>;
 export type GemCollection = z.infer<typeof gemCollectionSchema>;
 export type EconomyPrice = z.infer<typeof economyPriceSchema>;
 export type EconomyCollection = z.infer<typeof economyCollectionSchema>;
+export type PriceCheckMatchType = z.infer<typeof priceCheckMatchTypeSchema>;
+export type PriceCheckRequest = z.infer<typeof priceCheckRequestSchema>;
+export type PriceCheckResponse = z.infer<typeof priceCheckResponseSchema>;
 export type LadderBuild = z.infer<typeof ladderBuildSchema>;
 export type LadderBuildCollection = z.infer<typeof ladderBuildCollectionSchema>;
 export type AccountSnapshotSource = z.infer<typeof accountSnapshotSourceSchema>;

@@ -15,6 +15,8 @@ import {
   ladderBuildCollectionSchema,
   modCollectionSchema,
   openApiDocument,
+  priceCheckRequestSchema,
+  priceCheckResponseSchema,
   upgradeAdvisorRequestSchema,
   upgradeAdvisorResponseSchema,
   uniqueCollectionSchema,
@@ -213,6 +215,29 @@ api.get("/economy/:league", async (context) => {
       league,
       patch,
       prices: artifact?.economy ?? [],
+    }),
+  );
+});
+
+api.post("/price/check", async (context) => {
+  const rawBody = await readJsonBody(context);
+  const parsed = priceCheckRequestSchema.safeParse(rawBody);
+
+  if (!parsed.success) {
+    return context.json({ error: "invalid price check request" }, 400);
+  }
+
+  const artifact = await getMatchingArtifact(context, parsed.data);
+  const priceMatch = findPriceMatch(artifact?.economy ?? [], parsed.data.item);
+
+  return context.json(
+    priceCheckResponseSchema.parse({
+      source: "published-dataset",
+      league: parsed.data.league,
+      patch: parsed.data.patch,
+      item: parsed.data.item,
+      price: priceMatch?.price ?? null,
+      matchedBy: priceMatch?.matchedBy ?? null,
     }),
   );
 });
@@ -446,6 +471,23 @@ function getDatasetCounts(artifact: DatasetArtifact) {
   };
 }
 
+function findPriceMatch(
+  prices: DatasetArtifact["economy"],
+  item: DatasetArtifact["items"][number],
+) {
+  const idMatch = prices.find((price) => price.id === item.id);
+  if (idMatch) {
+    return { price: idMatch, matchedBy: "id" as const };
+  }
+
+  const itemName = normalizeSearchValue(item.name);
+  const nameMatch = prices.find(
+    (price) => normalizeSearchValue(price.name) === itemName,
+  );
+
+  return nameMatch ? { price: nameMatch, matchedBy: "name" as const } : null;
+}
+
 async function sha256Hex(value: string) {
   const digest = await crypto.subtle.digest(
     "SHA-256",
@@ -455,6 +497,10 @@ async function sha256Hex(value: string) {
   return [...new Uint8Array(digest)]
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
+}
+
+function normalizeSearchValue(value: string) {
+  return value.trim().toLowerCase();
 }
 
 function getVersionedQuery(context: Context<{ Bindings: Bindings }>) {

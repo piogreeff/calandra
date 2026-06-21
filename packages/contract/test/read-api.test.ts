@@ -14,6 +14,8 @@ import {
   ladderBuildCollectionSchema,
   modCollectionSchema,
   openApiDocument,
+  priceCheckRequestSchema,
+  priceCheckResponseSchema,
   upgradeAdvisorRequestSchema,
   upgradeAdvisorResponseSchema,
   uniqueCollectionSchema,
@@ -334,6 +336,47 @@ describe("phase 1 read API contract", () => {
     ).toBe("compareBuyVsCraft");
     expect(openApiDocument.components.schemas.BuyVsCraftRequest).toBeDefined();
     expect(openApiDocument.components.schemas.BuyVsCraftResponse).toBeDefined();
+  });
+
+  it("models deterministic price-check requests and responses", () => {
+    const request = priceCheckRequestSchema.parse({
+      league: "Dawn of the Hunt",
+      patch: "0.2.0",
+      item: {
+        id: "divine-orb",
+        name: "Divine Orb",
+        category: "currency",
+        rarity: "currency",
+      },
+    });
+
+    expect(request.item.name).toBe("Divine Orb");
+
+    const response = priceCheckResponseSchema.parse({
+      source: "published-dataset",
+      league: "Dawn of the Hunt",
+      patch: "0.2.0",
+      item: {
+        id: "divine-orb",
+        name: "Divine Orb",
+        category: "currency",
+        rarity: "currency",
+      },
+      price: {
+        id: "divine-orb",
+        name: "Divine Orb",
+        chaosEquivalent: 142,
+        updatedAt: "2026-06-21T00:00:00.000Z",
+      },
+      matchedBy: "id",
+    });
+
+    expect(response.price?.chaosEquivalent).toBe(142);
+    expect(openApiDocument.paths["/price/check"]?.post?.operationId).toBe(
+      "checkItemPrice",
+    );
+    expect(openApiDocument.components.schemas.PriceCheckRequest).toBeDefined();
+    expect(openApiDocument.components.schemas.PriceCheckResponse).toBeDefined();
   });
 });
 

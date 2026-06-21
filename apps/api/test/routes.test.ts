@@ -771,6 +771,103 @@ describe("api routes", () => {
     });
   });
 
+  it("checks a parsed item price against patch-versioned economy data", async () => {
+    const response = await api.request(
+      "/price/check",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          league: "Dawn of the Hunt",
+          patch: "0.2.0",
+          item: {
+            id: "divine-orb",
+            name: "Divine Orb",
+            category: "currency",
+            rarity: "currency",
+          },
+        }),
+      },
+      datasetEnv,
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      source: "published-dataset",
+      league: "Dawn of the Hunt",
+      patch: "0.2.0",
+      item: {
+        id: "divine-orb",
+        name: "Divine Orb",
+        category: "currency",
+        rarity: "currency",
+      },
+      price: {
+        id: "divine-orb",
+        name: "Divine Orb",
+        chaosEquivalent: 142,
+        updatedAt: "2026-06-21T00:00:00.000Z",
+      },
+      matchedBy: "id",
+    });
+  });
+
+  it("returns no price match for an unpriced parsed item", async () => {
+    const response = await api.request(
+      "/price/check",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          league: "Dawn of the Hunt",
+          patch: "0.2.0",
+          item: {
+            id: "unpriced-boots",
+            name: "Unpriced Boots",
+            category: "boots",
+            rarity: "rare",
+          },
+        }),
+      },
+      datasetEnv,
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      source: "published-dataset",
+      league: "Dawn of the Hunt",
+      patch: "0.2.0",
+      item: {
+        id: "unpriced-boots",
+        name: "Unpriced Boots",
+        category: "boots",
+        rarity: "rare",
+      },
+      price: null,
+      matchedBy: null,
+    });
+  });
+
+  it("rejects malformed price-check payloads", async () => {
+    const response = await api.request(
+      "/price/check",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          league: "Dawn of the Hunt",
+          item: "not-an-item",
+        }),
+      },
+      { APP_URL: "https://calandra.pages.dev" },
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "invalid price check request",
+    });
+  });
+
   it("diffs account snapshots with deterministic engine output", async () => {
     const response = await api.request(
       "/snapshots/diff",
