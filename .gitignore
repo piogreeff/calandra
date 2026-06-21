@@ -15,6 +15,7 @@ out/
 
 # Tauri / Rust
 apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/
 target/
 **/*.rs.bk
 

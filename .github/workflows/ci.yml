@@ -25,3 +25,18 @@ jobs:
       - run: pnpm test
       - run: pnpm docs:current
       - run: pnpm license:check
+
+  desktop-tauri:
+    runs-on: windows-latest
+    env:
+      CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @calandra/desktop run check:tauri

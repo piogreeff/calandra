@@ -15,6 +15,7 @@
     "tauri": "tauri",
     "build": "tsc --noEmit",
     "build:tauri": "tauri build",
+    "check:tauri": "cargo check --manifest-path src-tauri/Cargo.toml",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
