@@ -933,6 +933,89 @@ describe("api routes", () => {
     ]);
   });
 
+  it("rejects account snapshot writes without a bearer token when the write token is configured", async () => {
+    const response = await api.request(
+      "/snapshots",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          id: "snapshot-2026-06-21T10-00-00Z",
+          account: "example",
+          capturedAt: "2026-06-21T10:00:00.000Z",
+          source: "manual-import",
+          capabilities: { characters: true, stashes: true },
+          characters: [],
+          stashes: [],
+        }),
+      },
+      {
+        APP_URL: "https://calandra.pages.dev",
+        SNAPSHOT_WRITE_TOKEN: "test-write-token",
+        SNAPSHOT_BUCKET: {
+          async put() {
+            throw new Error("unauthorized writes must not reach R2");
+          },
+        },
+      },
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      error: "snapshot write is unauthorized",
+    });
+  });
+
+  it("accepts account snapshot writes with the configured bearer token", async () => {
+    const storedObjects: Array<{
+      key: string;
+      value: string;
+    }> = [];
+    const snapshot = {
+      id: "snapshot-2026-06-21T10-00-00Z",
+      account: "example",
+      capturedAt: "2026-06-21T10:00:00.000Z",
+      source: "manual-import",
+      capabilities: { characters: true, stashes: true },
+      characters: [],
+      stashes: [],
+    };
+
+    const response = await api.request(
+      "/snapshots",
+      {
+        method: "POST",
+        headers: {
+          authorization: "Bearer test-write-token",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(snapshot),
+      },
+      {
+        APP_URL: "https://calandra.pages.dev",
+        SNAPSHOT_WRITE_TOKEN: "test-write-token",
+        SNAPSHOT_R2_PREFIX: "snapshots",
+        SNAPSHOT_BUCKET: {
+          async put(key: string, value: string) {
+            storedObjects.push({ key, value });
+          },
+        },
+      },
+    );
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toMatchObject({
+      source: "snapshot-store",
+      objectKey: "snapshots/example/snapshot-2026-06-21T10-00-00Z.json",
+    });
+    expect(storedObjects).toEqual([
+      {
+        key: "snapshots/example/snapshot-2026-06-21T10-00-00Z.json",
+        value: JSON.stringify(snapshot),
+      },
+    ]);
+  });
+
   it("rejects malformed account snapshot writes", async () => {
     const response = await api.request(
       "/snapshots",

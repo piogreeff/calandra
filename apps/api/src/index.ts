@@ -39,6 +39,7 @@ type Bindings = {
   DATASET_R2_PREFIX?: string;
   DATA_BUCKET?: DatasetBucket;
   SNAPSHOT_R2_PREFIX?: string;
+  SNAPSHOT_WRITE_TOKEN?: string;
   SNAPSHOT_BUCKET?: SnapshotBucket;
 };
 
@@ -245,6 +246,10 @@ api.get("/snapshots/:account", async (context) => {
 });
 
 api.post("/snapshots", async (context) => {
+  if (!isSnapshotWriteAuthorized(context)) {
+    return context.json({ error: "snapshot write is unauthorized" }, 401);
+  }
+
   const rawBody = await readJsonBody(context);
   const parsed = accountSnapshotSchema.safeParse(rawBody);
 
@@ -595,6 +600,38 @@ function getSnapshotAccountPrefix(
   const prefix = context.env.SNAPSHOT_R2_PREFIX ?? "snapshots";
 
   return `${prefix}/${encodeURIComponent(account)}/`;
+}
+
+function isSnapshotWriteAuthorized(
+  context: Context<{ Bindings: Bindings }>,
+) {
+  const writeToken = context.env.SNAPSHOT_WRITE_TOKEN;
+
+  if (!writeToken) {
+    return true;
+  }
+
+  const authorization = context.req.header("authorization") ?? "";
+  const bearerPrefix = "Bearer ";
+
+  if (!authorization.startsWith(bearerPrefix)) {
+    return false;
+  }
+
+  return timingSafeEqual(authorization.slice(bearerPrefix.length), writeToken);
+}
+
+function timingSafeEqual(left: string, right: string) {
+  const leftBytes = new TextEncoder().encode(left);
+  const rightBytes = new TextEncoder().encode(right);
+  const length = Math.max(leftBytes.length, rightBytes.length);
+  let difference = leftBytes.length ^ rightBytes.length;
+
+  for (let index = 0; index < length; index += 1) {
+    difference |= (leftBytes[index] ?? 0) ^ (rightBytes[index] ?? 0);
+  }
+
+  return difference === 0;
 }
 
 function toSnapshotListItem({
