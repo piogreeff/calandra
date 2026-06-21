@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@calandra/contract": "workspace:*",
+    "@calandra/ui": "workspace:*",
     "flyonui": "^2.4.0",
     "lucide-react": "^0.468.0",
     "next": "^15.0.0",

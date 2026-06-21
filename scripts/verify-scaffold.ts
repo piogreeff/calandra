@@ -23,6 +23,8 @@ const requiredPaths = [
   "packages/dataset/package.json",
   "packages/ggg-api/package.json",
   "packages/ui/package.json",
+  "packages/ui/src/index.ts",
+  "packages/ui/src/theme.css",
 ];
 
 const missing = requiredPaths.filter(

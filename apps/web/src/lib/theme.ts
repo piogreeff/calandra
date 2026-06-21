@@ -1,32 +1,18 @@
+import {
+  availableThemeNames,
+  calandraThemeName,
+  type ThemeName,
+} from "@calandra/ui";
+
 export const themeCookieName = "calandra-theme";
 
 export const themeCookieMaxAgeSeconds = 60 * 60 * 24 * 365;
 
-export const defaultTheme = "calandra";
+export const defaultTheme = calandraThemeName;
 
-export const availableThemes = [
-  "calandra",
-  "light",
-  "dark",
-  "corporate",
-  "pastel",
-  "black",
-  "luxury",
-  "ghibli",
-  "gourmet",
-  "marshmallow",
-  "soft",
-  "spotify",
-  "valorant",
-  "shadcn",
-  "claude",
-  "vscode",
-  "mintlify",
-  "perplexity",
-  "slack",
-] as const;
+export const availableThemes = availableThemeNames;
 
-export type ThemeName = (typeof availableThemes)[number];
+export type { ThemeName };
 
 export function isThemeName(value: string): value is ThemeName {
   return availableThemes.includes(value as ThemeName);

@@ -71,6 +71,9 @@ importers:
       '@calandra/contract':
         specifier: workspace:*
         version: link:../../packages/contract
+      '@calandra/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       flyonui:
         specifier: ^2.4.0
         version: 2.4.1
@@ -141,7 +144,11 @@ importers:
         specifier: workspace:*
         version: link:../contract
 
-  packages/ui: {}
+  packages/ui:
+    devDependencies:
+      vitest:
+        specifier: ^1.6.0
+        version: 1.6.1(@types/node@20.19.43)(lightningcss@1.32.0)(terser@5.16.9)
 
 packages:
 
