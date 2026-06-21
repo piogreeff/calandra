@@ -41,6 +41,10 @@ The maintainer runs the ingest pipeline (game data from poe2db, economy from poe
 
 Recommendations are computed by a **deterministic engine** — slot scoring, mod tiers, crafting odds and costs all come from real game data and rules. A language model sits on top purely to explain and strategise over a compact, pre-computed context. The model never invents game values. Retrieval (Vectorize) keeps prompts small; an AI Gateway caches repeat queries; sessions run under a hard cost budget.
 
+## Snapshots
+
+Account snapshots are source-agnostic in the contract. Official PoE2 character snapshots can set `source: "official-poe2-character"` with `capabilities.stashes: false`; clipboard/manual imports can carry only what they actually observed. Snapshot comparisons use deterministic engine diffs over characters, equipment, and stash counts rather than model-generated summaries.
+
 ## Clients
 
 `apps/web` (Next.js 15 + FlyonUI) is the UI, rendered both standalone and inside the Tauri webview. The MCP server exposes the same read API and advisor as agent tools. A mobile browse/brainstorm client is a planned stretch. All of them speak the single contract in `packages/contract`; none of them hold business logic.

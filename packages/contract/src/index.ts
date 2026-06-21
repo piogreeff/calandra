@@ -112,6 +112,52 @@ export const ladderBuildCollectionSchema = z.object({
   builds: z.array(ladderBuildSchema),
 });
 
+export const accountSnapshotSourceSchema = z.enum([
+  "official-poe2-character",
+  "clipboard",
+  "manual-import",
+]);
+
+export const accountSnapshotCapabilitiesSchema = z.object({
+  characters: z.boolean(),
+  stashes: z.boolean(),
+});
+
+export const accountSnapshotGearItemSchema = z.object({
+  slot: z.string().min(1),
+  name: z.string().min(1),
+  itemId: z.string().min(1).optional(),
+  rarity: raritySchema.optional(),
+  stats: z.record(z.number()).optional(),
+});
+
+export const accountSnapshotCharacterSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  className: z.string().min(1),
+  level: z.number().int().positive(),
+  league: z.string().min(1),
+  equipment: z.array(accountSnapshotGearItemSchema),
+  passiveSkillIds: z.array(z.string().min(1)).optional(),
+});
+
+export const accountSnapshotStashSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  league: z.string().min(1),
+  items: z.array(accountSnapshotGearItemSchema),
+});
+
+export const accountSnapshotSchema = z.object({
+  id: z.string().min(1),
+  account: z.string().min(1),
+  capturedAt: z.string().datetime(),
+  source: accountSnapshotSourceSchema,
+  capabilities: accountSnapshotCapabilitiesSchema,
+  characters: z.array(accountSnapshotCharacterSchema),
+  stashes: z.array(accountSnapshotStashSchema).optional(),
+});
+
 export const advisorStatsSchema = z.record(z.number());
 
 export const advisorGearItemSchema = z.object({
@@ -578,6 +624,91 @@ export const openApiDocument = {
           },
         },
       },
+      AccountSnapshotCapabilities: {
+        type: "object",
+        required: ["characters", "stashes"],
+        properties: {
+          characters: { type: "boolean" },
+          stashes: { type: "boolean" },
+        },
+      },
+      AccountSnapshotGearItem: {
+        type: "object",
+        required: ["slot", "name"],
+        properties: {
+          slot: { type: "string", minLength: 1 },
+          name: { type: "string", minLength: 1 },
+          itemId: { type: "string", minLength: 1 },
+          rarity: {
+            type: "string",
+            enum: ["normal", "magic", "rare", "unique", "gem", "currency"],
+          },
+          stats: { type: "object", additionalProperties: { type: "number" } },
+        },
+      },
+      AccountSnapshotCharacter: {
+        type: "object",
+        required: ["id", "name", "className", "level", "league", "equipment"],
+        properties: {
+          id: { type: "string", minLength: 1 },
+          name: { type: "string", minLength: 1 },
+          className: { type: "string", minLength: 1 },
+          level: { type: "integer", minimum: 1 },
+          league: { type: "string", minLength: 1 },
+          equipment: {
+            type: "array",
+            items: { $ref: "#/components/schemas/AccountSnapshotGearItem" },
+          },
+          passiveSkillIds: {
+            type: "array",
+            items: { type: "string", minLength: 1 },
+          },
+        },
+      },
+      AccountSnapshotStash: {
+        type: "object",
+        required: ["id", "name", "league", "items"],
+        properties: {
+          id: { type: "string", minLength: 1 },
+          name: { type: "string", minLength: 1 },
+          league: { type: "string", minLength: 1 },
+          items: {
+            type: "array",
+            items: { $ref: "#/components/schemas/AccountSnapshotGearItem" },
+          },
+        },
+      },
+      AccountSnapshot: {
+        type: "object",
+        required: [
+          "id",
+          "account",
+          "capturedAt",
+          "source",
+          "capabilities",
+          "characters",
+        ],
+        properties: {
+          id: { type: "string", minLength: 1 },
+          account: { type: "string", minLength: 1 },
+          capturedAt: { type: "string", format: "date-time" },
+          source: {
+            type: "string",
+            enum: ["official-poe2-character", "clipboard", "manual-import"],
+          },
+          capabilities: {
+            $ref: "#/components/schemas/AccountSnapshotCapabilities",
+          },
+          characters: {
+            type: "array",
+            items: { $ref: "#/components/schemas/AccountSnapshotCharacter" },
+          },
+          stashes: {
+            type: "array",
+            items: { $ref: "#/components/schemas/AccountSnapshotStash" },
+          },
+        },
+      },
       AdvisorGearItem: {
         type: "object",
         required: ["slot", "name", "stats"],
@@ -705,6 +836,18 @@ export type EconomyPrice = z.infer<typeof economyPriceSchema>;
 export type EconomyCollection = z.infer<typeof economyCollectionSchema>;
 export type LadderBuild = z.infer<typeof ladderBuildSchema>;
 export type LadderBuildCollection = z.infer<typeof ladderBuildCollectionSchema>;
+export type AccountSnapshotSource = z.infer<typeof accountSnapshotSourceSchema>;
+export type AccountSnapshotCapabilities = z.infer<
+  typeof accountSnapshotCapabilitiesSchema
+>;
+export type AccountSnapshotGearItem = z.infer<
+  typeof accountSnapshotGearItemSchema
+>;
+export type AccountSnapshotCharacter = z.infer<
+  typeof accountSnapshotCharacterSchema
+>;
+export type AccountSnapshotStash = z.infer<typeof accountSnapshotStashSchema>;
+export type AccountSnapshot = z.infer<typeof accountSnapshotSchema>;
 export type AdvisorStats = z.infer<typeof advisorStatsSchema>;
 export type AdvisorGearItem = z.infer<typeof advisorGearItemSchema>;
 export type UpgradeAdvisorCandidate = z.infer<

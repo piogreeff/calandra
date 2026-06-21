@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  accountSnapshotSchema,
   datasetArtifactSchema,
   datasetManifestSchema,
   economyCollectionSchema,
@@ -226,5 +227,94 @@ describe("phase 1 read API contract", () => {
     expect(openApiDocument.paths["/advisor/upgrades"]?.post?.operationId).toBe(
       "rankUpgradeCandidates",
     );
+  });
+});
+
+describe("account snapshot contract", () => {
+  it("models source-agnostic official PoE2 character snapshots without stash access", () => {
+    const snapshot = accountSnapshotSchema.parse({
+      id: "snapshot-2026-06-21T10-00-00Z",
+      account: "example",
+      capturedAt: "2026-06-21T10:00:00.000Z",
+      source: "official-poe2-character",
+      capabilities: {
+        characters: true,
+        stashes: false,
+      },
+      characters: [
+        {
+          id: "character-1",
+          name: "CalandraTest",
+          className: "Deadeye",
+          level: 73,
+          league: "Dawn of the Hunt",
+          equipment: [
+            {
+              slot: "gloves",
+              name: "Duskthread Grips",
+              rarity: "rare",
+              stats: {
+                life: 65,
+                fireResistance: 18,
+              },
+            },
+          ],
+          passiveSkillIds: ["keystone-1"],
+        },
+      ],
+    });
+
+    expect(snapshot.source).toBe("official-poe2-character");
+    expect(snapshot.capabilities).toEqual({
+      characters: true,
+      stashes: false,
+    });
+    expect(snapshot.stashes).toBeUndefined();
+  });
+
+  it("allows stash-capable manual imports without implying official PoE2 stash support", () => {
+    const snapshot = accountSnapshotSchema.parse({
+      id: "manual-import-1",
+      account: "example",
+      capturedAt: "2026-06-21T10:00:00.000Z",
+      source: "manual-import",
+      capabilities: {
+        characters: true,
+        stashes: true,
+      },
+      characters: [],
+      stashes: [
+        {
+          id: "currency",
+          name: "Currency",
+          league: "Dawn of the Hunt",
+          items: [
+            {
+              slot: "stash",
+              name: "Divine Orb",
+              rarity: "currency",
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(snapshot.stashes).toHaveLength(1);
+  });
+
+  it("exports account snapshot schemas in OpenAPI", () => {
+    expect(openApiDocument.components.schemas.AccountSnapshot).toBeDefined();
+    expect(
+      openApiDocument.components.schemas.AccountSnapshot.properties.source,
+    ).toEqual({
+      type: "string",
+      enum: ["official-poe2-character", "clipboard", "manual-import"],
+    });
+    expect(
+      openApiDocument.components.schemas.AccountSnapshot.properties
+        .capabilities,
+    ).toEqual({
+      $ref: "#/components/schemas/AccountSnapshotCapabilities",
+    });
   });
 });

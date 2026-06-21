@@ -54,6 +54,71 @@ export interface UpgradeComparison {
   candidateMissingStats: string[];
 }
 
+export interface SnapshotGearItem {
+  slot: string;
+  name: string;
+  itemId?: string | undefined;
+  stats?: Record<string, number> | undefined;
+}
+
+export interface SnapshotCharacter {
+  id: string;
+  name: string;
+  className: string;
+  level: number;
+  equipment: SnapshotGearItem[];
+}
+
+export interface SnapshotStash {
+  id: string;
+  name: string;
+  items: SnapshotGearItem[];
+}
+
+export interface AccountSnapshotLike {
+  id: string;
+  capturedAt: string;
+  characters: SnapshotCharacter[];
+  stashes?: SnapshotStash[] | undefined;
+}
+
+export type SnapshotEntityChangeType = "added" | "removed" | "changed";
+
+export interface SnapshotEquipmentChange {
+  type: SnapshotEntityChangeType;
+  slot: string;
+  beforeName?: string | undefined;
+  afterName?: string | undefined;
+}
+
+export interface SnapshotCharacterChange {
+  id: string;
+  name: string;
+  type: SnapshotEntityChangeType;
+  beforeLevel?: number | undefined;
+  afterLevel?: number | undefined;
+  levelDelta: number;
+  equipmentChanges: SnapshotEquipmentChange[];
+}
+
+export interface SnapshotStashChange {
+  id: string;
+  name: string;
+  type: SnapshotEntityChangeType;
+  beforeItemCount?: number | undefined;
+  afterItemCount?: number | undefined;
+  itemCountDelta: number;
+}
+
+export interface AccountSnapshotDiff {
+  beforeSnapshotId: string;
+  afterSnapshotId: string;
+  beforeCapturedAt: string;
+  afterCapturedAt: string;
+  characterChanges: SnapshotCharacterChange[];
+  stashChanges: SnapshotStashChange[];
+}
+
 export function scoreItem(input: ScoreItemInput): ItemScore {
   const contributions = Object.entries(input.weights)
     .filter(([, weight]) => weight !== 0)
@@ -155,6 +220,190 @@ export function rankLoadoutUpgrades(
   );
 }
 
+export function diffAccountSnapshots(
+  before: AccountSnapshotLike,
+  after: AccountSnapshotLike,
+): AccountSnapshotDiff {
+  return {
+    beforeSnapshotId: before.id,
+    afterSnapshotId: after.id,
+    beforeCapturedAt: before.capturedAt,
+    afterCapturedAt: after.capturedAt,
+    characterChanges: diffCharacters(before.characters, after.characters),
+    stashChanges: diffStashes(before.stashes ?? [], after.stashes ?? []),
+  };
+}
+
+function diffCharacters(
+  beforeCharacters: SnapshotCharacter[],
+  afterCharacters: SnapshotCharacter[],
+): SnapshotCharacterChange[] {
+  const beforeById = new Map(
+    beforeCharacters.map((character) => [character.id, character]),
+  );
+  const afterById = new Map(
+    afterCharacters.map((character) => [character.id, character]),
+  );
+  const ids = uniqueSorted([...beforeById.keys(), ...afterById.keys()]);
+
+  return ids.flatMap<SnapshotCharacterChange>((id) => {
+    const before = beforeById.get(id);
+    const after = afterById.get(id);
+
+    if (before && !after) {
+      return [
+        {
+          id,
+          name: before.name,
+          type: "removed" as const,
+          beforeLevel: before.level,
+          levelDelta: -before.level,
+          equipmentChanges: before.equipment.map((item) => ({
+            type: "removed" as const,
+            slot: item.slot,
+            beforeName: item.name,
+          })),
+        },
+      ];
+    }
+
+    if (!before && after) {
+      return [
+        {
+          id,
+          name: after.name,
+          type: "added" as const,
+          afterLevel: after.level,
+          levelDelta: after.level,
+          equipmentChanges: after.equipment.map((item) => ({
+            type: "added" as const,
+            slot: item.slot,
+            afterName: item.name,
+          })),
+        },
+      ];
+    }
+
+    if (!before || !after) {
+      return [];
+    }
+
+    const equipmentChanges = diffEquipment(before.equipment, after.equipment);
+    const levelDelta = after.level - before.level;
+
+    if (levelDelta === 0 && equipmentChanges.length === 0) {
+      return [];
+    }
+
+    return [
+      {
+        id,
+        name: after.name,
+        type: "changed" as const,
+        beforeLevel: before.level,
+        afterLevel: after.level,
+        levelDelta,
+        equipmentChanges,
+      },
+    ];
+  });
+}
+
+function diffEquipment(
+  beforeEquipment: SnapshotGearItem[],
+  afterEquipment: SnapshotGearItem[],
+): SnapshotEquipmentChange[] {
+  const beforeBySlot = new Map(
+    beforeEquipment.map((item) => [item.slot, item]),
+  );
+  const afterBySlot = new Map(afterEquipment.map((item) => [item.slot, item]));
+  const slots = uniqueSorted([...beforeBySlot.keys(), ...afterBySlot.keys()]);
+
+  return slots.flatMap<SnapshotEquipmentChange>((slot) => {
+    const before = beforeBySlot.get(slot);
+    const after = afterBySlot.get(slot);
+
+    if (before && !after) {
+      return [{ type: "removed" as const, slot, beforeName: before.name }];
+    }
+
+    if (!before && after) {
+      return [{ type: "added" as const, slot, afterName: after.name }];
+    }
+
+    if (!before || !after || sameGearItem(before, after)) {
+      return [];
+    }
+
+    return [
+      {
+        type: "changed" as const,
+        slot,
+        beforeName: before.name,
+        afterName: after.name,
+      },
+    ];
+  });
+}
+
+function diffStashes(
+  beforeStashes: SnapshotStash[],
+  afterStashes: SnapshotStash[],
+): SnapshotStashChange[] {
+  const beforeById = new Map(beforeStashes.map((stash) => [stash.id, stash]));
+  const afterById = new Map(afterStashes.map((stash) => [stash.id, stash]));
+  const ids = uniqueSorted([...beforeById.keys(), ...afterById.keys()]);
+
+  return ids.flatMap<SnapshotStashChange>((id) => {
+    const before = beforeById.get(id);
+    const after = afterById.get(id);
+
+    if (before && !after) {
+      return [
+        {
+          id,
+          name: before.name,
+          type: "removed" as const,
+          beforeItemCount: before.items.length,
+          itemCountDelta: -before.items.length,
+        },
+      ];
+    }
+
+    if (!before && after) {
+      return [
+        {
+          id,
+          name: after.name,
+          type: "added" as const,
+          afterItemCount: after.items.length,
+          itemCountDelta: after.items.length,
+        },
+      ];
+    }
+
+    if (!before || !after) {
+      return [];
+    }
+
+    const itemCountDelta = after.items.length - before.items.length;
+    if (itemCountDelta === 0) {
+      return [];
+    }
+
+    return [
+      {
+        id,
+        name: after.name,
+        type: "changed" as const,
+        beforeItemCount: before.items.length,
+        afterItemCount: after.items.length,
+        itemCountDelta,
+      },
+    ];
+  });
+}
+
 function sum(values: number[]): number {
   return values.reduce((total, value) => total + value, 0);
 }
@@ -171,5 +420,28 @@ function exceedsBudget(
     maxBudgetChaos !== undefined &&
     candidate.estimatedCostChaos !== undefined &&
     candidate.estimatedCostChaos > maxBudgetChaos
+  );
+}
+
+function uniqueSorted(values: string[]): string[] {
+  return [...new Set(values)].sort((left, right) => left.localeCompare(right));
+}
+
+function sameGearItem(
+  left: SnapshotGearItem,
+  right: SnapshotGearItem,
+): boolean {
+  return (
+    left.name === right.name &&
+    left.itemId === right.itemId &&
+    stableStatsKey(left.stats) === stableStatsKey(right.stats)
+  );
+}
+
+function stableStatsKey(stats: Record<string, number> | undefined): string {
+  return JSON.stringify(
+    Object.entries(stats ?? {}).sort(([left], [right]) =>
+      left.localeCompare(right),
+    ),
   );
 }
