@@ -1,5 +1,7 @@
 export const themeCookieName = "calandra-theme";
 
+export const themeCookieMaxAgeSeconds = 60 * 60 * 24 * 365;
+
 export const defaultTheme = "calandra";
 
 export const availableThemes = [
@@ -21,7 +23,7 @@ export const availableThemes = [
   "vscode",
   "mintlify",
   "perplexity",
-  "slack"
+  "slack",
 ] as const;
 
 export type ThemeName = (typeof availableThemes)[number];

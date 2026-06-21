@@ -2,24 +2,28 @@
 
 import { Palette } from "lucide-react";
 import { useEffect, useState } from "react";
+import { availableThemes, isThemeName, type ThemeName } from "../lib/theme";
 import {
-  availableThemes,
-  isThemeName,
-  resolveTheme,
-  themeCookieName,
-  type ThemeName,
-} from "../lib/theme";
+  persistThemePreference,
+  readThemePreference,
+} from "../lib/theme-persistence";
 
 export function ThemeSelector({ selectedTheme }: { selectedTheme: ThemeName }) {
   const [theme, setTheme] = useState<ThemeName>(selectedTheme);
 
   useEffect(() => {
-    const match = document.cookie.match(
-      new RegExp(`(?:^|; )${themeCookieName}=([^;]+)`),
-    );
-    const cookieTheme = match ? decodeURIComponent(match[1] ?? "") : undefined;
+    let cancelled = false;
 
-    setTheme(resolveTheme(cookieTheme));
+    void readThemePreference().then((persistedTheme) => {
+      if (cancelled) return;
+
+      document.documentElement.setAttribute("data-theme", persistedTheme);
+      setTheme(persistedTheme);
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (
@@ -35,10 +39,8 @@ export function ThemeSelector({ selectedTheme }: { selectedTheme: ThemeName }) {
           if (!isThemeName(selected)) return;
 
           document.documentElement.setAttribute("data-theme", selected);
-          document.cookie = `${themeCookieName}=${encodeURIComponent(
-            selected,
-          )}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
           setTheme(selected);
+          void persistThemePreference(selected);
         }}
       >
         {availableThemes.map((theme) => (
