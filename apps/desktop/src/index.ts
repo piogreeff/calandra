@@ -22,6 +22,13 @@ export class BuildFileWriteRejectedError extends Error {
   }
 }
 
+export class LocalBackupRejectedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "LocalBackupRejectedError";
+  }
+}
+
 export interface Poe2Paths {
   gameDirectory: string;
   clientLogPath: string;
@@ -62,6 +69,38 @@ export interface BuildFileWritePlan {
   actionId: string;
   outputPath: string;
   content: string;
+}
+
+export type LocalBackupFileKind =
+  | "loot-filter"
+  | "build-file"
+  | "overlay-config";
+
+export interface LocalBackupFileRequest {
+  kind: LocalBackupFileKind;
+  sourcePath: string;
+}
+
+export interface LocalBackupRequest {
+  gameDirectory: string;
+  backupDirectory: string;
+  actionId: string;
+  capturedAt: string;
+  userInitiated: boolean;
+  files: LocalBackupFileRequest[];
+}
+
+export interface LocalBackupEntry {
+  kind: LocalBackupFileKind;
+  sourcePath: string;
+  destinationPath: string;
+}
+
+export interface LocalBackupPlan {
+  actionId: string;
+  capturedAt: string;
+  backupRoot: string;
+  entries: LocalBackupEntry[];
 }
 
 const poe2DocumentsSegments = ["Documents", "My Games", "Path of Exile 2"];
@@ -166,6 +205,65 @@ export function planBuildFileWrite(
   };
 }
 
+export function planLocalConfigBackup(
+  request: LocalBackupRequest,
+): LocalBackupPlan {
+  if (!request.userInitiated) {
+    throw new LocalBackupRejectedError(
+      "Local backup must be initiated by a user action",
+    );
+  }
+
+  const actionId = request.actionId.trim();
+  if (actionId.length === 0) {
+    throw new LocalBackupRejectedError("Local backup requires an action id");
+  }
+
+  if (request.files.length === 0) {
+    throw new LocalBackupRejectedError(
+      "Local backup requires at least one file",
+    );
+  }
+
+  const gameDirectory = win32.resolve(request.gameDirectory);
+  const backupDirectory = win32.resolve(request.backupDirectory);
+  const backupRoot = win32.resolve(
+    backupDirectory,
+    "Path of Exile 2",
+    normalizeBackupTimestamp(request.capturedAt),
+  );
+
+  const entries = request.files.map((file) => {
+    const sourcePath = win32.resolve(file.sourcePath);
+    if (!isPathInsideDirectory(sourcePath, gameDirectory)) {
+      throw new LocalBackupRejectedError(
+        "Local backup source path must stay inside the PoE2 directory",
+      );
+    }
+
+    const relativePath = win32.relative(gameDirectory, sourcePath);
+    const destinationPath = win32.resolve(backupRoot, relativePath);
+    if (!isPathInsideDirectory(destinationPath, backupRoot)) {
+      throw new LocalBackupRejectedError(
+        "Local backup destination path must stay inside the backup root",
+      );
+    }
+
+    return {
+      kind: file.kind,
+      sourcePath,
+      destinationPath,
+    };
+  });
+
+  return {
+    actionId,
+    capturedAt: request.capturedAt,
+    backupRoot,
+    entries,
+  };
+}
+
 function completeLineLength(content: string): number {
   const lastNewlineIndex = content.lastIndexOf("\n");
   return lastNewlineIndex === -1 ? 0 : lastNewlineIndex + 1;
@@ -194,6 +292,15 @@ function normalizeBuildFileName(fileName: string): string {
   return trimmed.toLowerCase().endsWith(".build")
     ? trimmed
     : `${trimmed}.build`;
+}
+
+function normalizeBackupTimestamp(capturedAt: string): string {
+  const trimmed = capturedAt.trim();
+  if (trimmed.length === 0) {
+    throw new LocalBackupRejectedError("Local backup requires a timestamp");
+  }
+
+  return trimmed.replace(/[:.]/g, "-");
 }
 
 function isPathInsideDirectory(path: string, directory: string): boolean {

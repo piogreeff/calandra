@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   BuildFileWriteRejectedError,
   ClipboardCaptureRejectedError,
+  LocalBackupRejectedError,
   captureClipboardItemText,
   createInitialClientLogCursor,
   getDefaultPoe2Paths,
+  planLocalConfigBackup,
   planBuildFileWrite,
   readClientLogAppend,
 } from "../src/index";
@@ -193,5 +195,99 @@ Item Level: 67
         userInitiated: true,
       }),
     ).toThrow(BuildFileWriteRejectedError);
+  });
+
+  it("plans a user-initiated local config backup inside the selected backup root", () => {
+    const plan = planLocalConfigBackup({
+      gameDirectory: "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2",
+      backupDirectory: "D:\\Calandra Backups",
+      actionId: "backup-001",
+      capturedAt: "2026-06-21T15:00:00.000Z",
+      userInitiated: true,
+      files: [
+        {
+          kind: "loot-filter",
+          sourcePath:
+            "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2\\NeverSink.filter",
+        },
+        {
+          kind: "build-file",
+          sourcePath:
+            "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2\\BuildPlanner\\Storm Monk.build",
+        },
+        {
+          kind: "overlay-config",
+          sourcePath:
+            "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2\\Calandra\\overlay.json",
+        },
+      ],
+    });
+
+    expect(plan).toEqual({
+      actionId: "backup-001",
+      capturedAt: "2026-06-21T15:00:00.000Z",
+      backupRoot:
+        "D:\\Calandra Backups\\Path of Exile 2\\2026-06-21T15-00-00-000Z",
+      entries: [
+        {
+          kind: "loot-filter",
+          sourcePath:
+            "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2\\NeverSink.filter",
+          destinationPath:
+            "D:\\Calandra Backups\\Path of Exile 2\\2026-06-21T15-00-00-000Z\\NeverSink.filter",
+        },
+        {
+          kind: "build-file",
+          sourcePath:
+            "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2\\BuildPlanner\\Storm Monk.build",
+          destinationPath:
+            "D:\\Calandra Backups\\Path of Exile 2\\2026-06-21T15-00-00-000Z\\BuildPlanner\\Storm Monk.build",
+        },
+        {
+          kind: "overlay-config",
+          sourcePath:
+            "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2\\Calandra\\overlay.json",
+          destinationPath:
+            "D:\\Calandra Backups\\Path of Exile 2\\2026-06-21T15-00-00-000Z\\Calandra\\overlay.json",
+        },
+      ],
+    });
+  });
+
+  it("rejects background local config backups", () => {
+    expect(() =>
+      planLocalConfigBackup({
+        gameDirectory: "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2",
+        backupDirectory: "D:\\Calandra Backups",
+        actionId: "background-backup",
+        capturedAt: "2026-06-21T15:00:00.000Z",
+        userInitiated: false,
+        files: [
+          {
+            kind: "loot-filter",
+            sourcePath:
+              "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2\\NeverSink.filter",
+          },
+        ],
+      }),
+    ).toThrow(LocalBackupRejectedError);
+  });
+
+  it("rejects local backup sources outside the PoE2 directory", () => {
+    expect(() =>
+      planLocalConfigBackup({
+        gameDirectory: "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2",
+        backupDirectory: "D:\\Calandra Backups",
+        actionId: "backup-002",
+        capturedAt: "2026-06-21T15:00:00.000Z",
+        userInitiated: true,
+        files: [
+          {
+            kind: "overlay-config",
+            sourcePath: "C:\\Users\\Pio\\Documents\\secret.txt",
+          },
+        ],
+      }),
+    ).toThrow(LocalBackupRejectedError);
   });
 });
