@@ -21,6 +21,7 @@ import {
   ladderBuildCollectionSchema,
   modCollectionSchema,
   openApiDocument,
+  poe2CharacterSnapshotCaptureRequestSchema,
   priceCheckRequestSchema,
   priceCheckResponseSchema,
   upgradeAdvisorRequestSchema,
@@ -33,6 +34,13 @@ import {
   estimateCraftingPlan,
   rankLoadoutUpgrades,
 } from "@calandra/engine";
+import {
+  GggApiConfigurationError,
+  GggApiHttpError,
+  GggApiScopeError,
+  capturePoe2CharacterSnapshot,
+  createGggApiClient,
+} from "@calandra/ggg-api";
 import { Hono, type Context } from "hono";
 
 type Bindings = {
@@ -43,6 +51,8 @@ type Bindings = {
   SNAPSHOT_R2_PREFIX?: string;
   SNAPSHOT_WRITE_TOKEN?: string;
   SNAPSHOT_BUCKET?: SnapshotBucket;
+  GGG_USER_AGENT?: string;
+  GGG_API_BASE_URL?: string;
 };
 
 export const api = new Hono<{ Bindings: Bindings }>();
@@ -235,6 +245,34 @@ async function getStoredAccountSnapshot(
   };
 }
 
+async function writeStoredAccountSnapshot(
+  context: Context<{ Bindings: Bindings }>,
+  snapshot: {
+    account: string;
+    id: string;
+  },
+) {
+  const snapshotBucket = context.env.SNAPSHOT_BUCKET;
+
+  if (!snapshotBucket?.put) {
+    return {
+      ok: false as const,
+      status: 503 as const,
+      body: { error: "snapshot bucket is not configured" },
+    };
+  }
+
+  const objectKey = getSnapshotObjectKey(context, snapshot);
+  await snapshotBucket.put(objectKey, JSON.stringify(snapshot), {
+    httpMetadata: { contentType: "application/json; charset=utf-8" },
+  });
+
+  return {
+    ok: true as const,
+    objectKey,
+  };
+}
+
 api.get("/snapshots/:account", async (context) => {
   const snapshotBucket = context.env.SNAPSHOT_BUCKET;
 
@@ -271,25 +309,101 @@ api.post("/snapshots", async (context) => {
     return context.json({ error: "invalid account snapshot" }, 400);
   }
 
-  const snapshotBucket = context.env.SNAPSHOT_BUCKET;
-
-  if (!snapshotBucket?.put) {
-    return context.json({ error: "snapshot bucket is not configured" }, 503);
+  const stored = await writeStoredAccountSnapshot(context, parsed.data);
+  if (!stored.ok) {
+    return context.json(stored.body, stored.status);
   }
-
-  const objectKey = getSnapshotObjectKey(context, parsed.data);
-  await snapshotBucket.put(objectKey, JSON.stringify(parsed.data), {
-    httpMetadata: { contentType: "application/json; charset=utf-8" },
-  });
 
   return context.json(
     accountSnapshotWriteResponseSchema.parse({
       source: "snapshot-store",
-      objectKey,
+      objectKey: stored.objectKey,
       snapshot: parsed.data,
     }),
     201,
   );
+});
+
+api.post("/snapshots/capture/poe2-character", async (context) => {
+  if (!isSnapshotWriteAuthorized(context)) {
+    return context.json({ error: "snapshot write is unauthorized" }, 401);
+  }
+
+  const rawBody = await readJsonBody(context);
+  const parsed = poe2CharacterSnapshotCaptureRequestSchema.safeParse(rawBody);
+
+  if (!parsed.success) {
+    return context.json(
+      { error: "invalid PoE2 character snapshot capture request" },
+      400,
+    );
+  }
+
+  if (!context.env.GGG_USER_AGENT) {
+    return context.json({ error: "GGG User-Agent is not configured" }, 503);
+  }
+
+  try {
+    const client = createGggApiClient({
+      accessToken: parsed.data.accessToken,
+      userAgent: context.env.GGG_USER_AGENT,
+      grantedScopes: parsed.data.grantedScopes,
+      fetch: (url, init) => fetch(url, init),
+      ...(context.env.GGG_API_BASE_URL
+        ? { baseUrl: context.env.GGG_API_BASE_URL }
+        : {}),
+    });
+    const snapshot = await capturePoe2CharacterSnapshot({
+      account: parsed.data.account,
+      client,
+      ...(parsed.data.capturedAt ? { capturedAt: parsed.data.capturedAt } : {}),
+      ...(parsed.data.snapshotId ? { id: parsed.data.snapshotId } : {}),
+    });
+    const stored = await writeStoredAccountSnapshot(context, snapshot);
+
+    if (!stored.ok) {
+      return context.json(stored.body, stored.status);
+    }
+
+    return context.json(
+      accountSnapshotWriteResponseSchema.parse({
+        source: "snapshot-store",
+        objectKey: stored.objectKey,
+        snapshot,
+      }),
+      201,
+    );
+  } catch (error) {
+    if (error instanceof GggApiScopeError) {
+      return context.json(
+        { error: "GGG OAuth token is missing required scope" },
+        401,
+      );
+    }
+
+    if (
+      error instanceof GggApiHttpError &&
+      (error.status === 401 || error.status === 403)
+    ) {
+      return context.json(
+        { error: "GGG OAuth token was rejected", status: error.status },
+        401,
+      );
+    }
+
+    if (error instanceof GggApiConfigurationError) {
+      return context.json({ error: error.message }, 400);
+    }
+
+    if (error instanceof GggApiHttpError) {
+      return context.json(
+        { error: "GGG API request failed", status: error.status },
+        502,
+      );
+    }
+
+    throw error;
+  }
 });
 
 api.post("/crafting/estimate", async (context) => {

@@ -13,6 +13,7 @@
   "dependencies": {
     "@calandra/contract": "workspace:*",
     "@calandra/engine": "workspace:*",
+    "@calandra/ggg-api": "workspace:*",
     "hono": "^4.4.0"
   },
   "devDependencies": {

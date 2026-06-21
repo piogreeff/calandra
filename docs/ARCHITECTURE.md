@@ -43,7 +43,7 @@ Recommendations are computed by a **deterministic engine** — slot scoring, mod
 
 ## Snapshots
 
-Account snapshots are source-agnostic in the contract. Official PoE2 character snapshots can set `source: "official-poe2-character"` with `capabilities.stashes: false`; clipboard/manual imports can carry only what they actually observed. Snapshot comparisons use deterministic engine diffs over characters, equipment, and stash counts rather than model-generated summaries.
+Account snapshots are source-agnostic in the contract. Official PoE2 character snapshots can set `source: "official-poe2-character"` with `capabilities.stashes: false`; clipboard/manual imports can carry only what they actually observed. The Worker exposes `POST /snapshots/capture/poe2-character` to use a caller-supplied GGG OAuth access token for one capture, persist only the normalized snapshot, and avoid storing the token. Snapshot comparisons use deterministic engine diffs over characters, equipment, and stash counts rather than model-generated summaries.
 
 ## Clients
 

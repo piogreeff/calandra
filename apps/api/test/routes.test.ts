@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "../src/index";
 
 const datasetSources = [
@@ -34,6 +34,10 @@ const r2Artifact = JSON.stringify({
 
 const r2ArtifactSha256 =
   "33272bd5d8c37deda60f5681e28372a400d207636abdacfbd1e07f2f359bfff8";
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("api routes", () => {
   const datasetEnv = {
@@ -1227,6 +1231,198 @@ describe("api routes", () => {
     ]);
   });
 
+  it("captures official PoE2 characters through GGG OAuth and persists a source-agnostic snapshot", async () => {
+    const storedObjects: Array<{
+      key: string;
+      value: string;
+      options: unknown;
+    }> = [];
+    const fetch = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === "https://api.pathofexile.com/character/poe2") {
+        expect(init?.headers).toMatchObject({
+          authorization: "Bearer ggg-access-token",
+          "User-Agent":
+            "calandra/0.1.0 (+https://calandra.pages.dev; maintainer@calandra.dev)",
+        });
+
+        return jsonResponse({
+          characters: [{ name: "CalandraTest" }],
+        });
+      }
+
+      if (
+        url === "https://api.pathofexile.com/character/poe2/CalandraTest"
+      ) {
+        return jsonResponse({
+          character: {
+            id: "character-1",
+            name: "CalandraTest",
+            class: "Deadeye",
+            level: 73,
+            league: "Dawn of the Hunt",
+            equipment: [
+              {
+                inventoryId: "gloves",
+                typeLine: "Duskthread Grips",
+                rarity: "rare",
+                id: "item-1",
+              },
+            ],
+          },
+        });
+      }
+
+      throw new Error(`Unexpected GGG API URL: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetch);
+
+    const response = await api.request(
+      "/snapshots/capture/poe2-character",
+      {
+        method: "POST",
+        headers: {
+          authorization: "Bearer snapshot-write-token",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          account: "example",
+          accessToken: "ggg-access-token",
+          grantedScopes: ["account:characters"],
+          capturedAt: "2026-06-21T10:00:00.000Z",
+          snapshotId: "snapshot-2026-06-21T10-00-00Z",
+        }),
+      },
+      {
+        APP_URL: "https://calandra.pages.dev",
+        GGG_USER_AGENT:
+          "calandra/0.1.0 (+https://calandra.pages.dev; maintainer@calandra.dev)",
+        SNAPSHOT_WRITE_TOKEN: "snapshot-write-token",
+        SNAPSHOT_R2_PREFIX: "snapshots",
+        SNAPSHOT_BUCKET: {
+          async put(key: string, value: string, options: unknown) {
+            storedObjects.push({ key, value, options });
+          },
+        },
+      },
+    );
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toEqual({
+      source: "snapshot-store",
+      objectKey: "snapshots/example/snapshot-2026-06-21T10-00-00Z.json",
+      snapshot: {
+        id: "snapshot-2026-06-21T10-00-00Z",
+        account: "example",
+        capturedAt: "2026-06-21T10:00:00.000Z",
+        source: "official-poe2-character",
+        capabilities: { characters: true, stashes: false },
+        characters: [
+          {
+            id: "character-1",
+            name: "CalandraTest",
+            className: "Deadeye",
+            level: 73,
+            league: "Dawn of the Hunt",
+            equipment: [
+              {
+                slot: "gloves",
+                name: "Duskthread Grips",
+                itemId: "item-1",
+                rarity: "rare",
+              },
+            ],
+          },
+        ],
+      },
+    });
+    expect(storedObjects).toEqual([
+      {
+        key: "snapshots/example/snapshot-2026-06-21T10-00-00Z.json",
+        value: JSON.stringify({
+          id: "snapshot-2026-06-21T10-00-00Z",
+          account: "example",
+          capturedAt: "2026-06-21T10:00:00.000Z",
+          source: "official-poe2-character",
+          capabilities: { characters: true, stashes: false },
+          characters: [
+            {
+              id: "character-1",
+              name: "CalandraTest",
+              className: "Deadeye",
+              level: 73,
+              league: "Dawn of the Hunt",
+              equipment: [
+                {
+                  slot: "gloves",
+                  name: "Duskthread Grips",
+                  itemId: "item-1",
+                  rarity: "rare",
+                },
+              ],
+            },
+          ],
+        }),
+        options: {
+          httpMetadata: { contentType: "application/json; charset=utf-8" },
+        },
+      },
+    ]);
+    expect(JSON.stringify(storedObjects)).not.toContain("ggg-access-token");
+  });
+
+  it("rejects official PoE2 character snapshot capture without GGG configuration", async () => {
+    const response = await api.request(
+      "/snapshots/capture/poe2-character",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          account: "example",
+          accessToken: "ggg-access-token",
+          grantedScopes: ["account:characters"],
+        }),
+      },
+      {
+        APP_URL: "https://calandra.pages.dev",
+        SNAPSHOT_BUCKET: {
+          async put() {
+            throw new Error("capture must stop before writing snapshots");
+          },
+        },
+      },
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: "GGG User-Agent is not configured",
+    });
+  });
+
+  it("rejects malformed official PoE2 character snapshot capture payloads", async () => {
+    const response = await api.request(
+      "/snapshots/capture/poe2-character",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          account: "example",
+          accessToken: "",
+          grantedScopes: [],
+        }),
+      },
+      {
+        APP_URL: "https://calandra.pages.dev",
+        GGG_USER_AGENT:
+          "calandra/0.1.0 (+https://calandra.pages.dev; maintainer@calandra.dev)",
+      },
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "invalid PoE2 character snapshot capture request",
+    });
+  });
+
   it("rejects malformed account snapshot writes", async () => {
     const response = await api.request(
       "/snapshots",
@@ -1725,4 +1921,11 @@ async function expectJson(
 
   expect(response.status).toBe(200);
   await expect(response.json()).resolves.toEqual(expected);
+}
+
+function jsonResponse(body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  });
 }

@@ -188,6 +188,14 @@ export const accountSnapshotWriteResponseSchema = z.object({
   snapshot: accountSnapshotSchema,
 });
 
+export const poe2CharacterSnapshotCaptureRequestSchema = z.object({
+  account: z.string().min(1),
+  accessToken: z.string().min(1),
+  grantedScopes: z.array(z.string().min(1)).min(1),
+  capturedAt: z.string().datetime().optional(),
+  snapshotId: z.string().min(1).optional(),
+});
+
 export const accountSnapshotListItemSchema = z.object({
   account: z.string().min(1),
   snapshotId: z.string().min(1),
@@ -749,6 +757,45 @@ export const openApiDocument = {
         },
       },
     },
+    "/snapshots/capture/poe2-character": {
+      post: {
+        operationId: "capturePoe2CharacterSnapshot",
+        summary: "Capture and persist an official PoE2 character snapshot",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                $ref: "#/components/schemas/Poe2CharacterSnapshotCaptureRequest",
+              },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description:
+              "Persisted source-agnostic account snapshot captured from official PoE2 character data",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/AccountSnapshotWriteResponse",
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Invalid PoE2 character snapshot capture request",
+          },
+          "401": {
+            description:
+              "Snapshot capture is unauthorized by Calandra or the supplied GGG OAuth token",
+          },
+          "503": {
+            description: "Snapshot bucket or GGG User-Agent is not configured",
+          },
+        },
+      },
+    },
     "/snapshots/{account}/{snapshotId}": {
       get: {
         operationId: "getAccountSnapshot",
@@ -1230,6 +1277,21 @@ export const openApiDocument = {
           snapshot: { $ref: "#/components/schemas/AccountSnapshot" },
         },
       },
+      Poe2CharacterSnapshotCaptureRequest: {
+        type: "object",
+        required: ["account", "accessToken", "grantedScopes"],
+        properties: {
+          account: { type: "string", minLength: 1 },
+          accessToken: { type: "string", minLength: 1 },
+          grantedScopes: {
+            type: "array",
+            minItems: 1,
+            items: { type: "string", minLength: 1 },
+          },
+          capturedAt: { type: "string", format: "date-time" },
+          snapshotId: { type: "string", minLength: 1 },
+        },
+      },
       AccountSnapshotListItem: {
         type: "object",
         required: ["account", "snapshotId", "objectKey"],
@@ -1632,6 +1694,9 @@ export type AccountSnapshotStash = z.infer<typeof accountSnapshotStashSchema>;
 export type AccountSnapshot = z.infer<typeof accountSnapshotSchema>;
 export type AccountSnapshotWriteResponse = z.infer<
   typeof accountSnapshotWriteResponseSchema
+>;
+export type Poe2CharacterSnapshotCaptureRequest = z.infer<
+  typeof poe2CharacterSnapshotCaptureRequestSchema
 >;
 export type AccountSnapshotListItem = z.infer<
   typeof accountSnapshotListItemSchema

@@ -18,6 +18,7 @@ import {
   ladderBuildCollectionSchema,
   modCollectionSchema,
   openApiDocument,
+  poe2CharacterSnapshotCaptureRequestSchema,
   priceCheckRequestSchema,
   priceCheckResponseSchema,
   upgradeAdvisorRequestSchema,
@@ -591,6 +592,10 @@ describe("account snapshot contract", () => {
       "saveAccountSnapshot",
     );
     expect(
+      openApiDocument.paths["/snapshots/capture/poe2-character"]?.post
+        ?.operationId,
+    ).toBe("capturePoe2CharacterSnapshot");
+    expect(
       openApiDocument.paths["/snapshots/{account}/{snapshotId}"]?.get
         ?.operationId,
     ).toBe("getAccountSnapshot");
@@ -608,6 +613,9 @@ describe("account snapshot contract", () => {
     ).toBeDefined();
     expect(
       openApiDocument.components.schemas.AccountSnapshotWriteResponse,
+    ).toBeDefined();
+    expect(
+      openApiDocument.components.schemas.Poe2CharacterSnapshotCaptureRequest,
     ).toBeDefined();
     expect(
       openApiDocument.components.schemas.AccountSnapshotDiffRequest,
@@ -658,6 +666,28 @@ describe("account snapshot contract", () => {
         snapshot,
       }).objectKey,
     ).toBe("snapshots/example/snapshot-2026-06-21T10-00-00Z.json");
+  });
+
+  it("models official PoE2 character snapshot capture requests without storing OAuth tokens", () => {
+    const request = poe2CharacterSnapshotCaptureRequestSchema.parse({
+      account: "example",
+      accessToken: "ggg-access-token",
+      grantedScopes: ["account:characters"],
+      capturedAt: "2026-06-21T10:00:00.000Z",
+      snapshotId: "snapshot-2026-06-21T10-00-00Z",
+    });
+
+    expect(request).toEqual({
+      account: "example",
+      accessToken: "ggg-access-token",
+      grantedScopes: ["account:characters"],
+      capturedAt: "2026-06-21T10:00:00.000Z",
+      snapshotId: "snapshot-2026-06-21T10-00-00Z",
+    });
+    expect(
+      openApiDocument.components.schemas.Poe2CharacterSnapshotCaptureRequest
+        .properties,
+    ).not.toHaveProperty("refreshToken");
   });
 
   it("models persisted account snapshot list responses", () => {
