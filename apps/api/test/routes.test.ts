@@ -624,6 +624,47 @@ describe("api routes", () => {
     });
   });
 
+  it("rejects stale R2 manifests that do not match the current contract", async () => {
+    const response = await api.request(
+      "/items?league=Dawn%20of%20the%20Hunt&patch=0.2.0",
+      undefined,
+      {
+        APP_URL: "https://calandra.pages.dev",
+        DATASET_R2_PREFIX: "datasets",
+        DATA_BUCKET: {
+          async get(key: string) {
+            return {
+              async text() {
+                return key.endsWith(".manifest.json")
+                  ? JSON.stringify({
+                      league: "Dawn of the Hunt",
+                      patch: "0.2.0",
+                      generatedAt: "2026-06-21T00:00:00.000Z",
+                      artifactKey: "datasets/Dawn of the Hunt/0.2.0.json",
+                      sha256: r2ArtifactSha256,
+                      counts: {
+                        items: 1,
+                        uniques: 0,
+                        mods: 0,
+                        gems: 0,
+                        economy: 0,
+                        ladderBuilds: 0,
+                      },
+                    })
+                  : r2Artifact;
+              },
+            };
+          },
+        },
+      },
+    );
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toEqual({
+      error: "dataset artifact failed manifest validation",
+    });
+  });
+
   it("ranks upgrade candidates with deterministic engine output", async () => {
     const response = await api.request(
       "/advisor/upgrades",

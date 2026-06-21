@@ -514,9 +514,7 @@ async function getMatchingDatasetManifest(
     throw new DatasetManifestValidationError("Dataset manifest missing");
   }
 
-  const manifest = datasetManifestSchema.parse(
-    JSON.parse((await manifestObject.text()).replace(/^\uFEFF/, "")),
-  );
+  const manifest = parseDatasetManifest(await manifestObject.text());
   await validateDatasetManifest({ artifact, artifactRaw, manifest, objectKey });
 
   return manifest;
@@ -549,16 +547,30 @@ async function getDatasetArtifact(
     throw new DatasetManifestValidationError("Dataset manifest missing");
   }
 
-  const manifest = datasetManifestSchema.parse(
-    JSON.parse((await manifestObject.text()).replace(/^\uFEFF/, "")),
-  );
+  const manifest = parseDatasetManifest(await manifestObject.text());
   await validateDatasetManifest({ artifact, artifactRaw, manifest, objectKey });
 
   return artifact;
 }
 
 function parseDatasetArtifact(raw: string) {
-  return datasetArtifactSchema.parse(JSON.parse(raw.replace(/^\uFEFF/, "")));
+  try {
+    return datasetArtifactSchema.parse(JSON.parse(raw.replace(/^\uFEFF/, "")));
+  } catch {
+    throw new DatasetManifestValidationError(
+      "Dataset artifact failed validation",
+    );
+  }
+}
+
+function parseDatasetManifest(raw: string) {
+  try {
+    return datasetManifestSchema.parse(JSON.parse(raw.replace(/^\uFEFF/, "")));
+  } catch {
+    throw new DatasetManifestValidationError(
+      "Dataset manifest failed validation",
+    );
+  }
 }
 
 async function readJsonBody(context: Context<{ Bindings: Bindings }>) {
