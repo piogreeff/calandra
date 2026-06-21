@@ -10,8 +10,11 @@
     }
   },
   "scripts": {
-    "dev": "echo desktop app scaffolded for Phase 2",
+    "dev": "echo desktop Tauri shell available via pnpm --filter @calandra/desktop dev:tauri",
+    "dev:tauri": "tauri dev",
+    "tauri": "tauri",
     "build": "tsc --noEmit",
+    "build:tauri": "tauri build",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
@@ -19,5 +22,8 @@
   "dependencies": {
     "@calandra/contract": "workspace:*",
     "@calandra/parser": "workspace:*"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.3"
   }
 }

@@ -1,0 +1,19 @@
+[package]
+name = "calandra-desktop"
+version = "0.0.0"
+description = "Calandra desktop companion shell"
+authors = ["Pio Greeff"]
+license = "MIT"
+repository = "https://github.com/piogreeff/calandra"
+edition = "2021"
+build = "build.rs"
+
+[lib]
+name = "calandra_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6.3", features = [] }
+
+[dependencies]
+tauri = { version = "2.11.3", features = [] }
