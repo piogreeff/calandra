@@ -43,6 +43,31 @@ export type DesktopClientLogAppendResult = {
   content: string;
 };
 
+export type DesktopLocalBackupFileRequest = {
+  kind: "loot-filter" | "build-file" | "overlay-config";
+  sourcePath: string;
+};
+
+export type DesktopLocalConfigBackupRequest = {
+  gameDirectory: string;
+  backupDirectory: string;
+  actionId: string;
+  capturedAt: string;
+  userInitiated: boolean;
+  files: DesktopLocalBackupFileRequest[];
+};
+
+export type DesktopLocalBackupEntry = DesktopLocalBackupFileRequest & {
+  destinationPath: string;
+};
+
+export type DesktopLocalConfigBackupPlan = {
+  actionId: string;
+  capturedAt: string;
+  backupRoot: string;
+  entries: DesktopLocalBackupEntry[];
+};
+
 type TauriGlobals = {
   __TAURI__?: unknown;
   __TAURI_INTERNALS__?: unknown;
@@ -142,6 +167,28 @@ export async function readDesktopClientLogAppend(
     "read_client_log_append",
     request,
   )) as DesktopClientLogAppendResult;
+}
+
+export async function runDesktopLocalConfigBackup(
+  request: DesktopLocalConfigBackupRequest,
+  {
+    globals = globalThis as TauriGlobals,
+    invoke,
+  }: {
+    globals?: TauriGlobals;
+    invoke?: Invoke;
+  } = {},
+): Promise<DesktopLocalConfigBackupPlan> {
+  if (!isTauriRuntime(globals)) {
+    throw new Error("Local backup requires the Calandra desktop shell");
+  }
+
+  const invokeCommand = invoke ?? (await loadTauriInvoke());
+
+  return (await invokeCommand(
+    "copy_local_config_backup",
+    request,
+  )) as DesktopLocalConfigBackupPlan;
 }
 
 export function isTauriRuntime(globals: TauriGlobals): boolean {

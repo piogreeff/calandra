@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use tauri::Manager;
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
@@ -22,6 +22,30 @@ pub struct BuildFileWritePlan {
 pub struct ClientLogAppendResult {
     pub cursor_offset: usize,
     pub content: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalBackupFileRequest {
+    pub kind: String,
+    pub source_path: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalBackupEntry {
+    pub kind: String,
+    pub source_path: String,
+    pub destination_path: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalBackupPlan {
+    pub action_id: String,
+    pub captured_at: String,
+    pub backup_root: String,
+    pub entries: Vec<LocalBackupEntry>,
 }
 
 #[derive(Debug, Default, serde::Deserialize, serde::Serialize)]
@@ -74,6 +98,25 @@ fn read_client_log_append(
     read_client_log_append_from_path(client_log_path, offset)
 }
 
+#[tauri::command]
+fn copy_local_config_backup(
+    game_directory: String,
+    backup_directory: String,
+    action_id: String,
+    captured_at: String,
+    user_initiated: bool,
+    files: Vec<LocalBackupFileRequest>,
+) -> Result<LocalBackupPlan, String> {
+    copy_local_config_backup_to_path(
+        game_directory,
+        backup_directory,
+        action_id,
+        captured_at,
+        user_initiated,
+        files,
+    )
+}
+
 pub fn resolve_default_poe2_paths(home_directory: impl AsRef<Path>) -> Poe2Paths {
     let game_directory = home_directory
         .as_ref()
@@ -96,6 +139,7 @@ pub fn run() {
             get_default_poe2_paths,
             get_theme_preference,
             set_theme_preference,
+            copy_local_config_backup,
             read_client_log_append,
             write_build_file
         ])
@@ -175,6 +219,105 @@ fn read_client_log_append_from_path(
     Ok(ClientLogAppendResult {
         cursor_offset: starting_offset + complete_length,
         content: appended_content[..complete_length].to_string(),
+    })
+}
+
+fn copy_local_config_backup_to_path(
+    game_directory: String,
+    backup_directory: String,
+    action_id: String,
+    captured_at: String,
+    user_initiated: bool,
+    files: Vec<LocalBackupFileRequest>,
+) -> Result<LocalBackupPlan, String> {
+    let plan = plan_local_config_backup(
+        game_directory,
+        backup_directory,
+        action_id,
+        captured_at,
+        user_initiated,
+        files,
+    )?;
+
+    for entry in &plan.entries {
+        let destination_path = PathBuf::from(&entry.destination_path);
+        if let Some(parent) = destination_path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|error| format!("Unable to create backup directory: {error}"))?;
+        }
+        std::fs::copy(&entry.source_path, &entry.destination_path)
+            .map_err(|error| format!("Unable to copy backup file: {error}"))?;
+    }
+
+    Ok(plan)
+}
+
+fn plan_local_config_backup(
+    game_directory: String,
+    backup_directory: String,
+    action_id: String,
+    captured_at: String,
+    user_initiated: bool,
+    files: Vec<LocalBackupFileRequest>,
+) -> Result<LocalBackupPlan, String> {
+    if !user_initiated {
+        return Err("Local backup must be initiated by a user action".to_string());
+    }
+
+    let action_id = action_id.trim().to_string();
+    if action_id.is_empty() {
+        return Err("Local backup requires an action id".to_string());
+    }
+
+    if files.is_empty() {
+        return Err("Local backup requires at least one file".to_string());
+    }
+
+    let captured_at = captured_at.trim().to_string();
+    if captured_at.is_empty() {
+        return Err("Local backup requires a timestamp".to_string());
+    }
+
+    let game_directory = normalize_path_lexically(PathBuf::from(game_directory));
+    let backup_root = normalize_path_lexically(
+        PathBuf::from(backup_directory)
+            .join("Path of Exile 2")
+            .join(normalize_backup_timestamp(&captured_at)),
+    );
+
+    let entries = files
+        .into_iter()
+        .map(|file| {
+            let source_path = normalize_path_lexically(PathBuf::from(file.source_path));
+            if !is_path_inside_directory(&source_path, &game_directory) {
+                return Err(
+                    "Local backup source path must stay inside the PoE2 directory".to_string(),
+                );
+            }
+
+            let relative_path = source_path.strip_prefix(&game_directory).map_err(|_| {
+                "Local backup source path must stay inside the PoE2 directory".to_string()
+            })?;
+            let destination_path = normalize_path_lexically(backup_root.join(relative_path));
+            if !is_path_inside_directory(&destination_path, &backup_root) {
+                return Err(
+                    "Local backup destination path must stay inside the backup root".to_string(),
+                );
+            }
+
+            Ok(LocalBackupEntry {
+                kind: file.kind,
+                source_path: path_to_string(source_path),
+                destination_path: path_to_string(destination_path),
+            })
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+
+    Ok(LocalBackupPlan {
+        action_id,
+        captured_at,
+        backup_root: path_to_string(backup_root),
+        entries,
     })
 }
 
@@ -279,6 +422,30 @@ fn complete_line_length(content: &str) -> usize {
         .rfind('\n')
         .map(|last_newline_index| last_newline_index + 1)
         .unwrap_or(0)
+}
+
+fn normalize_backup_timestamp(captured_at: &str) -> String {
+    captured_at.replace([':', '.'], "-")
+}
+
+fn is_path_inside_directory(path: &Path, directory: &Path) -> bool {
+    path != directory && path.starts_with(directory)
+}
+
+fn normalize_path_lexically(path: PathBuf) -> PathBuf {
+    let mut normalized = PathBuf::new();
+
+    for component in path.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                normalized.pop();
+            }
+            _ => normalized.push(component.as_os_str()),
+        }
+    }
+
+    normalized
 }
 
 fn path_to_string(path: PathBuf) -> String {
@@ -482,6 +649,130 @@ mod tests {
             error,
             "Client.txt read path must be the PoE2 Client.txt file"
         );
+    }
+
+    #[test]
+    fn plans_user_initiated_local_config_backup() {
+        let game_directory = PathBuf::from(r"C:\Users\Pio\Documents\My Games\Path of Exile 2");
+        let plan = plan_local_config_backup(
+            path_to_string(game_directory.clone()),
+            r"D:\Calandra Backups".to_string(),
+            "backup-001".to_string(),
+            "2026-06-21T15:00:00.000Z".to_string(),
+            true,
+            vec![
+                LocalBackupFileRequest {
+                    kind: "loot-filter".to_string(),
+                    source_path: path_to_string(game_directory.join("NeverSink.filter")),
+                },
+                LocalBackupFileRequest {
+                    kind: "build-file".to_string(),
+                    source_path: path_to_string(
+                        game_directory.join("BuildPlanner").join("Storm Monk.build"),
+                    ),
+                },
+            ],
+        )
+        .unwrap();
+
+        assert_eq!(plan.action_id, "backup-001");
+        assert_eq!(plan.captured_at, "2026-06-21T15:00:00.000Z");
+        assert!(plan
+            .backup_root
+            .ends_with(r"Path of Exile 2\2026-06-21T15-00-00-000Z"));
+        assert!(plan.entries[0]
+            .destination_path
+            .ends_with(r"2026-06-21T15-00-00-000Z\NeverSink.filter"));
+        assert!(plan.entries[1]
+            .destination_path
+            .ends_with(r"2026-06-21T15-00-00-000Z\BuildPlanner\Storm Monk.build"));
+    }
+
+    #[test]
+    fn rejects_background_local_config_backup() {
+        let error = plan_local_config_backup(
+            r"C:\Users\Pio\Documents\My Games\Path of Exile 2".to_string(),
+            r"D:\Calandra Backups".to_string(),
+            "background-backup".to_string(),
+            "2026-06-21T15:00:00.000Z".to_string(),
+            false,
+            vec![LocalBackupFileRequest {
+                kind: "loot-filter".to_string(),
+                source_path: r"C:\Users\Pio\Documents\My Games\Path of Exile 2\NeverSink.filter"
+                    .to_string(),
+            }],
+        )
+        .unwrap_err();
+
+        assert_eq!(error, "Local backup must be initiated by a user action");
+    }
+
+    #[test]
+    fn rejects_local_config_backup_sources_outside_poe2_directory() {
+        let error = plan_local_config_backup(
+            r"C:\Users\Pio\Documents\My Games\Path of Exile 2".to_string(),
+            r"D:\Calandra Backups".to_string(),
+            "backup-002".to_string(),
+            "2026-06-21T15:00:00.000Z".to_string(),
+            true,
+            vec![LocalBackupFileRequest {
+                kind: "overlay-config".to_string(),
+                source_path: r"C:\Users\Pio\Documents\secret.txt".to_string(),
+            }],
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            "Local backup source path must stay inside the PoE2 directory"
+        );
+    }
+
+    #[test]
+    fn copies_local_config_backup_files() {
+        let root = unique_settings_path("local-backup")
+            .parent()
+            .unwrap()
+            .to_path_buf();
+        let game_directory = root.join("Path of Exile 2");
+        let backup_directory = root.join("Calandra Backups");
+        let filter_path = game_directory.join("NeverSink.filter");
+        let build_path = game_directory.join("BuildPlanner").join("Storm Monk.build");
+
+        std::fs::create_dir_all(filter_path.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(build_path.parent().unwrap()).unwrap();
+        std::fs::write(&filter_path, "filter").unwrap();
+        std::fs::write(&build_path, "[build]\n").unwrap();
+
+        let plan = copy_local_config_backup_to_path(
+            path_to_string(game_directory.clone()),
+            path_to_string(backup_directory.clone()),
+            "backup-003".to_string(),
+            "2026-06-21T15:00:00.000Z".to_string(),
+            true,
+            vec![
+                LocalBackupFileRequest {
+                    kind: "loot-filter".to_string(),
+                    source_path: path_to_string(filter_path),
+                },
+                LocalBackupFileRequest {
+                    kind: "build-file".to_string(),
+                    source_path: path_to_string(build_path),
+                },
+            ],
+        )
+        .unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(PathBuf::from(&plan.entries[0].destination_path)).unwrap(),
+            "filter"
+        );
+        assert_eq!(
+            std::fs::read_to_string(PathBuf::from(&plan.entries[1].destination_path)).unwrap(),
+            "[build]\n"
+        );
+
+        let _ = std::fs::remove_dir_all(root);
     }
 
     fn unique_settings_path(name: &str) -> PathBuf {

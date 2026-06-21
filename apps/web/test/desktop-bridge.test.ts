@@ -4,6 +4,7 @@ import {
   getDesktopPoe2Paths,
   isTauriRuntime,
   readDesktopClientLogAppend,
+  runDesktopLocalConfigBackup,
   writeDesktopBuildFile,
 } from "../src/lib/desktop-bridge";
 
@@ -159,6 +160,65 @@ describe("desktop bridge", () => {
       clientLogPath:
         "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2\\Client.txt",
       offset: 0,
+    });
+  });
+
+  it("runs a local config backup through the Tauri desktop command", async () => {
+    const invoke = vi.fn(async () => ({
+      actionId: "backup-001",
+      capturedAt: "2026-06-21T15:00:00.000Z",
+      backupRoot:
+        "D:\\Calandra Backups\\Path of Exile 2\\2026-06-21T15-00-00-000Z",
+      entries: [
+        {
+          kind: "loot-filter",
+          sourcePath:
+            "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2\\NeverSink.filter",
+          destinationPath:
+            "D:\\Calandra Backups\\Path of Exile 2\\2026-06-21T15-00-00-000Z\\NeverSink.filter",
+        },
+      ],
+    }));
+
+    await expect(
+      runDesktopLocalConfigBackup(
+        {
+          gameDirectory:
+            "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2",
+          backupDirectory: "D:\\Calandra Backups",
+          actionId: "backup-001",
+          capturedAt: "2026-06-21T15:00:00.000Z",
+          userInitiated: true,
+          files: [
+            {
+              kind: "loot-filter",
+              sourcePath:
+                "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2\\NeverSink.filter",
+            },
+          ],
+        },
+        {
+          globals: { __TAURI_INTERNALS__: {} },
+          invoke,
+        },
+      ),
+    ).resolves.toMatchObject({
+      actionId: "backup-001",
+      entries: [{ kind: "loot-filter" }],
+    });
+    expect(invoke).toHaveBeenCalledWith("copy_local_config_backup", {
+      gameDirectory: "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2",
+      backupDirectory: "D:\\Calandra Backups",
+      actionId: "backup-001",
+      capturedAt: "2026-06-21T15:00:00.000Z",
+      userInitiated: true,
+      files: [
+        {
+          kind: "loot-filter",
+          sourcePath:
+            "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2\\NeverSink.filter",
+        },
+      ],
     });
   });
 
