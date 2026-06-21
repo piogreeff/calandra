@@ -1,0 +1,21 @@
+{
+  "name": "@calandra/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@calandra/contract": "workspace:*",
+    "@calandra/engine": "workspace:*",
+    "hono": "^4.4.0"
+  },
+  "devDependencies": {
+    "wrangler": "^3.60.0"
+  }
+}

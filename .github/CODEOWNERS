@@ -1,0 +1,5 @@
+# High-blast-radius surfaces require maintainer review.
+/packages/contract/ @piogreeff
+/apps/desktop/src-tauri/ @piogreeff
+/apps/mcp/ @piogreeff
+/.github/workflows/ @piogreeff

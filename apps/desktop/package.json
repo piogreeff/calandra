@@ -1,0 +1,23 @@
+{
+  "name": "@calandra/desktop",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "dev": "echo desktop app scaffolded for Phase 2",
+    "build": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@calandra/contract": "workspace:*",
+    "@calandra/parser": "workspace:*"
+  }
+}

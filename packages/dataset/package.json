@@ -1,0 +1,16 @@
+{
+  "name": "@calandra/dataset",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "import": "tsx src/cli.ts",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@calandra/contract": "workspace:*"
+  }
+}

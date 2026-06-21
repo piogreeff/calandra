@@ -1,0 +1,13 @@
+{
+  "name": "@calandra/mobile",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "echo mobile app scaffolded for Phase 7",
+    "build": "echo mobile app scaffolded for Phase 7",
+    "lint": "echo mobile app scaffolded for Phase 7",
+    "typecheck": "echo mobile app scaffolded for Phase 7",
+    "test": "echo mobile app scaffolded for Phase 7"
+  }
+}

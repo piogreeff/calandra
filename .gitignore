@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Builds
+dist/
+build/
+.next/
+.next-dev/
+out/
+.turbo/
+*.tsbuildinfo
+
+# Tauri / Rust
+apps/desktop/src-tauri/target/
+target/
+**/*.rs.bk
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Local data / dataset artifacts
+*.local
+/data/
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+*.pid
+npm-debug.log*
+pnpm-debug.log*
+
+# Coverage / test
+coverage/
+.vitest/
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.codegraph/
+.cursor/rules/codegraph.mdc
+.idea/
+.vscode/*
+!.vscode/extensions.json

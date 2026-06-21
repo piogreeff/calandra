@@ -1,0 +1,39 @@
+{
+  "name": "calandra",
+  "version": "0.0.0",
+  "private": true,
+  "description": "AI-powered, open-source Path of Exile 2 companion. Unofficial fan tool.",
+  "license": "MIT",
+  "author": "Pio Greeff (https://github.com/piogreeff)",
+  "homepage": "https://github.com/piogreeff/calandra",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/piogreeff/calandra.git"
+  },
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "scripts": {
+    "setup": "pnpm install && pnpm verify:scaffold",
+    "verify:scaffold": "tsx scripts/verify-scaffold.ts",
+    "docs:current": "tsx scripts/check-docs-current.ts",
+    "license:check": "tsx scripts/check-licenses.ts",
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "dataset:import": "pnpm --filter @calandra/dataset run import",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test && vitest run scripts",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.0",
+    "@types/node": "^20.14.0",
+    "prettier": "^3.3.0",
+    "tsx": "^4.15.0",
+    "typescript": "^5.5.0",
+    "vitest": "^1.6.0"
+  }
+}
