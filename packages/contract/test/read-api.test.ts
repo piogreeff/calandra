@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   accountSnapshotDiffRequestSchema,
   accountSnapshotDiffSchema,
+  accountSnapshotWriteResponseSchema,
   accountSnapshotSchema,
   buyVsCraftRequestSchema,
   buyVsCraftResponseSchema,
@@ -454,9 +455,15 @@ describe("account snapshot contract", () => {
 
   it("exports account snapshot schemas in OpenAPI", () => {
     expect(openApiDocument.components.schemas.AccountSnapshot).toBeDefined();
+    expect(openApiDocument.paths["/snapshots"]?.post?.operationId).toBe(
+      "saveAccountSnapshot",
+    );
     expect(openApiDocument.paths["/snapshots/diff"]?.post?.operationId).toBe(
       "diffAccountSnapshots",
     );
+    expect(
+      openApiDocument.components.schemas.AccountSnapshotWriteResponse,
+    ).toBeDefined();
     expect(
       openApiDocument.components.schemas.AccountSnapshotDiffRequest,
     ).toBeDefined();
@@ -475,6 +482,34 @@ describe("account snapshot contract", () => {
     ).toEqual({
       $ref: "#/components/schemas/AccountSnapshotCapabilities",
     });
+  });
+
+  it("models persisted account snapshot write responses", () => {
+    const snapshot = accountSnapshotSchema.parse({
+      id: "snapshot-2026-06-21T10-00-00Z",
+      account: "example",
+      capturedAt: "2026-06-21T10:00:00.000Z",
+      source: "official-poe2-character",
+      capabilities: { characters: true, stashes: false },
+      characters: [
+        {
+          id: "character-1",
+          name: "CalandraTest",
+          className: "Deadeye",
+          level: 73,
+          league: "Dawn of the Hunt",
+          equipment: [{ slot: "gloves", name: "Duskthread Grips" }],
+        },
+      ],
+    });
+
+    expect(
+      accountSnapshotWriteResponseSchema.parse({
+        source: "snapshot-store",
+        objectKey: "snapshots/example/snapshot-2026-06-21T10-00-00Z.json",
+        snapshot,
+      }).objectKey,
+    ).toBe("snapshots/example/snapshot-2026-06-21T10-00-00Z.json");
   });
 
   it("models deterministic account snapshot diff requests and responses", () => {

@@ -5,6 +5,7 @@ compatibility_date = "2026-06-21"
 [vars]
 APP_URL = "https://calandra.pages.dev"
 DATASET_R2_PREFIX = "datasets"
+SNAPSHOT_R2_PREFIX = "snapshots"
 
 [[kv_namespaces]]
 binding = "ECONOMY"
@@ -12,6 +13,10 @@ id = "afc8f30fee77488a97916a46af96e9c6"
 
 [[r2_buckets]]
 binding = "DATA_BUCKET"
+bucket_name = "calandra-data"
+
+[[r2_buckets]]
+binding = "SNAPSHOT_BUCKET"
 bucket_name = "calandra-data"
 
 [[vectorize]]

@@ -173,6 +173,12 @@ export const accountSnapshotSchema = z.object({
   stashes: z.array(accountSnapshotStashSchema).optional(),
 });
 
+export const accountSnapshotWriteResponseSchema = z.object({
+  source: z.literal("snapshot-store"),
+  objectKey: z.string().min(1),
+  snapshot: accountSnapshotSchema,
+});
+
 export const snapshotEntityChangeTypeSchema = z.enum([
   "added",
   "removed",
@@ -576,6 +582,38 @@ export const openApiDocument = {
         },
       },
     },
+    "/snapshots": {
+      post: {
+        operationId: "saveAccountSnapshot",
+        summary: "Persist one source-agnostic account snapshot",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/AccountSnapshot" },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "Persisted account snapshot metadata",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/AccountSnapshotWriteResponse",
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Invalid account snapshot",
+          },
+          "503": {
+            description: "Snapshot storage is not configured",
+          },
+        },
+      },
+    },
     "/advisor/upgrades": {
       post: {
         operationId: "rankUpgradeCandidates",
@@ -953,6 +991,15 @@ export const openApiDocument = {
           },
         },
       },
+      AccountSnapshotWriteResponse: {
+        type: "object",
+        required: ["source", "objectKey", "snapshot"],
+        properties: {
+          source: { type: "string", enum: ["snapshot-store"] },
+          objectKey: { type: "string", minLength: 1 },
+          snapshot: { $ref: "#/components/schemas/AccountSnapshot" },
+        },
+      },
       SnapshotEquipmentChange: {
         type: "object",
         required: ["type", "slot"],
@@ -1280,6 +1327,9 @@ export type AccountSnapshotCharacter = z.infer<
 >;
 export type AccountSnapshotStash = z.infer<typeof accountSnapshotStashSchema>;
 export type AccountSnapshot = z.infer<typeof accountSnapshotSchema>;
+export type AccountSnapshotWriteResponse = z.infer<
+  typeof accountSnapshotWriteResponseSchema
+>;
 export type SnapshotEntityChangeType = z.infer<
   typeof snapshotEntityChangeTypeSchema
 >;

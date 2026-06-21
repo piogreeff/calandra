@@ -1,6 +1,8 @@
 import {
   accountSnapshotDiffRequestSchema,
   accountSnapshotDiffSchema,
+  accountSnapshotSchema,
+  accountSnapshotWriteResponseSchema,
   buyVsCraftRequestSchema,
   buyVsCraftResponseSchema,
   craftingEstimateRequestSchema,
@@ -34,6 +36,8 @@ type Bindings = {
   DATASET_ARTIFACT_JSON?: string;
   DATASET_R2_PREFIX?: string;
   DATA_BUCKET?: DatasetBucket;
+  SNAPSHOT_R2_PREFIX?: string;
+  SNAPSHOT_BUCKET?: SnapshotBucket;
 };
 
 export const api = new Hono<{ Bindings: Bindings }>();
@@ -94,6 +98,35 @@ api.post("/snapshots/diff", async (context) => {
     accountSnapshotDiffSchema.parse(
       diffAccountSnapshots(parsed.data.before, parsed.data.after),
     ),
+  );
+});
+
+api.post("/snapshots", async (context) => {
+  const rawBody = await readJsonBody(context);
+  const parsed = accountSnapshotSchema.safeParse(rawBody);
+
+  if (!parsed.success) {
+    return context.json({ error: "invalid account snapshot" }, 400);
+  }
+
+  const snapshotBucket = context.env.SNAPSHOT_BUCKET;
+
+  if (!snapshotBucket) {
+    return context.json({ error: "snapshot bucket is not configured" }, 503);
+  }
+
+  const objectKey = getSnapshotObjectKey(context, parsed.data);
+  await snapshotBucket.put(objectKey, JSON.stringify(parsed.data), {
+    httpMetadata: { contentType: "application/json; charset=utf-8" },
+  });
+
+  return context.json(
+    accountSnapshotWriteResponseSchema.parse({
+      source: "snapshot-store",
+      objectKey,
+      snapshot: parsed.data,
+    }),
+    201,
   );
 });
 
@@ -405,6 +438,15 @@ function getDatasetManifestKey(
   return `${prefix}/${version.league}/${version.patch}.manifest.json`;
 }
 
+function getSnapshotObjectKey(
+  context: Context<{ Bindings: Bindings }>,
+  snapshot: { account: string; id: string },
+) {
+  const prefix = context.env.SNAPSHOT_R2_PREFIX ?? "snapshots";
+
+  return `${prefix}/${encodeURIComponent(snapshot.account)}/${encodeURIComponent(snapshot.id)}.json`;
+}
+
 async function validateDatasetManifest({
   artifact,
   artifactRaw,
@@ -519,6 +561,14 @@ function getVersionedQuery(context: Context<{ Bindings: Bindings }>) {
 
 type DatasetBucket = {
   get(key: string): Promise<DatasetObject | null>;
+};
+
+type SnapshotBucket = {
+  put(
+    key: string,
+    value: string,
+    options?: { httpMetadata?: { contentType?: string } },
+  ): Promise<unknown>;
 };
 
 type DatasetObject = {

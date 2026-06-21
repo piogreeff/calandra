@@ -868,6 +868,116 @@ describe("api routes", () => {
     });
   });
 
+  it("stores source-agnostic account snapshots in the snapshot bucket", async () => {
+    const storedObjects: Array<{
+      key: string;
+      value: string;
+      options: unknown;
+    }> = [];
+    const snapshot = {
+      id: "snapshot-2026-06-21T10-00-00Z",
+      account: "example",
+      capturedAt: "2026-06-21T10:00:00.000Z",
+      source: "official-poe2-character",
+      capabilities: { characters: true, stashes: false },
+      characters: [
+        {
+          id: "character-1",
+          name: "CalandraTest",
+          className: "Deadeye",
+          level: 73,
+          league: "Dawn of the Hunt",
+          equipment: [
+            {
+              slot: "gloves",
+              name: "Duskthread Grips",
+              stats: { life: 65 },
+            },
+          ],
+        },
+      ],
+    };
+
+    const response = await api.request(
+      "/snapshots",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(snapshot),
+      },
+      {
+        APP_URL: "https://calandra.pages.dev",
+        SNAPSHOT_R2_PREFIX: "snapshots",
+        SNAPSHOT_BUCKET: {
+          async put(key: string, value: string, options: unknown) {
+            storedObjects.push({ key, value, options });
+          },
+        },
+      },
+    );
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toEqual({
+      source: "snapshot-store",
+      objectKey: "snapshots/example/snapshot-2026-06-21T10-00-00Z.json",
+      snapshot,
+    });
+    expect(storedObjects).toEqual([
+      {
+        key: "snapshots/example/snapshot-2026-06-21T10-00-00Z.json",
+        value: JSON.stringify(snapshot),
+        options: {
+          httpMetadata: { contentType: "application/json; charset=utf-8" },
+        },
+      },
+    ]);
+  });
+
+  it("rejects malformed account snapshot writes", async () => {
+    const response = await api.request(
+      "/snapshots",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          id: "snapshot-missing-fields",
+          account: "example",
+        }),
+      },
+      { APP_URL: "https://calandra.pages.dev" },
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "invalid account snapshot",
+    });
+  });
+
+  it("requires a snapshot bucket before accepting account snapshots", async () => {
+    const response = await api.request(
+      "/snapshots",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          id: "snapshot-2026-06-21T10-00-00Z",
+          account: "example",
+          capturedAt: "2026-06-21T10:00:00.000Z",
+          source: "manual-import",
+          capabilities: { characters: true, stashes: true },
+          characters: [],
+          stashes: [],
+        }),
+      },
+      { APP_URL: "https://calandra.pages.dev" },
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: "snapshot bucket is not configured",
+    });
+  });
+
   it("diffs account snapshots with deterministic engine output", async () => {
     const response = await api.request(
       "/snapshots/diff",
