@@ -20,6 +20,21 @@ export const poe2StashOAuthSupport = {
     "Official Account Stashes are currently documented as PoE1 only; do not substitute session-cookie endpoints.",
 } as const;
 
+export const poe2CurrencyExchangeSupport = {
+  supported: true,
+  requiredScope: gggOAuthScopes.serviceCurrencyExchange,
+  realm: gggPoe2Realm,
+  endpoint: `/currency-exchange/${gggPoe2Realm}`,
+  limitation:
+    "Official PoE2 currency exchange data is hourly historical aggregate market data, not current item trade-search results.",
+} as const;
+
+export const poe2ItemTradeSearchSupport = {
+  supported: false,
+  reason:
+    "The developer docs do not list item trade-search as a supported API resource; do not call internal trade website, session-cookie, or reverse-engineered endpoints.",
+} as const;
+
 export const gggOAuthTokenEnvelopeVersion = 1;
 export const gggOAuthTokenEncryptionAlgorithm = "AES-256-GCM";
 
@@ -395,6 +410,13 @@ export function createGggApiClient(options: GggApiClientOptions) {
           requiredScope: gggOAuthScopes.accountCharacters,
         },
       );
+    },
+    getPoe2CurrencyExchangeMarkets(id?: string | number) {
+      const suffix = id === undefined ? "" : `/${encodeURIComponent(id)}`;
+
+      return requestJson(`${poe2CurrencyExchangeSupport.endpoint}${suffix}`, {
+        requiredScope: gggOAuthScopes.serviceCurrencyExchange,
+      });
     },
   };
 }

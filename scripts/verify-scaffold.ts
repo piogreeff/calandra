@@ -12,6 +12,7 @@ const requiredPaths = [
   "docs/ARCHITECTURE.md",
   "docs/SELF_HOSTING.md",
   "docs/spikes/2026-06-21-poe2-oauth-coverage.md",
+  "docs/spikes/2026-06-21-poe2-trade-pricing.md",
   "apps/api/package.json",
   "apps/web/package.json",
   "apps/desktop/package.json",

@@ -12,6 +12,8 @@ import {
   encryptGggOAuthTokenSet,
   getRetryAfterMs,
   gggOAuthScopes,
+  poe2CurrencyExchangeSupport,
+  poe2ItemTradeSearchSupport,
   poe2StashOAuthSupport,
   type GggOAuthTokenSet,
   type GggHttpResponse,
@@ -46,6 +48,21 @@ describe("GGG official API client hygiene", () => {
     });
   });
 
+  it("enables official PoE2 currency exchange history and disables item trade-search", () => {
+    expect(poe2CurrencyExchangeSupport).toMatchObject({
+      supported: true,
+      requiredScope: gggOAuthScopes.serviceCurrencyExchange,
+      realm: "poe2",
+      endpoint: "/currency-exchange/poe2",
+    });
+    expect(poe2ItemTradeSearchSupport).toMatchObject({
+      supported: false,
+    });
+    expect(poe2ItemTradeSearchSupport.reason).toContain(
+      "do not call internal trade website",
+    );
+  });
+
   it("sends Authorization and User-Agent headers for PoE2 character requests", async () => {
     const fetch = vi.fn(async () =>
       jsonResponse(200, { characters: [{ name: "CalandraTest" }] }),
@@ -70,6 +87,60 @@ describe("GGG official API client hygiene", () => {
           authorization: "Bearer access-token",
           "User-Agent": userAgent,
         },
+      },
+    );
+  });
+
+  it("requests official PoE2 currency exchange markets with service:cxapi", async () => {
+    const fetch = vi.fn(async () =>
+      jsonResponse(200, {
+        next_change_id: 1782043200,
+        markets: [
+          {
+            league: "Dawn of the Hunt",
+            market_id: "chaos|divine",
+          },
+        ],
+      }),
+    );
+    const client = createGggApiClient({
+      accessToken: "service-token",
+      userAgent,
+      grantedScopes: [gggOAuthScopes.serviceCurrencyExchange],
+      fetch,
+    });
+
+    await expect(
+      client.getPoe2CurrencyExchangeMarkets(1782043200),
+    ).resolves.toMatchObject({
+      next_change_id: 1782043200,
+    });
+
+    expect(fetch).toHaveBeenCalledWith(
+      "https://api.pathofexile.com/currency-exchange/poe2/1782043200",
+      {
+        method: "GET",
+        headers: {
+          accept: "application/json",
+          authorization: "Bearer service-token",
+          "User-Agent": userAgent,
+        },
+      },
+    );
+  });
+
+  it("rejects PoE2 currency exchange requests without service:cxapi", async () => {
+    const client = createGggApiClient({
+      accessToken: "service-token",
+      userAgent,
+      grantedScopes: [],
+      fetch: vi.fn(),
+    });
+
+    await expect(client.getPoe2CurrencyExchangeMarkets()).rejects.toMatchObject(
+      {
+        name: "GggApiScopeError",
+        requiredScope: gggOAuthScopes.serviceCurrencyExchange,
       },
     );
   });
