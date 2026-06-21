@@ -6,6 +6,7 @@ compatibility_date = "2026-06-21"
 APP_URL = "https://calandra.pages.dev"
 DATASET_R2_PREFIX = "datasets"
 SNAPSHOT_R2_PREFIX = "snapshots"
+GGG_USER_AGENT = "calandra/0.1.0 (+https://calandra.pages.dev; piogreeff@users.noreply.github.com)"
 
 [[kv_namespaces]]
 binding = "ECONOMY"
