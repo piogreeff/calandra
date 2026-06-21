@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { win32 } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   BuildFileWriteRejectedError,
   ClipboardCaptureRejectedError,
@@ -12,6 +12,7 @@ import {
   getDefaultPoe2Paths,
   planLocalConfigBackup,
   planBuildFileWrite,
+  priceClipboardItemText,
   readClientLogAppend,
   writeBuildFile,
 } from "../src/index";
@@ -130,6 +131,90 @@ Item Level: 67
         userInitiated: true,
       }),
     ).toThrow(ClipboardCaptureRejectedError);
+  });
+
+  it("price-checks clipboard item text with one user-initiated server action", async () => {
+    const fetch = vi.fn(async () =>
+      jsonResponse({
+        source: "published-dataset",
+        league: "Dawn of the Hunt",
+        patch: "0.2.0",
+        item: {
+          id: "body-armour/dragon-shelter",
+          name: "Dragon Shelter",
+          category: "body-armour",
+          rarity: "rare",
+        },
+        price: {
+          id: "body-armour/dragon-shelter",
+          name: "Dragon Shelter",
+          chaosEquivalent: 42,
+          updatedAt: "2026-06-21T00:00:00.000Z",
+        },
+        matchedBy: "id",
+      }),
+    );
+
+    const result = await priceClipboardItemText(
+      `
+Item Class: Body Armours
+Rarity: Rare
+Dragon Shelter
+Advanced Altar Robe
+--------
+Item Level: 67
+--------
++72 to maximum Life
+`,
+      {
+        apiBaseUrl: "https://calandra-api.workers.dev/",
+        league: "Dawn of the Hunt",
+        patch: "0.2.0",
+        actionId: "hotkey-price-001",
+        capturedAt: "2026-06-21T13:58:00.000Z",
+        userInitiated: true,
+        fetch,
+      },
+    );
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledWith(
+      "https://calandra-api.workers.dev/price/check",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          league: "Dawn of the Hunt",
+          patch: "0.2.0",
+          item: {
+            id: "body-armour/dragon-shelter",
+            name: "Dragon Shelter",
+            category: "body-armour",
+            rarity: "rare",
+          },
+        }),
+      },
+    );
+    expect(result.actionId).toBe("hotkey-price-001");
+    expect(result.capture.contractItem.name).toBe("Dragon Shelter");
+    expect(result.priceCheck.price?.chaosEquivalent).toBe(42);
+  });
+
+  it("does not price-check clipboard text from a background read", async () => {
+    const fetch = vi.fn();
+
+    await expect(
+      priceClipboardItemText("Item Class: Body Armours", {
+        apiBaseUrl: "https://calandra-api.workers.dev",
+        league: "Dawn of the Hunt",
+        patch: "0.2.0",
+        actionId: "background-price",
+        capturedAt: "2026-06-21T13:58:00.000Z",
+        userInitiated: false,
+        fetch,
+      }),
+    ).rejects.toThrow(ClipboardCaptureRejectedError);
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("plans a user-initiated .build write inside BuildPlanner", () => {
@@ -383,4 +468,11 @@ Item Level: 67
 
 async function createTempWindowsTree() {
   return mkdtemp(win32.join(tmpdir(), "calandra-desktop-"));
+}
+
+function jsonResponse(body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  });
 }

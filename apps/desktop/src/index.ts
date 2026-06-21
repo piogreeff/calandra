@@ -1,13 +1,18 @@
 import { copyFile, mkdir, writeFile } from "node:fs/promises";
 import { win32 } from "node:path";
 import {
+  priceCheckRequestSchema,
+  priceCheckResponseSchema,
+  type Item,
+  type PriceCheckResponse,
+} from "@calandra/contract";
+import {
   parseClientLogText,
   parseItemText,
   toContractItem,
   type ParsedClientLogLine,
   type ParsedClipboardItem,
 } from "@calandra/parser";
-import type { Item } from "@calandra/contract";
 
 export class ClipboardCaptureRejectedError extends Error {
   constructor(message: string) {
@@ -58,6 +63,20 @@ export interface ClipboardItemCapture {
   contractItem: Item;
 }
 
+export interface ClipboardPriceCheckRequest extends ClipboardCaptureRequest {
+  apiBaseUrl: string;
+  league: string;
+  patch: string;
+  fetch?: FetchLike;
+}
+
+export interface ClipboardPriceCheckResult {
+  actionId: string;
+  capturedAt: string;
+  capture: ClipboardItemCapture;
+  priceCheck: PriceCheckResponse;
+}
+
 export interface BuildFileWriteRequest {
   buildPlannerDirectory: string;
   fileName: string;
@@ -103,6 +122,8 @@ export interface LocalBackupPlan {
   backupRoot: string;
   entries: LocalBackupEntry[];
 }
+
+type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 
 const poe2DocumentsSegments = ["Documents", "My Games", "Path of Exile 2"];
 
@@ -171,6 +192,38 @@ export function captureClipboardItemText(
     capturedAt: request.capturedAt,
     item,
     contractItem: toContractItem(item),
+  };
+}
+
+export async function priceClipboardItemText(
+  clipboardText: string,
+  request: ClipboardPriceCheckRequest,
+): Promise<ClipboardPriceCheckResult> {
+  const capture = captureClipboardItemText(clipboardText, request);
+  const priceCheckRequest = priceCheckRequestSchema.parse({
+    league: request.league,
+    patch: request.patch,
+    item: capture.contractItem,
+  });
+  const fetchImplementation = request.fetch ?? fetch;
+  const response = await fetchImplementation(
+    `${normalizeBaseUrl(request.apiBaseUrl)}/price/check`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(priceCheckRequest),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Calandra price check failed with HTTP ${response.status}`);
+  }
+
+  return {
+    actionId: capture.actionId,
+    capturedAt: capture.capturedAt,
+    capture,
+    priceCheck: priceCheckResponseSchema.parse(await response.json()),
   };
 }
 
@@ -296,6 +349,10 @@ function completeLineLength(content: string): number {
 
 function stripTrailingSeparators(path: string): string {
   return path.replace(/[\\/]+$/, "");
+}
+
+function normalizeBaseUrl(apiBaseUrl: string) {
+  return apiBaseUrl.replace(/\/+$/, "");
 }
 
 function normalizeBuildFileName(fileName: string): string {
