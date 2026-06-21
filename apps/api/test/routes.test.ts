@@ -1090,6 +1090,91 @@ describe("api routes", () => {
     });
   });
 
+  it("lists persisted account snapshots from the snapshot bucket", async () => {
+    const requestedPrefixes: string[] = [];
+    const response = await api.request("/snapshots/example", undefined, {
+      APP_URL: "https://calandra.pages.dev",
+      SNAPSHOT_R2_PREFIX: "snapshots",
+      SNAPSHOT_BUCKET: {
+        async list(options: { prefix?: string }) {
+          requestedPrefixes.push(options.prefix ?? "");
+
+          return {
+            objects: [
+              {
+                key: "snapshots/example/snapshot-2026-06-21T11-00-00Z.json",
+                uploaded: new Date("2026-06-21T11:01:00.000Z"),
+                size: 1024,
+              },
+              {
+                key: "snapshots/example/snapshot-2026-06-21T10-00-00Z.json",
+                uploaded: new Date("2026-06-21T10:01:00.000Z"),
+                size: 512,
+              },
+              {
+                key: "snapshots/example/not-a-json-object.tmp",
+                uploaded: new Date("2026-06-21T09:01:00.000Z"),
+                size: 128,
+              },
+            ],
+          };
+        },
+      },
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      source: "snapshot-store",
+      account: "example",
+      snapshots: [
+        {
+          account: "example",
+          snapshotId: "snapshot-2026-06-21T10-00-00Z",
+          objectKey: "snapshots/example/snapshot-2026-06-21T10-00-00Z.json",
+          uploadedAt: "2026-06-21T10:01:00.000Z",
+          size: 512,
+        },
+        {
+          account: "example",
+          snapshotId: "snapshot-2026-06-21T11-00-00Z",
+          objectKey: "snapshots/example/snapshot-2026-06-21T11-00-00Z.json",
+          uploadedAt: "2026-06-21T11:01:00.000Z",
+          size: 1024,
+        },
+      ],
+    });
+    expect(requestedPrefixes).toEqual(["snapshots/example/"]);
+  });
+
+  it("returns an empty account snapshot list when none exist", async () => {
+    const response = await api.request("/snapshots/example", undefined, {
+      APP_URL: "https://calandra.pages.dev",
+      SNAPSHOT_BUCKET: {
+        async list() {
+          return { objects: [] };
+        },
+      },
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      source: "snapshot-store",
+      account: "example",
+      snapshots: [],
+    });
+  });
+
+  it("requires a snapshot bucket before listing account snapshots", async () => {
+    const response = await api.request("/snapshots/example", undefined, {
+      APP_URL: "https://calandra.pages.dev",
+    });
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: "snapshot bucket is not configured",
+    });
+  });
+
   it("diffs account snapshots with deterministic engine output", async () => {
     const response = await api.request(
       "/snapshots/diff",

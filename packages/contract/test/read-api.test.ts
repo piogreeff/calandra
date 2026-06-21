@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   accountSnapshotDiffRequestSchema,
   accountSnapshotDiffSchema,
+  accountSnapshotListResponseSchema,
   accountSnapshotWriteResponseSchema,
   accountSnapshotSchema,
   buyVsCraftRequestSchema,
@@ -462,9 +463,15 @@ describe("account snapshot contract", () => {
       openApiDocument.paths["/snapshots/{account}/{snapshotId}"]?.get
         ?.operationId,
     ).toBe("getAccountSnapshot");
+    expect(
+      openApiDocument.paths["/snapshots/{account}"]?.get?.operationId,
+    ).toBe("listAccountSnapshots");
     expect(openApiDocument.paths["/snapshots/diff"]?.post?.operationId).toBe(
       "diffAccountSnapshots",
     );
+    expect(
+      openApiDocument.components.schemas.AccountSnapshotListResponse,
+    ).toBeDefined();
     expect(
       openApiDocument.components.schemas.AccountSnapshotWriteResponse,
     ).toBeDefined();
@@ -514,6 +521,24 @@ describe("account snapshot contract", () => {
         snapshot,
       }).objectKey,
     ).toBe("snapshots/example/snapshot-2026-06-21T10-00-00Z.json");
+  });
+
+  it("models persisted account snapshot list responses", () => {
+    const list = accountSnapshotListResponseSchema.parse({
+      source: "snapshot-store",
+      account: "example",
+      snapshots: [
+        {
+          account: "example",
+          snapshotId: "snapshot-2026-06-21T10-00-00Z",
+          objectKey: "snapshots/example/snapshot-2026-06-21T10-00-00Z.json",
+          uploadedAt: "2026-06-21T10:01:00.000Z",
+          size: 512,
+        },
+      ],
+    });
+
+    expect(list.snapshots[0]?.snapshotId).toBe("snapshot-2026-06-21T10-00-00Z");
   });
 
   it("models deterministic account snapshot diff requests and responses", () => {

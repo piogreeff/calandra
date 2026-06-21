@@ -1,6 +1,7 @@
 import {
   accountSnapshotDiffRequestSchema,
   accountSnapshotDiffSchema,
+  accountSnapshotListResponseSchema,
   accountSnapshotSchema,
   accountSnapshotWriteResponseSchema,
   buyVsCraftRequestSchema,
@@ -144,6 +145,30 @@ api.get("/snapshots/:account/:snapshotId", async (context) => {
   }
 
   return context.json(parsed.data);
+});
+
+api.get("/snapshots/:account", async (context) => {
+  const snapshotBucket = context.env.SNAPSHOT_BUCKET;
+
+  if (!snapshotBucket?.list) {
+    return context.json({ error: "snapshot bucket is not configured" }, 503);
+  }
+
+  const account = context.req.param("account");
+  const prefix = getSnapshotAccountPrefix(context, account);
+  const listed = await snapshotBucket.list({ prefix });
+  const snapshots = listed.objects
+    .map((object) => toSnapshotListItem({ account, prefix, object }))
+    .filter((item) => item !== undefined)
+    .sort((left, right) => left.snapshotId.localeCompare(right.snapshotId));
+
+  return context.json(
+    accountSnapshotListResponseSchema.parse({
+      source: "snapshot-store",
+      account,
+      snapshots,
+    }),
+  );
 });
 
 api.post("/snapshots", async (context) => {
@@ -487,9 +512,54 @@ function getSnapshotObjectKey(
   context: Context<{ Bindings: Bindings }>,
   snapshot: { account: string; id: string },
 ) {
+  return `${getSnapshotAccountPrefix(context, snapshot.account)}${encodeURIComponent(snapshot.id)}.json`;
+}
+
+function getSnapshotAccountPrefix(
+  context: Context<{ Bindings: Bindings }>,
+  account: string,
+) {
   const prefix = context.env.SNAPSHOT_R2_PREFIX ?? "snapshots";
 
-  return `${prefix}/${encodeURIComponent(snapshot.account)}/${encodeURIComponent(snapshot.id)}.json`;
+  return `${prefix}/${encodeURIComponent(account)}/`;
+}
+
+function toSnapshotListItem({
+  account,
+  prefix,
+  object,
+}: {
+  account: string;
+  prefix: string;
+  object: SnapshotListedObject;
+}) {
+  if (!object.key.startsWith(prefix) || !object.key.endsWith(".json")) {
+    return undefined;
+  }
+
+  const encodedSnapshotId = object.key.slice(prefix.length, -".json".length);
+
+  if (!encodedSnapshotId || encodedSnapshotId.includes("/")) {
+    return undefined;
+  }
+
+  return {
+    account,
+    snapshotId: decodeURIComponent(encodedSnapshotId),
+    objectKey: object.key,
+    uploadedAt: serializeSnapshotUploadedAt(object.uploaded),
+    size: object.size,
+  };
+}
+
+function serializeSnapshotUploadedAt(value: Date | string | undefined) {
+  if (!value) {
+    return undefined;
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+
+  return Number.isNaN(date.valueOf()) ? undefined : date.toISOString();
 }
 
 async function validateDatasetManifest({
@@ -610,6 +680,7 @@ type DatasetBucket = {
 
 type SnapshotBucket = {
   get?(key: string): Promise<SnapshotObject | null>;
+  list?(options: { prefix?: string }): Promise<SnapshotListResult>;
   put?(
     key: string,
     value: string,
@@ -623,6 +694,16 @@ type DatasetObject = {
 
 type SnapshotObject = {
   text(): Promise<string>;
+};
+
+type SnapshotListResult = {
+  objects: SnapshotListedObject[];
+};
+
+type SnapshotListedObject = {
+  key: string;
+  uploaded?: Date | string;
+  size?: number;
 };
 
 class DatasetManifestValidationError extends Error {}

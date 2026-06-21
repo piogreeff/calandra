@@ -179,6 +179,20 @@ export const accountSnapshotWriteResponseSchema = z.object({
   snapshot: accountSnapshotSchema,
 });
 
+export const accountSnapshotListItemSchema = z.object({
+  account: z.string().min(1),
+  snapshotId: z.string().min(1),
+  objectKey: z.string().min(1),
+  uploadedAt: z.string().datetime().optional(),
+  size: z.number().int().nonnegative().optional(),
+});
+
+export const accountSnapshotListResponseSchema = z.object({
+  source: z.literal("snapshot-store"),
+  account: z.string().min(1),
+  snapshots: z.array(accountSnapshotListItemSchema),
+});
+
 export const snapshotEntityChangeTypeSchema = z.enum([
   "added",
   "removed",
@@ -653,6 +667,35 @@ export const openApiDocument = {
         },
       },
     },
+    "/snapshots/{account}": {
+      get: {
+        operationId: "listAccountSnapshots",
+        summary: "List persisted account snapshots",
+        parameters: [
+          {
+            name: "account",
+            in: "path",
+            required: true,
+            schema: { type: "string", minLength: 1 },
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Persisted account snapshot list",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/AccountSnapshotListResponse",
+                },
+              },
+            },
+          },
+          "503": {
+            description: "Snapshot storage is not configured",
+          },
+        },
+      },
+    },
     "/advisor/upgrades": {
       post: {
         operationId: "rankUpgradeCandidates",
@@ -1039,6 +1082,29 @@ export const openApiDocument = {
           snapshot: { $ref: "#/components/schemas/AccountSnapshot" },
         },
       },
+      AccountSnapshotListItem: {
+        type: "object",
+        required: ["account", "snapshotId", "objectKey"],
+        properties: {
+          account: { type: "string", minLength: 1 },
+          snapshotId: { type: "string", minLength: 1 },
+          objectKey: { type: "string", minLength: 1 },
+          uploadedAt: { type: "string", format: "date-time" },
+          size: { type: "integer", minimum: 0 },
+        },
+      },
+      AccountSnapshotListResponse: {
+        type: "object",
+        required: ["source", "account", "snapshots"],
+        properties: {
+          source: { type: "string", enum: ["snapshot-store"] },
+          account: { type: "string", minLength: 1 },
+          snapshots: {
+            type: "array",
+            items: { $ref: "#/components/schemas/AccountSnapshotListItem" },
+          },
+        },
+      },
       SnapshotEquipmentChange: {
         type: "object",
         required: ["type", "slot"],
@@ -1368,6 +1434,12 @@ export type AccountSnapshotStash = z.infer<typeof accountSnapshotStashSchema>;
 export type AccountSnapshot = z.infer<typeof accountSnapshotSchema>;
 export type AccountSnapshotWriteResponse = z.infer<
   typeof accountSnapshotWriteResponseSchema
+>;
+export type AccountSnapshotListItem = z.infer<
+  typeof accountSnapshotListItemSchema
+>;
+export type AccountSnapshotListResponse = z.infer<
+  typeof accountSnapshotListResponseSchema
 >;
 export type SnapshotEntityChangeType = z.infer<
   typeof snapshotEntityChangeTypeSchema
