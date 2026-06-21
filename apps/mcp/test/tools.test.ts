@@ -7,6 +7,7 @@ describe("Calandra MCP tools", () => {
       "search_items",
       "price_item",
       "recommend_upgrade",
+      "estimate_crafting",
       "get_economy",
     ]);
   });
@@ -172,6 +173,98 @@ describe("Calandra MCP tools", () => {
           candidateMissingStats: [],
         },
       ],
+    });
+  });
+
+  it("routes crafting estimates to the deterministic crafting endpoint", async () => {
+    const fetch = vi.fn(async () =>
+      jsonResponse({
+        source: "deterministic-engine",
+        itemLevel: 68,
+        currencyCostChaos: 2,
+        eligibleModCount: 2,
+        totalEligibleWeight: 400,
+        eligibleTargetModIds: ["life-t2"],
+        blockedTargetModIds: ["life-t1"],
+        hitProbability: 0.25,
+        expectedAttempts: 4,
+        expectedCostChaos: 8,
+      }),
+    );
+    const server = createCalandraMcpServer({
+      apiBaseUrl: "https://calandra-api.workers.dev",
+      fetch,
+    });
+
+    const result = await server.callTool("estimate_crafting", {
+      itemLevel: 68,
+      currencyCostChaos: 2,
+      targetModIds: ["life-t2", "life-t1"],
+      modPool: [
+        {
+          id: "life-t2",
+          name: "+# to maximum Life",
+          minItemLevel: 60,
+          weight: 100,
+        },
+        {
+          id: "mana-t2",
+          name: "+# to maximum Mana",
+          minItemLevel: 60,
+          weight: 300,
+        },
+        {
+          id: "life-t1",
+          name: "+# to maximum Life",
+          minItemLevel: 75,
+          weight: 50,
+        },
+      ],
+    });
+
+    expect(fetch).toHaveBeenCalledWith(
+      "https://calandra-api.workers.dev/crafting/estimate",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          itemLevel: 68,
+          currencyCostChaos: 2,
+          targetModIds: ["life-t2", "life-t1"],
+          modPool: [
+            {
+              id: "life-t2",
+              name: "+# to maximum Life",
+              minItemLevel: 60,
+              weight: 100,
+            },
+            {
+              id: "mana-t2",
+              name: "+# to maximum Mana",
+              minItemLevel: 60,
+              weight: 300,
+            },
+            {
+              id: "life-t1",
+              name: "+# to maximum Life",
+              minItemLevel: 75,
+              weight: 50,
+            },
+          ],
+        }),
+      },
+    );
+    expect(parseToolJson(result)).toEqual({
+      source: "deterministic-engine",
+      itemLevel: 68,
+      currencyCostChaos: 2,
+      eligibleModCount: 2,
+      totalEligibleWeight: 400,
+      eligibleTargetModIds: ["life-t2"],
+      blockedTargetModIds: ["life-t1"],
+      hitProbability: 0.25,
+      expectedAttempts: 4,
+      expectedCostChaos: 8,
     });
   });
 

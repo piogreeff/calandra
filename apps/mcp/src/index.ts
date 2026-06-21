@@ -1,4 +1,6 @@
 import {
+  craftingEstimateRequestSchema,
+  craftingEstimateResponseSchema,
   economyCollectionSchema,
   itemCollectionSchema,
   upgradeAdvisorRequestSchema,
@@ -10,6 +12,7 @@ export type CalandraMcpToolName =
   | "search_items"
   | "price_item"
   | "recommend_upgrade"
+  | "estimate_crafting"
   | "get_economy";
 
 export interface CalandraMcpTool {
@@ -100,6 +103,21 @@ export function listCalandraMcpTools(): CalandraMcpTool[] {
       },
     },
     {
+      name: "estimate_crafting",
+      description:
+        "Estimate crafting odds and expected chaos cost with Calandra's deterministic engine.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          itemLevel: { type: "number", minimum: 0 },
+          currencyCostChaos: { type: "number", minimum: 0 },
+          targetModIds: { type: "array" },
+          modPool: { type: "array" },
+        },
+        required: ["itemLevel", "currencyCostChaos", "targetModIds", "modPool"],
+      },
+    },
+    {
       name: "get_economy",
       description: "Fetch Calandra's economy prices for one league and patch.",
       inputSchema: {
@@ -133,6 +151,10 @@ export function createCalandraMcpServer(options: CalandraMcpServerOptions) {
         case "recommend_upgrade":
           return jsonToolResult(
             await recommendUpgrade(apiBaseUrl, fetchImplementation, input),
+          );
+        case "estimate_crafting":
+          return jsonToolResult(
+            await estimateCrafting(apiBaseUrl, fetchImplementation, input),
           );
         case "get_economy":
           return jsonToolResult(
@@ -193,6 +215,22 @@ async function recommendUpgrade(
 
   return upgradeAdvisorResponseSchema.parse(
     await fetchJson(fetchImplementation, `${apiBaseUrl}/advisor/upgrades`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(request),
+    }),
+  );
+}
+
+async function estimateCrafting(
+  apiBaseUrl: string,
+  fetchImplementation: FetchLike,
+  input: unknown,
+) {
+  const request = craftingEstimateRequestSchema.parse(input);
+
+  return craftingEstimateResponseSchema.parse(
+    await fetchJson(fetchImplementation, `${apiBaseUrl}/crafting/estimate`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(request),
