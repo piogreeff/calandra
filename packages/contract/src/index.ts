@@ -268,6 +268,22 @@ export const craftingEstimateResponseSchema = z.object({
   expectedCostChaos: z.number().nonnegative().optional(),
 });
 
+export const acquisitionRecommendationSchema = z.enum(["buy", "craft"]);
+
+export const buyVsCraftRequestSchema = z.object({
+  marketPriceChaos: z.number().nonnegative(),
+  crafting: craftingEstimateRequestSchema,
+});
+
+export const buyVsCraftResponseSchema = z.object({
+  source: z.literal("deterministic-engine"),
+  recommendation: acquisitionRecommendationSchema,
+  marketPriceChaos: z.number().nonnegative(),
+  expectedCraftCostChaos: z.number().nonnegative().optional(),
+  savingsChaos: z.number().nonnegative(),
+  estimate: craftingEstimateResponseSchema.omit({ source: true }),
+});
+
 export const datasetArtifactSchema = z.object({
   ...versionedCollectionFields,
   generatedAt: z.string().datetime(),
@@ -570,6 +586,33 @@ export const openApiDocument = {
           },
           "400": {
             description: "Invalid crafting estimate request",
+          },
+        },
+      },
+    },
+    "/crafting/buy-vs-craft": {
+      post: {
+        operationId: "compareBuyVsCraft",
+        summary: "Compare market buy price against deterministic crafting cost",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/BuyVsCraftRequest" },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Deterministic buy-vs-craft recommendation",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/BuyVsCraftResponse" },
+              },
+            },
+          },
+          "400": {
+            description: "Invalid buy-vs-craft request",
           },
         },
       },
@@ -1041,6 +1084,61 @@ export const openApiDocument = {
           expectedCostChaos: { type: "number", minimum: 0 },
         },
       },
+      BuyVsCraftRequest: {
+        type: "object",
+        required: ["marketPriceChaos", "crafting"],
+        properties: {
+          marketPriceChaos: { type: "number", minimum: 0 },
+          crafting: { $ref: "#/components/schemas/CraftingEstimateRequest" },
+        },
+      },
+      BuyVsCraftResponse: {
+        type: "object",
+        required: [
+          "source",
+          "recommendation",
+          "marketPriceChaos",
+          "savingsChaos",
+          "estimate",
+        ],
+        properties: {
+          source: { type: "string", enum: ["deterministic-engine"] },
+          recommendation: { type: "string", enum: ["buy", "craft"] },
+          marketPriceChaos: { type: "number", minimum: 0 },
+          expectedCraftCostChaos: { type: "number", minimum: 0 },
+          savingsChaos: { type: "number", minimum: 0 },
+          estimate: { $ref: "#/components/schemas/CraftingEstimateResult" },
+        },
+      },
+      CraftingEstimateResult: {
+        type: "object",
+        required: [
+          "itemLevel",
+          "currencyCostChaos",
+          "eligibleModCount",
+          "totalEligibleWeight",
+          "eligibleTargetModIds",
+          "blockedTargetModIds",
+          "hitProbability",
+        ],
+        properties: {
+          itemLevel: { type: "integer", minimum: 0 },
+          currencyCostChaos: { type: "number", minimum: 0 },
+          eligibleModCount: { type: "integer", minimum: 0 },
+          totalEligibleWeight: { type: "number", minimum: 0 },
+          eligibleTargetModIds: {
+            type: "array",
+            items: { type: "string", minLength: 1 },
+          },
+          blockedTargetModIds: {
+            type: "array",
+            items: { type: "string", minLength: 1 },
+          },
+          hitProbability: { type: "number", minimum: 0, maximum: 1 },
+          expectedAttempts: { type: "number", exclusiveMinimum: 0 },
+          expectedCostChaos: { type: "number", minimum: 0 },
+        },
+      },
       DatasetCounts: {
         type: "object",
         required: [
@@ -1140,6 +1238,11 @@ export type CraftingEstimateRequest = z.infer<
 export type CraftingEstimateResponse = z.infer<
   typeof craftingEstimateResponseSchema
 >;
+export type AcquisitionRecommendation = z.infer<
+  typeof acquisitionRecommendationSchema
+>;
+export type BuyVsCraftRequest = z.infer<typeof buyVsCraftRequestSchema>;
+export type BuyVsCraftResponse = z.infer<typeof buyVsCraftResponseSchema>;
 export type DatasetArtifact = z.infer<typeof datasetArtifactSchema>;
 export type DatasetCounts = z.infer<typeof datasetCountsSchema>;
 export type DatasetManifest = z.infer<typeof datasetManifestSchema>;

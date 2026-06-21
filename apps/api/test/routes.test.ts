@@ -698,6 +698,79 @@ describe("api routes", () => {
     });
   });
 
+  it("compares buying and crafting with deterministic engine output", async () => {
+    const response = await api.request(
+      "/crafting/buy-vs-craft",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          marketPriceChaos: 12,
+          crafting: {
+            itemLevel: 68,
+            currencyCostChaos: 2,
+            targetModIds: ["life-t2"],
+            modPool: [
+              {
+                id: "life-t2",
+                name: "+# to maximum Life",
+                minItemLevel: 60,
+                weight: 100,
+              },
+              {
+                id: "mana-t2",
+                name: "+# to maximum Mana",
+                minItemLevel: 60,
+                weight: 300,
+              },
+            ],
+          },
+        }),
+      },
+      { APP_URL: "https://calandra.pages.dev" },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      source: "deterministic-engine",
+      recommendation: "craft",
+      marketPriceChaos: 12,
+      expectedCraftCostChaos: 8,
+      savingsChaos: 4,
+      estimate: {
+        itemLevel: 68,
+        currencyCostChaos: 2,
+        eligibleModCount: 2,
+        totalEligibleWeight: 400,
+        eligibleTargetModIds: ["life-t2"],
+        blockedTargetModIds: [],
+        hitProbability: 0.25,
+        expectedAttempts: 4,
+        expectedCostChaos: 8,
+      },
+    });
+  });
+
+  it("rejects malformed buy-vs-craft payloads", async () => {
+    const response = await api.request(
+      "/crafting/buy-vs-craft",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          marketPriceChaos: -1,
+          crafting: "not-a-craft-plan",
+        }),
+      },
+      { APP_URL: "https://calandra.pages.dev" },
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "invalid buy-vs-craft request",
+    });
+  });
+
   it("diffs account snapshots with deterministic engine output", async () => {
     const response = await api.request(
       "/snapshots/diff",

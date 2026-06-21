@@ -3,6 +3,8 @@ import {
   accountSnapshotDiffRequestSchema,
   accountSnapshotDiffSchema,
   accountSnapshotSchema,
+  buyVsCraftRequestSchema,
+  buyVsCraftResponseSchema,
   craftingEstimateRequestSchema,
   craftingEstimateResponseSchema,
   datasetArtifactSchema,
@@ -279,6 +281,59 @@ describe("phase 1 read API contract", () => {
     expect(
       openApiDocument.components.schemas.CraftingEstimateResponse,
     ).toBeDefined();
+  });
+
+  it("models deterministic buy-vs-craft requests and responses", () => {
+    const request = buyVsCraftRequestSchema.parse({
+      marketPriceChaos: 12,
+      crafting: {
+        itemLevel: 68,
+        currencyCostChaos: 2,
+        targetModIds: ["life-t2"],
+        modPool: [
+          {
+            id: "life-t2",
+            name: "+# to maximum Life",
+            minItemLevel: 60,
+            weight: 100,
+          },
+          {
+            id: "mana-t2",
+            name: "+# to maximum Mana",
+            minItemLevel: 60,
+            weight: 300,
+          },
+        ],
+      },
+    });
+
+    expect(request.marketPriceChaos).toBe(12);
+
+    const response = buyVsCraftResponseSchema.parse({
+      source: "deterministic-engine",
+      recommendation: "craft",
+      marketPriceChaos: 12,
+      expectedCraftCostChaos: 8,
+      savingsChaos: 4,
+      estimate: {
+        itemLevel: 68,
+        currencyCostChaos: 2,
+        eligibleModCount: 2,
+        totalEligibleWeight: 400,
+        eligibleTargetModIds: ["life-t2"],
+        blockedTargetModIds: [],
+        hitProbability: 0.25,
+        expectedAttempts: 4,
+        expectedCostChaos: 8,
+      },
+    });
+
+    expect(response.recommendation).toBe("craft");
+    expect(
+      openApiDocument.paths["/crafting/buy-vs-craft"]?.post?.operationId,
+    ).toBe("compareBuyVsCraft");
+    expect(openApiDocument.components.schemas.BuyVsCraftRequest).toBeDefined();
+    expect(openApiDocument.components.schemas.BuyVsCraftResponse).toBeDefined();
   });
 });
 

@@ -1,6 +1,8 @@
 import {
   accountSnapshotDiffRequestSchema,
   accountSnapshotDiffSchema,
+  buyVsCraftRequestSchema,
+  buyVsCraftResponseSchema,
   craftingEstimateRequestSchema,
   craftingEstimateResponseSchema,
   datasetArtifactSchema,
@@ -18,6 +20,7 @@ import {
   uniqueCollectionSchema,
 } from "@calandra/contract";
 import {
+  compareBuyVsCraft,
   diffAccountSnapshots,
   estimateCraftingPlan,
   rankLoadoutUpgrades,
@@ -104,6 +107,22 @@ api.post("/crafting/estimate", async (context) => {
     craftingEstimateResponseSchema.parse({
       source: "deterministic-engine",
       ...estimateCraftingPlan(parsed.data),
+    }),
+  );
+});
+
+api.post("/crafting/buy-vs-craft", async (context) => {
+  const rawBody = await readJsonBody(context);
+  const parsed = buyVsCraftRequestSchema.safeParse(rawBody);
+
+  if (!parsed.success) {
+    return context.json({ error: "invalid buy-vs-craft request" }, 400);
+  }
+
+  return context.json(
+    buyVsCraftResponseSchema.parse({
+      source: "deterministic-engine",
+      ...compareBuyVsCraft(parsed.data),
     }),
   );
 });

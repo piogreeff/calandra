@@ -145,6 +145,21 @@ export interface CraftingEstimate {
   expectedCostChaos?: number | undefined;
 }
 
+export interface BuyVsCraftInput {
+  marketPriceChaos: number;
+  crafting: CraftingEstimateInput;
+}
+
+export type AcquisitionRecommendation = "buy" | "craft";
+
+export interface BuyVsCraftComparison {
+  recommendation: AcquisitionRecommendation;
+  marketPriceChaos: number;
+  expectedCraftCostChaos?: number | undefined;
+  savingsChaos: number;
+  estimate: CraftingEstimate;
+}
+
 export function scoreItem(input: ScoreItemInput): ItemScore {
   const contributions = Object.entries(input.weights)
     .filter(([, weight]) => weight !== 0)
@@ -299,6 +314,26 @@ export function estimateCraftingPlan(
     hitProbability,
     ...(expectedAttempts !== undefined ? { expectedAttempts } : {}),
     ...(expectedCostChaos !== undefined ? { expectedCostChaos } : {}),
+  };
+}
+
+export function compareBuyVsCraft(
+  input: BuyVsCraftInput,
+): BuyVsCraftComparison {
+  const estimate = estimateCraftingPlan(input.crafting);
+  const expectedCraftCostChaos = estimate.expectedCostChaos;
+  const shouldCraft =
+    expectedCraftCostChaos !== undefined &&
+    expectedCraftCostChaos < input.marketPriceChaos;
+
+  return {
+    recommendation: shouldCraft ? "craft" : "buy",
+    marketPriceChaos: input.marketPriceChaos,
+    ...(expectedCraftCostChaos !== undefined ? { expectedCraftCostChaos } : {}),
+    savingsChaos: shouldCraft
+      ? roundScore(input.marketPriceChaos - expectedCraftCostChaos)
+      : 0,
+    estimate,
   };
 }
 
