@@ -7,7 +7,7 @@ Thanks for your interest. A few things make this project unusual — read the ha
 These protect users from account bans and the project from takedowns. PRs that cross these lines will be closed.
 
 1. **The desktop agent never touches the game process.** No memory reading, no injection, no overlays that read the screen, no input automation beyond a single user-initiated keypress. The model is: read-only overlay + one server action per user action.
-2. **No scrapers in clients or self-host paths.** Game data is produced by the maintainer's pipeline and published as a dataset. Self-hosters and clients *consume* it. Do not add code that scrapes poe2db, poe.ninja, or any other site from the app.
+2. **No scrapers in clients or self-host paths.** Game data is produced by the maintainer's pipeline and published as a dataset. Self-hosters and clients _consume_ it. Do not add code that scrapes poe2db, poe.ninja, or any other site from the app.
 3. **Never scrape Maxroll or Mobalytics.** Their guide content is copyrighted. Link out instead.
 4. **Ship no game assets.** Item art and data are GGG IP under their fan content policy — referenced and cached with attribution, never committed or relicensed.
 5. **Official API hygiene.** Descriptive `User-Agent` with contact, OAuth scopes, honor rate limits with backoff, encrypt tokens at rest.
@@ -36,6 +36,7 @@ packages/contract   Zod + OpenAPI — the API contract (CODEOWNERS-gated)
 packages/parser     item-text + Client.txt parsers
 packages/engine     deterministic upgrade + crafting engine (pure, no LLM)
 packages/dataset    dataset build + publish tooling
+packages/ggg-api    official GGG API client hygiene helpers
 packages/ui         shared FlyonUI theme tokens + components
 ```
 

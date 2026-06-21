@@ -45,4 +45,6 @@ Recommendations are computed by a **deterministic engine** — slot scoring, mod
 
 `apps/web` (Next.js 15 + FlyonUI) is the UI, rendered both standalone and inside the Tauri webview. The MCP server exposes the same read API and advisor as agent tools. A mobile browse/brainstorm client is a planned stretch. All of them speak the single contract in `packages/contract`; none of them hold business logic.
 
+Official Path of Exile API access goes through `packages/ggg-api`. That package centralizes Calandra's required `User-Agent` format, OAuth scope checks, and `429`/rate-limit backoff so character snapshot code does not grow one-off HTTP behavior.
+
 `apps/mcp` owns the agent tool surface. Its first tools proxy the existing API contract: `search_items`, `price_item`, `recommend_upgrade`, and `get_economy`. The handlers validate Calandra API responses with the shared Zod schemas and return MCP-style text content; transport wiring can wrap the same registry later without changing tool behavior.

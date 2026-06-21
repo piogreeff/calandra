@@ -24,6 +24,8 @@ Hybrid by necessity: anything that reads the live game (overlay, hotkey, clipboa
 
 The Worker serves the current contract at `/openapi.json`; during temporary-domain development that is `https://calandra-api.piogreeff.workers.dev/openapi.json`. Published dataset metadata is available at `/datasets/manifest?league=<league>&patch=<patch>` after the Worker validates the artifact checksum and counts.
 
+Official GGG API calls should go through `packages/ggg-api`, which enforces Calandra's descriptive `User-Agent`, OAuth scope checks, and `429`/rate-limit backoff for future character snapshot work.
+
 The dataset package validates maintainer-published game-data artifacts for self-host imports:
 
 ```bash

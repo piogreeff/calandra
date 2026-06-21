@@ -130,6 +130,8 @@ importers:
 
   packages/engine: {}
 
+  packages/ggg-api: {}
+
   packages/parser:
     dependencies:
       '@calandra/contract':

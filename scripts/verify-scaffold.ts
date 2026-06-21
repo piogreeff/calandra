@@ -21,13 +21,18 @@ const requiredPaths = [
   "packages/parser/package.json",
   "packages/engine/package.json",
   "packages/dataset/package.json",
-  "packages/ui/package.json"
+  "packages/ggg-api/package.json",
+  "packages/ui/package.json",
 ];
 
-const missing = requiredPaths.filter((path) => !existsSync(join(process.cwd(), path)));
+const missing = requiredPaths.filter(
+  (path) => !existsSync(join(process.cwd(), path)),
+);
 
 if (missing.length > 0) {
-  console.error(`Calandra scaffold is missing required paths:\n${missing.map((path) => `- ${path}`).join("\n")}`);
+  console.error(
+    `Calandra scaffold is missing required paths:\n${missing.map((path) => `- ${path}`).join("\n")}`,
+  );
   process.exit(1);
 }
 

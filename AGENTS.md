@@ -31,6 +31,7 @@ packages/contract  Zod + OpenAPI (CODEOWNERS-gated)
 packages/parser    item-text + Client.txt parsers
 packages/engine    deterministic upgrade + crafting engine (pure, no LLM)
 packages/dataset   dataset build + publish
+packages/ggg-api   official GGG API client hygiene: UA, scopes, rate-limit backoff
 packages/ui        FlyonUI theme tokens + components
 docs/              ARCHITECTURE.md, SELF_HOSTING.md
 ```
