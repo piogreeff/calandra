@@ -32,6 +32,16 @@ pub struct ClipboardTextCapture {
     pub text: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OverlayModePlan {
+    pub action_id: String,
+    pub overlay_enabled: bool,
+    pub always_on_top: bool,
+    pub decorations: bool,
+    pub shadow: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LocalBackupFileRequest {
@@ -121,6 +131,31 @@ fn capture_clipboard_text(
 }
 
 #[tauri::command]
+fn set_overlay_mode(
+    app: tauri::AppHandle,
+    action_id: String,
+    overlay_enabled: bool,
+    user_initiated: bool,
+) -> Result<OverlayModePlan, String> {
+    let plan = plan_overlay_mode(action_id, overlay_enabled, user_initiated)?;
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| "Unable to resolve Calandra main window".to_string())?;
+
+    window
+        .set_always_on_top(plan.always_on_top)
+        .map_err(|error| format!("Unable to update overlay topmost mode: {error}"))?;
+    window
+        .set_decorations(plan.decorations)
+        .map_err(|error| format!("Unable to update overlay window chrome: {error}"))?;
+    window
+        .set_shadow(plan.shadow)
+        .map_err(|error| format!("Unable to update overlay window shadow: {error}"))?;
+
+    Ok(plan)
+}
+
+#[tauri::command]
 fn copy_local_config_backup(
     game_directory: String,
     backup_directory: String,
@@ -170,6 +205,7 @@ pub fn run() {
             get_theme_preference,
             set_theme_preference,
             capture_clipboard_text,
+            set_overlay_mode,
             copy_local_config_backup,
             discover_local_config_backup_files,
             read_client_log_append,
@@ -283,6 +319,29 @@ fn capture_clipboard_text_from_reader(
         action_id,
         captured_at,
         text,
+    })
+}
+
+fn plan_overlay_mode(
+    action_id: String,
+    overlay_enabled: bool,
+    user_initiated: bool,
+) -> Result<OverlayModePlan, String> {
+    if !user_initiated {
+        return Err("Overlay mode must be initiated by a user action".to_string());
+    }
+
+    let action_id = action_id.trim().to_string();
+    if action_id.is_empty() {
+        return Err("Overlay mode requires an action id".to_string());
+    }
+
+    Ok(OverlayModePlan {
+        action_id,
+        overlay_enabled,
+        always_on_top: overlay_enabled,
+        decorations: !overlay_enabled,
+        shadow: !overlay_enabled,
     })
 }
 
@@ -844,6 +903,38 @@ mod tests {
         .unwrap_err();
 
         assert_eq!(error, "Clipboard text is empty");
+    }
+
+    #[test]
+    fn plans_user_initiated_overlay_mode_enable() {
+        let plan =
+            plan_overlay_mode("overlay-001".to_string(), true, true).unwrap();
+
+        assert_eq!(plan.action_id, "overlay-001");
+        assert!(plan.overlay_enabled);
+        assert!(plan.always_on_top);
+        assert!(!plan.decorations);
+        assert!(!plan.shadow);
+    }
+
+    #[test]
+    fn plans_user_initiated_overlay_mode_disable() {
+        let plan =
+            plan_overlay_mode("overlay-002".to_string(), false, true).unwrap();
+
+        assert_eq!(plan.action_id, "overlay-002");
+        assert!(!plan.overlay_enabled);
+        assert!(!plan.always_on_top);
+        assert!(plan.decorations);
+        assert!(plan.shadow);
+    }
+
+    #[test]
+    fn rejects_background_overlay_mode_changes() {
+        let error =
+            plan_overlay_mode("background-overlay".to_string(), true, false).unwrap_err();
+
+        assert_eq!(error, "Overlay mode must be initiated by a user action");
     }
 
     #[test]

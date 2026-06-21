@@ -6,6 +6,7 @@ import {
   Clipboard,
   FolderOpen,
   Loader2,
+  MonitorUp,
   XCircle,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -14,12 +15,15 @@ import {
   discoverDesktopLocalConfigBackupFiles,
   getDesktopPoe2Paths,
   runDesktopLocalConfigBackup,
+  setDesktopOverlayMode,
   subscribeDesktopClipboardHotkey,
   type DesktopClipboardItemCapture,
   type DesktopClipboardItemCaptureRequest,
   type DesktopLocalBackupFileRequest,
   type DesktopLocalConfigBackupPlan,
   type DesktopLocalConfigBackupRequest,
+  type DesktopOverlayModePlan,
+  type DesktopOverlayModeRequest,
   type DesktopPoe2PathState,
 } from "../lib/desktop-bridge";
 
@@ -41,9 +45,16 @@ type ClipboardCaptureState =
   | { status: "success"; capture: DesktopClipboardItemCapture }
   | { status: "error"; message: string };
 
+type OverlayModeState =
+  | { status: "idle"; overlayEnabled: boolean }
+  | { status: "running"; overlayEnabled: boolean }
+  | { status: "success"; plan: DesktopOverlayModePlan }
+  | { status: "error"; overlayEnabled: boolean; message: string };
+
 export function DesktopPathsPanel({
   loadPaths = getDesktopPoe2Paths,
   captureClipboardItem = captureDesktopClipboardItem,
+  setOverlayMode = setDesktopOverlayMode,
   subscribeClipboardHotkey = subscribeDesktopClipboardHotkey,
   discoverBackupFiles = discoverDesktopLocalConfigBackupFiles,
   runBackup = runDesktopLocalConfigBackup,
@@ -53,6 +64,9 @@ export function DesktopPathsPanel({
   captureClipboardItem?: (
     request: DesktopClipboardItemCaptureRequest,
   ) => Promise<DesktopClipboardItemCapture>;
+  setOverlayMode?: (
+    request: DesktopOverlayModeRequest,
+  ) => Promise<DesktopOverlayModePlan>;
   subscribeClipboardHotkey?: (
     onPressed: () => void,
   ) => Promise<(() => Promise<void>) | undefined>;
@@ -72,6 +86,10 @@ export function DesktopPathsPanel({
   });
   const [clipboardState, setClipboardState] = useState<ClipboardCaptureState>({
     status: "idle",
+  });
+  const [overlayState, setOverlayState] = useState<OverlayModeState>({
+    status: "idle",
+    overlayEnabled: false,
   });
 
   useEffect(() => {
@@ -154,6 +172,31 @@ export function DesktopPathsPanel({
     [captureClipboardItem, now],
   );
 
+  async function handleOverlayToggle() {
+    if (!paths) return;
+
+    const overlayEnabled = !isOverlayEnabled(overlayState);
+    setOverlayState({ status: "running", overlayEnabled });
+
+    try {
+      const plan = await setOverlayMode(
+        createOverlayModeRequest({
+          capturedAt: now().toISOString(),
+          overlayEnabled,
+        }),
+      );
+
+      setOverlayState({ status: "success", plan });
+    } catch (error) {
+      setOverlayState({
+        status: "error",
+        overlayEnabled: !overlayEnabled,
+        message:
+          error instanceof Error ? error.message : "Overlay mode change failed",
+      });
+    }
+  }
+
   useEffect(() => {
     if (!paths) {
       return;
@@ -207,6 +250,21 @@ export function DesktopPathsPanel({
           <PathRow label="Game folder" value={paths.gameDirectory} />
           <PathRow label="Client.txt" value={paths.clientLogPath} />
           <PathRow label="BuildPlanner" value={paths.buildPlannerDirectory} />
+          <button
+            type="button"
+            className="btn btn-accent btn-sm w-full"
+            disabled={overlayState.status === "running"}
+            aria-pressed={isOverlayEnabled(overlayState)}
+            onClick={() => void handleOverlayToggle()}
+          >
+            {overlayState.status === "running" ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <MonitorUp className="size-4" aria-hidden="true" />
+            )}
+            {isOverlayEnabled(overlayState) ? "Exit overlay" : "Enter overlay"}
+          </button>
+          <OverlayModeStatus state={overlayState} />
           <button
             type="button"
             className="btn btn-secondary btn-sm w-full"
@@ -293,6 +351,20 @@ export function createLocalConfigBackupRequest({
   };
 }
 
+export function createOverlayModeRequest({
+  capturedAt,
+  overlayEnabled,
+}: {
+  capturedAt: string;
+  overlayEnabled: boolean;
+}): DesktopOverlayModeRequest {
+  return {
+    actionId: `overlay-${capturedAt.replace(/[:.]/g, "-")}`,
+    overlayEnabled,
+    userInitiated: true,
+  };
+}
+
 export function defaultLocalBackupDirectory(gameDirectory: string): string {
   const trimmed = gameDirectory.replace(/[\\/]+$/, "");
   const lastSlash = Math.max(
@@ -334,6 +406,42 @@ function ClipboardCaptureStatus({ state }: { state: ClipboardCaptureState }) {
       </div>
     </div>
   );
+}
+
+function OverlayModeStatus({ state }: { state: OverlayModeState }) {
+  if (state.status === "idle" || state.status === "running") {
+    return null;
+  }
+
+  if (state.status === "success") {
+    return (
+      <div className="rounded-md border border-success/30 bg-success/10 p-3 text-xs text-success">
+        <div className="flex items-center gap-2 font-semibold">
+          <CheckCircle2 className="size-4" aria-hidden="true" />
+          <span>
+            {state.plan.overlayEnabled ? "Overlay active" : "Overlay closed"}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-md border border-error/35 bg-error/10 p-3 text-xs text-error">
+      <div className="flex items-center gap-2 font-semibold">
+        <XCircle className="size-4" aria-hidden="true" />
+        <span>{state.message}</span>
+      </div>
+    </div>
+  );
+}
+
+function isOverlayEnabled(state: OverlayModeState) {
+  if (state.status === "success") {
+    return state.plan.overlayEnabled;
+  }
+
+  return state.overlayEnabled;
 }
 
 function LocalBackupStatus({ state }: { state: LocalBackupState }) {

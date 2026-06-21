@@ -64,6 +64,20 @@ export type DesktopClipboardItemCapture = DesktopClipboardTextCapture & {
   contractItem: Item;
 };
 
+export type DesktopOverlayModeRequest = {
+  actionId: string;
+  overlayEnabled: boolean;
+  userInitiated: boolean;
+};
+
+export type DesktopOverlayModePlan = {
+  actionId: string;
+  overlayEnabled: boolean;
+  alwaysOnTop: boolean;
+  decorations: boolean;
+  shadow: boolean;
+};
+
 export type DesktopClipboardHotkeyEvent = {
   shortcut: string;
   state: "Pressed" | "Released";
@@ -238,6 +252,28 @@ export async function captureDesktopClipboardItem(
     item,
     contractItem: toContractItem(item),
   };
+}
+
+export async function setDesktopOverlayMode(
+  request: DesktopOverlayModeRequest,
+  {
+    globals = globalThis as TauriGlobals,
+    invoke,
+  }: {
+    globals?: TauriGlobals;
+    invoke?: Invoke;
+  } = {},
+): Promise<DesktopOverlayModePlan> {
+  if (!isTauriRuntime(globals)) {
+    throw new Error("Overlay mode requires the Calandra desktop shell");
+  }
+
+  const invokeCommand = invoke ?? (await loadTauriInvoke());
+
+  return (await invokeCommand(
+    "set_overlay_mode",
+    request,
+  )) as DesktopOverlayModePlan;
 }
 
 export async function subscribeDesktopClipboardHotkey(

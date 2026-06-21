@@ -7,6 +7,7 @@ import {
   isTauriRuntime,
   readDesktopClientLogAppend,
   runDesktopLocalConfigBackup,
+  setDesktopOverlayMode,
   subscribeDesktopClipboardHotkey,
   type DesktopClipboardHotkeyEvent,
   writeDesktopBuildFile,
@@ -350,6 +351,58 @@ Item Level: 67
     expect(onPressed).toHaveBeenCalledTimes(1);
     await cleanup?.();
     expect(unregister).toHaveBeenCalledWith("CommandOrControl+Shift+C");
+  });
+
+  it("sets overlay mode through the Tauri desktop command", async () => {
+    const invoke = vi.fn(async () => ({
+      actionId: "overlay-001",
+      overlayEnabled: true,
+      alwaysOnTop: true,
+      decorations: false,
+      shadow: false,
+    }));
+
+    await expect(
+      setDesktopOverlayMode(
+        {
+          actionId: "overlay-001",
+          overlayEnabled: true,
+          userInitiated: true,
+        },
+        {
+          globals: { __TAURI_INTERNALS__: {} },
+          invoke,
+        },
+      ),
+    ).resolves.toEqual({
+      actionId: "overlay-001",
+      overlayEnabled: true,
+      alwaysOnTop: true,
+      decorations: false,
+      shadow: false,
+    });
+
+    expect(invoke).toHaveBeenCalledWith("set_overlay_mode", {
+      actionId: "overlay-001",
+      overlayEnabled: true,
+      userInitiated: true,
+    });
+  });
+
+  it("rejects overlay mode changes outside the desktop shell", async () => {
+    await expect(
+      setDesktopOverlayMode(
+        {
+          actionId: "overlay-001",
+          overlayEnabled: true,
+          userInitiated: true,
+        },
+        {
+          globals: {},
+          invoke: vi.fn(),
+        },
+      ),
+    ).rejects.toThrow("Overlay mode requires the Calandra desktop shell");
   });
 
   it("skips desktop clipboard hotkey registration outside Tauri", async () => {

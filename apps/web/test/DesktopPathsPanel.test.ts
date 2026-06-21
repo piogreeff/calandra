@@ -3,6 +3,7 @@ import {
   createClipboardCaptureRequest,
   createClipboardHotkeyCaptureRequest,
   createLocalConfigBackupRequest,
+  createOverlayModeRequest,
   defaultLocalBackupDirectory,
 } from "../src/components/DesktopPathsPanel";
 
@@ -51,6 +52,19 @@ describe("DesktopPathsPanel helpers", () => {
             "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2\\NeverSink.filter",
         },
       ],
+    });
+  });
+
+  it("builds a user-initiated overlay mode request", () => {
+    expect(
+      createOverlayModeRequest({
+        capturedAt: "2026-06-21T18:55:00.000Z",
+        overlayEnabled: true,
+      }),
+    ).toEqual({
+      actionId: "overlay-2026-06-21T18-55-00-000Z",
+      overlayEnabled: true,
+      userInitiated: true,
     });
   });
 
