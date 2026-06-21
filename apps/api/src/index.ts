@@ -101,6 +101,51 @@ api.post("/snapshots/diff", async (context) => {
   );
 });
 
+api.get("/snapshots/:account/:snapshotId", async (context) => {
+  const snapshotBucket = context.env.SNAPSHOT_BUCKET;
+
+  if (!snapshotBucket?.get) {
+    return context.json({ error: "snapshot bucket is not configured" }, 503);
+  }
+
+  const account = context.req.param("account");
+  const snapshotId = context.req.param("snapshotId");
+  const objectKey = getSnapshotObjectKey(context, {
+    account,
+    id: snapshotId,
+  });
+  const object = await snapshotBucket.get(objectKey);
+
+  if (!object) {
+    return context.json(
+      { error: "account snapshot not found", account, snapshotId },
+      404,
+    );
+  }
+
+  let rawSnapshot: unknown;
+
+  try {
+    rawSnapshot = JSON.parse((await object.text()).replace(/^\uFEFF/, ""));
+  } catch {
+    return context.json(
+      { error: "stored account snapshot failed validation" },
+      502,
+    );
+  }
+
+  const parsed = accountSnapshotSchema.safeParse(rawSnapshot);
+
+  if (!parsed.success) {
+    return context.json(
+      { error: "stored account snapshot failed validation" },
+      502,
+    );
+  }
+
+  return context.json(parsed.data);
+});
+
 api.post("/snapshots", async (context) => {
   const rawBody = await readJsonBody(context);
   const parsed = accountSnapshotSchema.safeParse(rawBody);
@@ -111,7 +156,7 @@ api.post("/snapshots", async (context) => {
 
   const snapshotBucket = context.env.SNAPSHOT_BUCKET;
 
-  if (!snapshotBucket) {
+  if (!snapshotBucket?.put) {
     return context.json({ error: "snapshot bucket is not configured" }, 503);
   }
 
@@ -564,7 +609,8 @@ type DatasetBucket = {
 };
 
 type SnapshotBucket = {
-  put(
+  get?(key: string): Promise<SnapshotObject | null>;
+  put?(
     key: string,
     value: string,
     options?: { httpMetadata?: { contentType?: string } },
@@ -572,6 +618,10 @@ type SnapshotBucket = {
 };
 
 type DatasetObject = {
+  text(): Promise<string>;
+};
+
+type SnapshotObject = {
   text(): Promise<string>;
 };
 

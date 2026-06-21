@@ -614,6 +614,45 @@ export const openApiDocument = {
         },
       },
     },
+    "/snapshots/{account}/{snapshotId}": {
+      get: {
+        operationId: "getAccountSnapshot",
+        summary: "Restore one persisted account snapshot",
+        parameters: [
+          {
+            name: "account",
+            in: "path",
+            required: true,
+            schema: { type: "string", minLength: 1 },
+          },
+          {
+            name: "snapshotId",
+            in: "path",
+            required: true,
+            schema: { type: "string", minLength: 1 },
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Persisted account snapshot",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/AccountSnapshot" },
+              },
+            },
+          },
+          "404": {
+            description: "Account snapshot not found",
+          },
+          "502": {
+            description: "Stored account snapshot failed validation",
+          },
+          "503": {
+            description: "Snapshot storage is not configured",
+          },
+        },
+      },
+    },
     "/advisor/upgrades": {
       post: {
         operationId: "rankUpgradeCandidates",

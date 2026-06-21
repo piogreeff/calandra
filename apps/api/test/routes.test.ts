@@ -978,6 +978,118 @@ describe("api routes", () => {
     });
   });
 
+  it("restores a persisted account snapshot from the snapshot bucket", async () => {
+    const requestedKeys: string[] = [];
+    const snapshot = {
+      id: "snapshot-2026-06-21T10-00-00Z",
+      account: "example",
+      capturedAt: "2026-06-21T10:00:00.000Z",
+      source: "official-poe2-character",
+      capabilities: { characters: true, stashes: false },
+      characters: [
+        {
+          id: "character-1",
+          name: "CalandraTest",
+          className: "Deadeye",
+          level: 73,
+          league: "Dawn of the Hunt",
+          equipment: [
+            {
+              slot: "gloves",
+              name: "Duskthread Grips",
+              stats: { life: 65 },
+            },
+          ],
+        },
+      ],
+    };
+
+    const response = await api.request(
+      "/snapshots/example/snapshot-2026-06-21T10-00-00Z",
+      undefined,
+      {
+        APP_URL: "https://calandra.pages.dev",
+        SNAPSHOT_R2_PREFIX: "snapshots",
+        SNAPSHOT_BUCKET: {
+          async get(key: string) {
+            requestedKeys.push(key);
+
+            return {
+              async text() {
+                return JSON.stringify(snapshot);
+              },
+            };
+          },
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(snapshot);
+    expect(requestedKeys).toEqual([
+      "snapshots/example/snapshot-2026-06-21T10-00-00Z.json",
+    ]);
+  });
+
+  it("returns 404 when a persisted account snapshot is missing", async () => {
+    const response = await api.request(
+      "/snapshots/example/missing-snapshot",
+      undefined,
+      {
+        APP_URL: "https://calandra.pages.dev",
+        SNAPSHOT_BUCKET: {
+          async get() {
+            return null;
+          },
+        },
+      },
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({
+      error: "account snapshot not found",
+      account: "example",
+      snapshotId: "missing-snapshot",
+    });
+  });
+
+  it("requires a snapshot bucket before restoring account snapshots", async () => {
+    const response = await api.request(
+      "/snapshots/example/snapshot-2026-06-21T10-00-00Z",
+      undefined,
+      { APP_URL: "https://calandra.pages.dev" },
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: "snapshot bucket is not configured",
+    });
+  });
+
+  it("rejects corrupted stored account snapshots", async () => {
+    const response = await api.request(
+      "/snapshots/example/snapshot-2026-06-21T10-00-00Z",
+      undefined,
+      {
+        APP_URL: "https://calandra.pages.dev",
+        SNAPSHOT_BUCKET: {
+          async get() {
+            return {
+              async text() {
+                return JSON.stringify({ id: "snapshot-missing-fields" });
+              },
+            };
+          },
+        },
+      },
+    );
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toEqual({
+      error: "stored account snapshot failed validation",
+    });
+  });
+
   it("diffs account snapshots with deterministic engine output", async () => {
     const response = await api.request(
       "/snapshots/diff",

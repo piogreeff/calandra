@@ -458,6 +458,10 @@ describe("account snapshot contract", () => {
     expect(openApiDocument.paths["/snapshots"]?.post?.operationId).toBe(
       "saveAccountSnapshot",
     );
+    expect(
+      openApiDocument.paths["/snapshots/{account}/{snapshotId}"]?.get
+        ?.operationId,
+    ).toBe("getAccountSnapshot");
     expect(openApiDocument.paths["/snapshots/diff"]?.post?.operationId).toBe(
       "diffAccountSnapshots",
     );
