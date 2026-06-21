@@ -23,6 +23,7 @@ import {
   dashboardDatasetVersion,
   defaultApiBaseUrl,
   getDashboardDataset,
+  getDashboardSnapshotDiff,
   getDashboardSnapshots,
 } from "../lib/read-api";
 
@@ -83,6 +84,10 @@ export default async function Home() {
     getDashboardDataset(),
     getDashboardSnapshots("example"),
   ]);
+  const snapshotDiff = await getDashboardSnapshotDiff(
+    snapshotList.account,
+    snapshotList.snapshots,
+  );
   const endpointLabel = new URL(defaultApiBaseUrl).hostname;
   const datasetSource =
     dataset.source === "api" ? "Published R2 artifact" : "Demo fallback";
@@ -95,6 +100,7 @@ export default async function Home() {
   const shortChecksum = dataset.manifest.sha256.slice(0, 12);
   const latestSnapshot =
     snapshotList.snapshots[snapshotList.snapshots.length - 1];
+  const latestDiff = snapshotDiff.diff;
 
   return (
     <main className="min-h-screen">
@@ -406,6 +412,89 @@ export default async function Home() {
               </Panel>
 
               <Panel
+                title="Snapshot diff"
+                icon={<RotateCcw className="size-4" aria-hidden="true" />}
+              >
+                {latestDiff ? (
+                  <div className="space-y-3">
+                    <div className="rounded-md border border-base-300/70 bg-base-100/45 p-3">
+                      <p className="text-xs uppercase text-base-content/55">
+                        Latest round trip
+                      </p>
+                      <p className="mt-1 break-all text-xs font-medium text-base-content">
+                        {latestDiff.beforeSnapshotId} {" -> "}{" "}
+                        {latestDiff.afterSnapshotId}
+                      </p>
+                    </div>
+
+                    {latestDiff.characterChanges.map((change) => (
+                      <article
+                        key={change.id}
+                        className="rounded-md border border-base-300/70 bg-base-100/45 p-3"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-xs uppercase text-base-content/55">
+                              Character
+                            </p>
+                            <h3 className="truncate text-sm font-semibold text-base-content">
+                              {change.name}
+                            </h3>
+                          </div>
+                          <span className="shrink-0 rounded-md bg-success/10 px-2 py-1 text-xs font-semibold text-success">
+                            {formatLevelDelta(change.levelDelta)}
+                          </span>
+                        </div>
+                        {change.equipmentChanges.length > 0 ? (
+                          <div className="mt-3 space-y-2">
+                            {change.equipmentChanges.map((equipment) => (
+                              <div
+                                key={`${change.id}-${equipment.slot}`}
+                                className="rounded-md bg-base-200/80 p-2 text-sm"
+                              >
+                                <p className="text-xs text-base-content/55">
+                                  {equipment.slot}
+                                </p>
+                                <p className="mt-1 break-words font-medium text-base-content">
+                                  {equipment.beforeName ?? "None"} {" -> "}{" "}
+                                  {equipment.afterName ?? "None"}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+                      </article>
+                    ))}
+
+                    {latestDiff.stashChanges.map((change) => (
+                      <article
+                        key={change.id}
+                        className="rounded-md border border-base-300/70 bg-base-100/45 p-3"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-xs uppercase text-base-content/55">
+                              Stash
+                            </p>
+                            <h3 className="truncate text-sm font-semibold text-base-content">
+                              {change.name}
+                            </h3>
+                          </div>
+                          <span className="shrink-0 rounded-md bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
+                            {formatItemDelta(change.itemCountDelta)}
+                          </span>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="rounded-md border border-base-300/70 bg-base-100/45 p-3 text-sm text-base-content/70">
+                    {formatSnapshotDiffEmptyState(snapshotDiff.reason)}
+                  </p>
+                )}
+              </Panel>
+
+              <Panel
                 title="Dataset manifest"
                 icon={<Database className="size-4" aria-hidden="true" />}
               >
@@ -485,6 +574,38 @@ function formatBytes(value: number | undefined) {
   }
 
   return `${(value / 1024).toFixed(1)} KB`;
+}
+
+function formatLevelDelta(delta: number) {
+  if (delta === 0) {
+    return "No levels";
+  }
+
+  const prefix = delta > 0 ? "+" : "";
+  const unit = Math.abs(delta) === 1 ? "level" : "levels";
+
+  return `${prefix}${delta} ${unit}`;
+}
+
+function formatItemDelta(delta: number) {
+  if (delta === 0) {
+    return "No items";
+  }
+
+  const prefix = delta > 0 ? "+" : "";
+  const unit = Math.abs(delta) === 1 ? "item" : "items";
+
+  return `${prefix}${delta} ${unit}`;
+}
+
+function formatSnapshotDiffEmptyState(
+  reason: "ready" | "insufficient-snapshots" | "unavailable",
+) {
+  if (reason === "insufficient-snapshots") {
+    return "Need two stored snapshots before Calandra can render a diff.";
+  }
+
+  return "Snapshot diff is unavailable from the temporary API.";
 }
 
 function Panel({

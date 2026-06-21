@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   getDashboardDataset,
+  getDashboardSnapshotDiff,
   getDashboardSnapshots,
 } from "../src/lib/read-api";
 
@@ -147,6 +148,163 @@ describe("dashboard read API client", () => {
       source: "fallback",
       account: "example",
       snapshots: [],
+    });
+  });
+
+  it("loads the latest account snapshot diff through the typed API", async () => {
+    const fetchImplementation = vi.fn(async (input: RequestInfo | URL, init) => {
+      const url = String(input);
+
+      if (url.endsWith("/snapshots/example/snapshot-before")) {
+        return Response.json({
+          id: "snapshot-before",
+          account: "example",
+          capturedAt: "2026-06-21T09:00:00.000Z",
+          source: "manual-import",
+          capabilities: { characters: true, stashes: true },
+          characters: [
+            {
+              id: "char-1",
+              name: "Monkette",
+              className: "Monk",
+              level: 43,
+              league: "Dawn of the Hunt",
+              equipment: [{ slot: "Gloves", name: "Frayed Mail Mitts" }],
+            },
+          ],
+          stashes: [
+            {
+              id: "stash-1",
+              name: "Currency Tab",
+              league: "Dawn of the Hunt",
+              items: [{ slot: "stash", name: "Exalted Orb" }],
+            },
+          ],
+        });
+      }
+
+      if (url.endsWith("/snapshots/example/snapshot-after")) {
+        return Response.json({
+          id: "snapshot-after",
+          account: "example",
+          capturedAt: "2026-06-21T10:00:00.000Z",
+          source: "manual-import",
+          capabilities: { characters: true, stashes: true },
+          characters: [
+            {
+              id: "char-1",
+              name: "Monkette",
+              className: "Monk",
+              level: 45,
+              league: "Dawn of the Hunt",
+              equipment: [{ slot: "Gloves", name: "Duskthread Grips" }],
+            },
+          ],
+          stashes: [
+            {
+              id: "stash-1",
+              name: "Currency Tab",
+              league: "Dawn of the Hunt",
+              items: [
+                { slot: "stash", name: "Exalted Orb" },
+                { slot: "stash", name: "Divine Orb" },
+              ],
+            },
+          ],
+        });
+      }
+
+      expect(url).toBe(
+        "https://calandra-api.piogreeff.workers.dev/snapshots/diff",
+      );
+      expect(init?.method).toBe("POST");
+      expect(JSON.parse(String(init?.body))).toMatchObject({
+        before: { id: "snapshot-before" },
+        after: { id: "snapshot-after" },
+      });
+
+      return Response.json({
+        beforeSnapshotId: "snapshot-before",
+        afterSnapshotId: "snapshot-after",
+        beforeCapturedAt: "2026-06-21T09:00:00.000Z",
+        afterCapturedAt: "2026-06-21T10:00:00.000Z",
+        characterChanges: [
+          {
+            id: "char-1",
+            name: "Monkette",
+            type: "changed",
+            beforeLevel: 43,
+            afterLevel: 45,
+            levelDelta: 2,
+            equipmentChanges: [
+              {
+                type: "changed",
+                slot: "Gloves",
+                beforeName: "Frayed Mail Mitts",
+                afterName: "Duskthread Grips",
+              },
+            ],
+          },
+        ],
+        stashChanges: [
+          {
+            id: "stash-1",
+            name: "Currency Tab",
+            type: "changed",
+            beforeItemCount: 1,
+            afterItemCount: 2,
+            itemCountDelta: 1,
+          },
+        ],
+      });
+    });
+
+    const diff = await getDashboardSnapshotDiff(
+      "example",
+      [
+        {
+          account: "example",
+          snapshotId: "snapshot-before",
+          objectKey: "snapshots/example/snapshot-before.json",
+        },
+        {
+          account: "example",
+          snapshotId: "snapshot-after",
+          objectKey: "snapshots/example/snapshot-after.json",
+        },
+      ],
+      "https://calandra-api.piogreeff.workers.dev",
+      fetchImplementation,
+    );
+
+    expect(diff.source).toBe("api");
+    expect(diff.reason).toBe("ready");
+    expect(diff.diff?.characterChanges[0]?.levelDelta).toBe(2);
+    expect(diff.diff?.stashChanges[0]?.itemCountDelta).toBe(1);
+  });
+
+  it("does not request a snapshot diff until two snapshots are available", async () => {
+    const fetchImplementation = vi.fn();
+
+    const diff = await getDashboardSnapshotDiff(
+      "example",
+      [
+        {
+          account: "example",
+          snapshotId: "snapshot-after",
+          objectKey: "snapshots/example/snapshot-after.json",
+        },
+      ],
+      "https://calandra-api.piogreeff.workers.dev",
+      fetchImplementation,
+    );
+
+    expect(fetchImplementation).not.toHaveBeenCalled();
+    expect(diff).toEqual({
+      source: "fallback",
+      reason: "insufficient-snapshots",
+      account: "example",
+      diff: null,
     });
   });
 });

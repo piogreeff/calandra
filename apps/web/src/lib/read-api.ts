@@ -1,9 +1,12 @@
 import {
+  accountSnapshotDiffSchema,
   accountSnapshotListResponseSchema,
+  accountSnapshotSchema,
   datasetManifestSchema,
   economyCollectionSchema,
   itemCollectionSchema,
   uniqueCollectionSchema,
+  type AccountSnapshotDiff,
   type AccountSnapshotListItem,
   type DatasetManifest,
   type EconomyPrice,
@@ -31,6 +34,13 @@ export type DashboardSnapshots = {
   source: "api" | "fallback";
   account: string;
   snapshots: AccountSnapshotListItem[];
+};
+
+export type DashboardSnapshotDiff = {
+  source: "api" | "fallback";
+  reason: "ready" | "insufficient-snapshots" | "unavailable";
+  account: string;
+  diff: AccountSnapshotDiff | null;
 };
 
 const fallbackDataset: DashboardDataset = {
@@ -94,6 +104,18 @@ function fallbackSnapshots(account: string): DashboardSnapshots {
     source: "fallback",
     account,
     snapshots: [],
+  };
+}
+
+function fallbackSnapshotDiff(
+  account: string,
+  reason: Exclude<DashboardSnapshotDiff["reason"], "ready">,
+): DashboardSnapshotDiff {
+  return {
+    source: "fallback",
+    reason,
+    account,
+    diff: null,
   };
 }
 
@@ -164,12 +186,68 @@ export async function getDashboardSnapshots(
   }
 }
 
+export async function getDashboardSnapshotDiff(
+  account: string,
+  snapshots: AccountSnapshotListItem[],
+  apiBaseUrl = defaultApiBaseUrl,
+  fetchImplementation: typeof fetch = fetch,
+): Promise<DashboardSnapshotDiff> {
+  const [beforeSnapshot, afterSnapshot] = snapshots.slice(-2);
+
+  if (!beforeSnapshot || !afterSnapshot) {
+    return fallbackSnapshotDiff(account, "insufficient-snapshots");
+  }
+
+  try {
+    const [before, after] = await Promise.all([
+      fetchJson(
+        fetchImplementation,
+        `${apiBaseUrl}/snapshots/${encodeURIComponent(account)}/${encodeURIComponent(
+          beforeSnapshot.snapshotId,
+        )}`,
+        accountSnapshotSchema.parse,
+      ),
+      fetchJson(
+        fetchImplementation,
+        `${apiBaseUrl}/snapshots/${encodeURIComponent(account)}/${encodeURIComponent(
+          afterSnapshot.snapshotId,
+        )}`,
+        accountSnapshotSchema.parse,
+      ),
+    ]);
+
+    const diff = await fetchJson(
+      fetchImplementation,
+      `${apiBaseUrl}/snapshots/diff`,
+      accountSnapshotDiffSchema.parse,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ before, after }),
+      },
+    );
+
+    return {
+      source: "api",
+      reason: "ready",
+      account,
+      diff,
+    };
+  } catch {
+    return fallbackSnapshotDiff(account, "unavailable");
+  }
+}
+
 async function fetchJson<T>(
   fetchImplementation: typeof fetch,
   url: string,
   parse: (value: unknown) => T,
+  init?: RequestInit,
 ) {
-  const response = await fetchImplementation(url);
+  const response =
+    init === undefined
+      ? await fetchImplementation(url)
+      : await fetchImplementation(url, init);
 
   if (!response.ok) {
     throw new Error(`Calandra API request failed with HTTP ${response.status}`);

@@ -25,6 +25,14 @@ describe("home dashboard", () => {
     expect(html).toContain("Snapshot restore");
     expect(html).toContain("snapshot-2026-06-21T10-00-00Z");
     expect(html).toContain("512 B");
+    expect(html).toContain("Snapshot diff");
+    expect(html).toContain("Monkette");
+    expect(html).toContain("+2 levels");
+    expect(html).toContain("Gloves");
+    expect(html).toContain("Frayed Mail Mitts");
+    expect(html).toContain("Duskthread Grips");
+    expect(html).toContain("Currency Tab");
+    expect(html).toContain("+7 items");
   });
 });
 
@@ -89,17 +97,126 @@ function mockDashboardFetch() {
       });
     }
 
-    if (url.includes("/snapshots/example")) {
+    if (url.endsWith("/snapshots/example")) {
       return Response.json({
         source: "snapshot-store",
         account: "example",
         snapshots: [
           {
             account: "example",
+            snapshotId: "snapshot-2026-06-21T09-00-00Z",
+            objectKey: "snapshots/example/snapshot-2026-06-21T09-00-00Z.json",
+            uploadedAt: "2026-06-21T09:01:00.000Z",
+            size: 480,
+          },
+          {
+            account: "example",
             snapshotId: "snapshot-2026-06-21T10-00-00Z",
             objectKey: "snapshots/example/snapshot-2026-06-21T10-00-00Z.json",
             uploadedAt: "2026-06-21T10:01:00.000Z",
             size: 512,
+          },
+        ],
+      });
+    }
+
+    if (url.includes("/snapshots/example/snapshot-2026-06-21T09-00-00Z")) {
+      return Response.json({
+        id: "snapshot-2026-06-21T09-00-00Z",
+        account: "example",
+        capturedAt: "2026-06-21T09:00:00.000Z",
+        source: "manual-import",
+        capabilities: { characters: true, stashes: true },
+        characters: [
+          {
+            id: "char-1",
+            name: "Monkette",
+            className: "Monk",
+            level: 43,
+            league: "Dawn of the Hunt",
+            equipment: [{ slot: "Gloves", name: "Frayed Mail Mitts" }],
+          },
+        ],
+        stashes: [
+          {
+            id: "stash-1",
+            name: "Currency Tab",
+            league: "Dawn of the Hunt",
+            items: [{ slot: "stash", name: "Exalted Orb" }],
+          },
+        ],
+      });
+    }
+
+    if (url.includes("/snapshots/example/snapshot-2026-06-21T10-00-00Z")) {
+      return Response.json({
+        id: "snapshot-2026-06-21T10-00-00Z",
+        account: "example",
+        capturedAt: "2026-06-21T10:00:00.000Z",
+        source: "manual-import",
+        capabilities: { characters: true, stashes: true },
+        characters: [
+          {
+            id: "char-1",
+            name: "Monkette",
+            className: "Monk",
+            level: 45,
+            league: "Dawn of the Hunt",
+            equipment: [{ slot: "Gloves", name: "Duskthread Grips" }],
+          },
+        ],
+        stashes: [
+          {
+            id: "stash-1",
+            name: "Currency Tab",
+            league: "Dawn of the Hunt",
+            items: [
+              { slot: "stash", name: "Exalted Orb" },
+              { slot: "stash", name: "Divine Orb" },
+              { slot: "stash", name: "Chaos Orb" },
+              { slot: "stash", name: "Vaal Orb" },
+              { slot: "stash", name: "Regal Orb" },
+              { slot: "stash", name: "Alchemy Orb" },
+              { slot: "stash", name: "Mirror Shard" },
+              { slot: "stash", name: "Gemcutter Prism" },
+            ],
+          },
+        ],
+      });
+    }
+
+    if (url.includes("/snapshots/diff")) {
+      return Response.json({
+        beforeSnapshotId: "snapshot-2026-06-21T09-00-00Z",
+        afterSnapshotId: "snapshot-2026-06-21T10-00-00Z",
+        beforeCapturedAt: "2026-06-21T09:00:00.000Z",
+        afterCapturedAt: "2026-06-21T10:00:00.000Z",
+        characterChanges: [
+          {
+            id: "char-1",
+            name: "Monkette",
+            type: "changed",
+            beforeLevel: 43,
+            afterLevel: 45,
+            levelDelta: 2,
+            equipmentChanges: [
+              {
+                type: "changed",
+                slot: "Gloves",
+                beforeName: "Frayed Mail Mitts",
+                afterName: "Duskthread Grips",
+              },
+            ],
+          },
+        ],
+        stashChanges: [
+          {
+            id: "stash-1",
+            name: "Currency Tab",
+            type: "changed",
+            beforeItemCount: 1,
+            afterItemCount: 8,
+            itemCountDelta: 7,
           },
         ],
       });
