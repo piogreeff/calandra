@@ -32,6 +32,11 @@ describe("home dashboard", () => {
     expect(html).toContain("Published R2 artifact");
     expect(html).toContain("Dataset manifest");
     expect(html).toContain("9aaa78cdba51");
+    expect(html).toContain("Source attribution");
+    expect(html).toContain("poe2db.tw");
+    expect(html).toContain(
+      "Game data derived from Path of Exile 2 community references",
+    );
     expect(html).toContain("Snapshot restore");
     expect(html).toContain("snapshot-2026-06-21T10-00-00Z");
     expect(html).toContain("512 B");

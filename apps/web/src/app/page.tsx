@@ -517,6 +517,29 @@ export default async function Home() {
                       {shortChecksum}
                     </span>
                   </div>
+                  <div className="space-y-2 border-t border-base-300/60 pt-3">
+                    <p className="text-xs font-medium uppercase text-base-content/55">
+                      Source attribution
+                    </p>
+                    {dataset.manifest.sources.map((source) => (
+                      <div
+                        key={`${source.kind}-${source.name}`}
+                        className="space-y-1"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="font-medium text-base-content">
+                            {source.name}
+                          </span>
+                          <span className="rounded-md bg-base-300/70 px-2 py-1 text-xs text-base-content/70">
+                            {source.kind}
+                          </span>
+                        </div>
+                        <p className="break-words text-xs leading-5 text-base-content/60">
+                          {source.attribution}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </Panel>
 
