@@ -8,6 +8,7 @@ describe("Calandra MCP tools", () => {
       "price_item",
       "recommend_upgrade",
       "estimate_crafting",
+      "compare_buy_vs_craft",
       "get_economy",
     ]);
   });
@@ -265,6 +266,104 @@ describe("Calandra MCP tools", () => {
       hitProbability: 0.25,
       expectedAttempts: 4,
       expectedCostChaos: 8,
+    });
+  });
+
+  it("routes buy-vs-craft comparisons to the deterministic crafting endpoint", async () => {
+    const fetch = vi.fn(async () =>
+      jsonResponse({
+        source: "deterministic-engine",
+        recommendation: "craft",
+        marketPriceChaos: 12,
+        expectedCraftCostChaos: 8,
+        savingsChaos: 4,
+        estimate: {
+          itemLevel: 68,
+          currencyCostChaos: 2,
+          eligibleModCount: 2,
+          totalEligibleWeight: 400,
+          eligibleTargetModIds: ["life-t2"],
+          blockedTargetModIds: [],
+          hitProbability: 0.25,
+          expectedAttempts: 4,
+          expectedCostChaos: 8,
+        },
+      }),
+    );
+    const server = createCalandraMcpServer({
+      apiBaseUrl: "https://calandra-api.workers.dev",
+      fetch,
+    });
+
+    const result = await server.callTool("compare_buy_vs_craft", {
+      marketPriceChaos: 12,
+      crafting: {
+        itemLevel: 68,
+        currencyCostChaos: 2,
+        targetModIds: ["life-t2"],
+        modPool: [
+          {
+            id: "life-t2",
+            name: "+# to maximum Life",
+            minItemLevel: 60,
+            weight: 100,
+          },
+          {
+            id: "mana-t2",
+            name: "+# to maximum Mana",
+            minItemLevel: 60,
+            weight: 300,
+          },
+        ],
+      },
+    });
+
+    expect(fetch).toHaveBeenCalledWith(
+      "https://calandra-api.workers.dev/crafting/buy-vs-craft",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          marketPriceChaos: 12,
+          crafting: {
+            itemLevel: 68,
+            currencyCostChaos: 2,
+            targetModIds: ["life-t2"],
+            modPool: [
+              {
+                id: "life-t2",
+                name: "+# to maximum Life",
+                minItemLevel: 60,
+                weight: 100,
+              },
+              {
+                id: "mana-t2",
+                name: "+# to maximum Mana",
+                minItemLevel: 60,
+                weight: 300,
+              },
+            ],
+          },
+        }),
+      },
+    );
+    expect(parseToolJson(result)).toEqual({
+      source: "deterministic-engine",
+      recommendation: "craft",
+      marketPriceChaos: 12,
+      expectedCraftCostChaos: 8,
+      savingsChaos: 4,
+      estimate: {
+        itemLevel: 68,
+        currencyCostChaos: 2,
+        eligibleModCount: 2,
+        totalEligibleWeight: 400,
+        eligibleTargetModIds: ["life-t2"],
+        blockedTargetModIds: [],
+        hitProbability: 0.25,
+        expectedAttempts: 4,
+        expectedCostChaos: 8,
+      },
     });
   });
 

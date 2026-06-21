@@ -1,4 +1,6 @@
 import {
+  buyVsCraftRequestSchema,
+  buyVsCraftResponseSchema,
   craftingEstimateRequestSchema,
   craftingEstimateResponseSchema,
   economyCollectionSchema,
@@ -13,6 +15,7 @@ export type CalandraMcpToolName =
   | "price_item"
   | "recommend_upgrade"
   | "estimate_crafting"
+  | "compare_buy_vs_craft"
   | "get_economy";
 
 export interface CalandraMcpTool {
@@ -118,6 +121,19 @@ export function listCalandraMcpTools(): CalandraMcpTool[] {
       },
     },
     {
+      name: "compare_buy_vs_craft",
+      description:
+        "Compare a market buy price against deterministic expected crafting cost.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          marketPriceChaos: { type: "number", minimum: 0 },
+          crafting: { type: "object" },
+        },
+        required: ["marketPriceChaos", "crafting"],
+      },
+    },
+    {
       name: "get_economy",
       description: "Fetch Calandra's economy prices for one league and patch.",
       inputSchema: {
@@ -155,6 +171,10 @@ export function createCalandraMcpServer(options: CalandraMcpServerOptions) {
         case "estimate_crafting":
           return jsonToolResult(
             await estimateCrafting(apiBaseUrl, fetchImplementation, input),
+          );
+        case "compare_buy_vs_craft":
+          return jsonToolResult(
+            await compareBuyVsCraft(apiBaseUrl, fetchImplementation, input),
           );
         case "get_economy":
           return jsonToolResult(
@@ -235,6 +255,26 @@ async function estimateCrafting(
       headers: { "content-type": "application/json" },
       body: JSON.stringify(request),
     }),
+  );
+}
+
+async function compareBuyVsCraft(
+  apiBaseUrl: string,
+  fetchImplementation: FetchLike,
+  input: unknown,
+) {
+  const request = buyVsCraftRequestSchema.parse(input);
+
+  return buyVsCraftResponseSchema.parse(
+    await fetchJson(
+      fetchImplementation,
+      `${apiBaseUrl}/crafting/buy-vs-craft`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(request),
+      },
+    ),
   );
 }
 
