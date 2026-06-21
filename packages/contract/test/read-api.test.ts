@@ -3,6 +3,8 @@ import {
   accountSnapshotDiffRequestSchema,
   accountSnapshotDiffSchema,
   accountSnapshotSchema,
+  craftingEstimateRequestSchema,
+  craftingEstimateResponseSchema,
   datasetArtifactSchema,
   datasetManifestSchema,
   economyCollectionSchema,
@@ -229,6 +231,54 @@ describe("phase 1 read API contract", () => {
     expect(openApiDocument.paths["/advisor/upgrades"]?.post?.operationId).toBe(
       "rankUpgradeCandidates",
     );
+  });
+
+  it("models deterministic crafting estimate requests and responses", () => {
+    const request = craftingEstimateRequestSchema.parse({
+      itemLevel: 68,
+      currencyCostChaos: 2,
+      targetModIds: ["life-t2"],
+      modPool: [
+        {
+          id: "life-t2",
+          name: "+# to maximum Life",
+          minItemLevel: 60,
+          weight: 100,
+        },
+        {
+          id: "mana-t2",
+          name: "+# to maximum Mana",
+          minItemLevel: 60,
+          weight: 300,
+        },
+      ],
+    });
+
+    expect(request.modPool[0]?.weight).toBe(100);
+
+    const response = craftingEstimateResponseSchema.parse({
+      source: "deterministic-engine",
+      itemLevel: 68,
+      currencyCostChaos: 2,
+      eligibleModCount: 2,
+      totalEligibleWeight: 400,
+      eligibleTargetModIds: ["life-t2"],
+      blockedTargetModIds: [],
+      hitProbability: 0.25,
+      expectedAttempts: 4,
+      expectedCostChaos: 8,
+    });
+
+    expect(response.expectedCostChaos).toBe(8);
+    expect(openApiDocument.paths["/crafting/estimate"]?.post?.operationId).toBe(
+      "estimateCraftingPlan",
+    );
+    expect(
+      openApiDocument.components.schemas.CraftingEstimateRequest,
+    ).toBeDefined();
+    expect(
+      openApiDocument.components.schemas.CraftingEstimateResponse,
+    ).toBeDefined();
   });
 });
 

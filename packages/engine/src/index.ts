@@ -119,6 +119,32 @@ export interface AccountSnapshotDiff {
   stashChanges: SnapshotStashChange[];
 }
 
+export interface CraftingModCandidate {
+  id: string;
+  name: string;
+  minItemLevel: number;
+  weight: number;
+}
+
+export interface CraftingEstimateInput {
+  itemLevel: number;
+  currencyCostChaos: number;
+  targetModIds: string[];
+  modPool: CraftingModCandidate[];
+}
+
+export interface CraftingEstimate {
+  itemLevel: number;
+  currencyCostChaos: number;
+  eligibleModCount: number;
+  totalEligibleWeight: number;
+  eligibleTargetModIds: string[];
+  blockedTargetModIds: string[];
+  hitProbability: number;
+  expectedAttempts?: number | undefined;
+  expectedCostChaos?: number | undefined;
+}
+
 export function scoreItem(input: ScoreItemInput): ItemScore {
   const contributions = Object.entries(input.weights)
     .filter(([, weight]) => weight !== 0)
@@ -231,6 +257,48 @@ export function diffAccountSnapshots(
     afterCapturedAt: after.capturedAt,
     characterChanges: diffCharacters(before.characters, after.characters),
     stashChanges: diffStashes(before.stashes ?? [], after.stashes ?? []),
+  };
+}
+
+export function estimateCraftingPlan(
+  input: CraftingEstimateInput,
+): CraftingEstimate {
+  const targetIds = uniqueSorted(input.targetModIds);
+  const eligibleMods = input.modPool.filter(
+    (mod) => mod.minItemLevel <= input.itemLevel && mod.weight > 0,
+  );
+  const eligibleTargetMods = eligibleMods.filter((mod) =>
+    targetIds.includes(mod.id),
+  );
+  const eligibleTargetModIds = uniqueSorted(
+    eligibleTargetMods.map((mod) => mod.id),
+  );
+  const blockedTargetModIds = targetIds.filter(
+    (id) => !eligibleTargetModIds.includes(id),
+  );
+  const totalEligibleWeight = sum(eligibleMods.map((mod) => mod.weight));
+  const targetWeight = sum(eligibleTargetMods.map((mod) => mod.weight));
+  const hitProbability =
+    totalEligibleWeight > 0
+      ? roundScore(targetWeight / totalEligibleWeight)
+      : 0;
+  const expectedAttempts =
+    hitProbability > 0 ? roundScore(1 / hitProbability) : undefined;
+  const expectedCostChaos =
+    expectedAttempts !== undefined
+      ? roundScore(expectedAttempts * input.currencyCostChaos)
+      : undefined;
+
+  return {
+    itemLevel: input.itemLevel,
+    currencyCostChaos: input.currencyCostChaos,
+    eligibleModCount: eligibleMods.length,
+    totalEligibleWeight,
+    eligibleTargetModIds,
+    blockedTargetModIds,
+    hitProbability,
+    ...(expectedAttempts !== undefined ? { expectedAttempts } : {}),
+    ...(expectedCostChaos !== undefined ? { expectedCostChaos } : {}),
   };
 }
 

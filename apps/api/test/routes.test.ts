@@ -626,6 +626,78 @@ describe("api routes", () => {
     });
   });
 
+  it("estimates crafting odds and cost with deterministic engine output", async () => {
+    const response = await api.request(
+      "/crafting/estimate",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          itemLevel: 68,
+          currencyCostChaos: 2,
+          targetModIds: ["life-t2", "life-t1"],
+          modPool: [
+            {
+              id: "life-t2",
+              name: "+# to maximum Life",
+              minItemLevel: 60,
+              weight: 100,
+            },
+            {
+              id: "mana-t2",
+              name: "+# to maximum Mana",
+              minItemLevel: 60,
+              weight: 300,
+            },
+            {
+              id: "life-t1",
+              name: "+# to maximum Life",
+              minItemLevel: 75,
+              weight: 50,
+            },
+          ],
+        }),
+      },
+      { APP_URL: "https://calandra.pages.dev" },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      source: "deterministic-engine",
+      itemLevel: 68,
+      currencyCostChaos: 2,
+      eligibleModCount: 2,
+      totalEligibleWeight: 400,
+      eligibleTargetModIds: ["life-t2"],
+      blockedTargetModIds: ["life-t1"],
+      hitProbability: 0.25,
+      expectedAttempts: 4,
+      expectedCostChaos: 8,
+    });
+  });
+
+  it("rejects malformed crafting estimate payloads", async () => {
+    const response = await api.request(
+      "/crafting/estimate",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          itemLevel: 68,
+          currencyCostChaos: 2,
+          targetModIds: [],
+          modPool: "not-array",
+        }),
+      },
+      { APP_URL: "https://calandra.pages.dev" },
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "invalid crafting estimate request",
+    });
+  });
+
   it("diffs account snapshots with deterministic engine output", async () => {
     const response = await api.request(
       "/snapshots/diff",

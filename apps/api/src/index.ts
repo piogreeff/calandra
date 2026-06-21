@@ -1,6 +1,8 @@
 import {
   accountSnapshotDiffRequestSchema,
   accountSnapshotDiffSchema,
+  craftingEstimateRequestSchema,
+  craftingEstimateResponseSchema,
   datasetArtifactSchema,
   datasetManifestSchema,
   type DatasetArtifact,
@@ -15,7 +17,11 @@ import {
   upgradeAdvisorResponseSchema,
   uniqueCollectionSchema,
 } from "@calandra/contract";
-import { diffAccountSnapshots, rankLoadoutUpgrades } from "@calandra/engine";
+import {
+  diffAccountSnapshots,
+  estimateCraftingPlan,
+  rankLoadoutUpgrades,
+} from "@calandra/engine";
 import { Hono, type Context } from "hono";
 
 type Bindings = {
@@ -83,6 +89,22 @@ api.post("/snapshots/diff", async (context) => {
     accountSnapshotDiffSchema.parse(
       diffAccountSnapshots(parsed.data.before, parsed.data.after),
     ),
+  );
+});
+
+api.post("/crafting/estimate", async (context) => {
+  const rawBody = await readJsonBody(context);
+  const parsed = craftingEstimateRequestSchema.safeParse(rawBody);
+
+  if (!parsed.success) {
+    return context.json({ error: "invalid crafting estimate request" }, 400);
+  }
+
+  return context.json(
+    craftingEstimateResponseSchema.parse({
+      source: "deterministic-engine",
+      ...estimateCraftingPlan(parsed.data),
+    }),
   );
 });
 

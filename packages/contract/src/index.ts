@@ -241,6 +241,33 @@ export const upgradeAdvisorResponseSchema = z.object({
   upgrades: z.array(upgradeAdvisorResultSchema),
 });
 
+export const craftingModCandidateSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  minItemLevel: z.number().int().nonnegative(),
+  weight: z.number().positive(),
+});
+
+export const craftingEstimateRequestSchema = z.object({
+  itemLevel: z.number().int().nonnegative(),
+  currencyCostChaos: z.number().nonnegative(),
+  targetModIds: z.array(z.string().min(1)).min(1),
+  modPool: z.array(craftingModCandidateSchema).min(1),
+});
+
+export const craftingEstimateResponseSchema = z.object({
+  source: z.literal("deterministic-engine"),
+  itemLevel: z.number().int().nonnegative(),
+  currencyCostChaos: z.number().nonnegative(),
+  eligibleModCount: z.number().int().nonnegative(),
+  totalEligibleWeight: z.number().nonnegative(),
+  eligibleTargetModIds: z.array(z.string().min(1)),
+  blockedTargetModIds: z.array(z.string().min(1)),
+  hitProbability: z.number().min(0).max(1),
+  expectedAttempts: z.number().positive().optional(),
+  expectedCostChaos: z.number().nonnegative().optional(),
+});
+
 export const datasetArtifactSchema = z.object({
   ...versionedCollectionFields,
   generatedAt: z.string().datetime(),
@@ -514,6 +541,35 @@ export const openApiDocument = {
           },
           "400": {
             description: "Invalid upgrade advisor request",
+          },
+        },
+      },
+    },
+    "/crafting/estimate": {
+      post: {
+        operationId: "estimateCraftingPlan",
+        summary: "Estimate crafting odds and expected cost deterministically",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/CraftingEstimateRequest" },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Deterministic crafting estimate",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/CraftingEstimateResponse",
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Invalid crafting estimate request",
           },
         },
       },
@@ -926,6 +982,65 @@ export const openApiDocument = {
           },
         },
       },
+      CraftingModCandidate: {
+        type: "object",
+        required: ["id", "name", "minItemLevel", "weight"],
+        properties: {
+          id: { type: "string", minLength: 1 },
+          name: { type: "string", minLength: 1 },
+          minItemLevel: { type: "integer", minimum: 0 },
+          weight: { type: "number", exclusiveMinimum: 0 },
+        },
+      },
+      CraftingEstimateRequest: {
+        type: "object",
+        required: ["itemLevel", "currencyCostChaos", "targetModIds", "modPool"],
+        properties: {
+          itemLevel: { type: "integer", minimum: 0 },
+          currencyCostChaos: { type: "number", minimum: 0 },
+          targetModIds: {
+            type: "array",
+            minItems: 1,
+            items: { type: "string", minLength: 1 },
+          },
+          modPool: {
+            type: "array",
+            minItems: 1,
+            items: { $ref: "#/components/schemas/CraftingModCandidate" },
+          },
+        },
+      },
+      CraftingEstimateResponse: {
+        type: "object",
+        required: [
+          "source",
+          "itemLevel",
+          "currencyCostChaos",
+          "eligibleModCount",
+          "totalEligibleWeight",
+          "eligibleTargetModIds",
+          "blockedTargetModIds",
+          "hitProbability",
+        ],
+        properties: {
+          source: { type: "string", enum: ["deterministic-engine"] },
+          itemLevel: { type: "integer", minimum: 0 },
+          currencyCostChaos: { type: "number", minimum: 0 },
+          eligibleModCount: { type: "integer", minimum: 0 },
+          totalEligibleWeight: { type: "number", minimum: 0 },
+          eligibleTargetModIds: {
+            type: "array",
+            items: { type: "string", minLength: 1 },
+          },
+          blockedTargetModIds: {
+            type: "array",
+            items: { type: "string", minLength: 1 },
+          },
+          hitProbability: { type: "number", minimum: 0, maximum: 1 },
+          expectedAttempts: { type: "number", exclusiveMinimum: 0 },
+          expectedCostChaos: { type: "number", minimum: 0 },
+        },
+      },
       DatasetCounts: {
         type: "object",
         required: [
@@ -1017,6 +1132,13 @@ export type UpgradeAdvisorRequest = z.infer<typeof upgradeAdvisorRequestSchema>;
 export type UpgradeAdvisorResult = z.infer<typeof upgradeAdvisorResultSchema>;
 export type UpgradeAdvisorResponse = z.infer<
   typeof upgradeAdvisorResponseSchema
+>;
+export type CraftingModCandidate = z.infer<typeof craftingModCandidateSchema>;
+export type CraftingEstimateRequest = z.infer<
+  typeof craftingEstimateRequestSchema
+>;
+export type CraftingEstimateResponse = z.infer<
+  typeof craftingEstimateResponseSchema
 >;
 export type DatasetArtifact = z.infer<typeof datasetArtifactSchema>;
 export type DatasetCounts = z.infer<typeof datasetCountsSchema>;
