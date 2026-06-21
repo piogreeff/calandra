@@ -3,6 +3,7 @@ import {
   createDesktopThemeStore,
   getDesktopPoe2Paths,
   isTauriRuntime,
+  writeDesktopBuildFile,
 } from "../src/lib/desktop-bridge";
 
 describe("desktop bridge", () => {
@@ -71,6 +72,62 @@ describe("desktop bridge", () => {
     expect(invoke).toHaveBeenCalledWith("set_theme_preference", {
       theme: "dark",
     });
+  });
+
+  it("writes .build files through the Tauri desktop command", async () => {
+    const invoke = vi.fn(async () => ({
+      actionId: "advisor-export-001",
+      outputPath:
+        "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2\\BuildPlanner\\Storm Monk.build",
+      content: "[build]\nname=Storm Monk\n",
+    }));
+
+    await expect(
+      writeDesktopBuildFile(
+        {
+          buildPlannerDirectory:
+            "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2\\BuildPlanner",
+          fileName: "Storm Monk",
+          content: "[build]\nname=Storm Monk\n",
+          actionId: "advisor-export-001",
+          userInitiated: true,
+        },
+        {
+          globals: { __TAURI_INTERNALS__: {} },
+          invoke,
+        },
+      ),
+    ).resolves.toMatchObject({
+      outputPath:
+        "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2\\BuildPlanner\\Storm Monk.build",
+    });
+    expect(invoke).toHaveBeenCalledWith("write_build_file", {
+      buildPlannerDirectory:
+        "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2\\BuildPlanner",
+      fileName: "Storm Monk",
+      content: "[build]\nname=Storm Monk\n",
+      actionId: "advisor-export-001",
+      userInitiated: true,
+    });
+  });
+
+  it("rejects .build writes outside the desktop shell", async () => {
+    await expect(
+      writeDesktopBuildFile(
+        {
+          buildPlannerDirectory:
+            "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2\\BuildPlanner",
+          fileName: "Storm Monk",
+          content: "[build]\n",
+          actionId: "advisor-export-001",
+          userInitiated: true,
+        },
+        {
+          globals: {},
+          invoke: vi.fn(),
+        },
+      ),
+    ).rejects.toThrow(".build export requires the Calandra desktop shell");
   });
 
   it("detects both Tauri runtime global shapes", () => {

@@ -19,6 +19,20 @@ export type DesktopThemeStore = {
   setThemePreference(theme: string): Promise<void>;
 };
 
+export type DesktopBuildFileWriteRequest = {
+  buildPlannerDirectory: string;
+  fileName: string;
+  content: string;
+  actionId: string;
+  userInitiated: boolean;
+};
+
+export type DesktopBuildFileWritePlan = {
+  actionId: string;
+  outputPath: string;
+  content: string;
+};
+
 type TauriGlobals = {
   __TAURI__?: unknown;
   __TAURI_INTERNALS__?: unknown;
@@ -74,6 +88,28 @@ export function createDesktopThemeStore({
       await invokeCommand("set_theme_preference", { theme });
     },
   };
+}
+
+export async function writeDesktopBuildFile(
+  request: DesktopBuildFileWriteRequest,
+  {
+    globals = globalThis as TauriGlobals,
+    invoke,
+  }: {
+    globals?: TauriGlobals;
+    invoke?: Invoke;
+  } = {},
+): Promise<DesktopBuildFileWritePlan> {
+  if (!isTauriRuntime(globals)) {
+    throw new Error(".build export requires the Calandra desktop shell");
+  }
+
+  const invokeCommand = invoke ?? (await loadTauriInvoke());
+
+  return (await invokeCommand(
+    "write_build_file",
+    request,
+  )) as DesktopBuildFileWritePlan;
 }
 
 export function isTauriRuntime(globals: TauriGlobals): boolean {
