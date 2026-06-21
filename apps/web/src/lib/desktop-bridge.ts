@@ -64,6 +64,20 @@ export type DesktopClipboardItemCapture = DesktopClipboardTextCapture & {
   contractItem: Item;
 };
 
+export type DesktopClipboardHotkeyEvent = {
+  shortcut: string;
+  state: "Pressed" | "Released";
+};
+
+export type DesktopClipboardHotkeyRegister = (
+  shortcut: string,
+  handler: (event: DesktopClipboardHotkeyEvent) => void,
+) => Promise<void>;
+
+export type DesktopClipboardHotkeyUnregister = (
+  shortcut: string,
+) => Promise<void>;
+
 export type DesktopLocalBackupFileRequest = {
   kind: "loot-filter" | "build-file" | "overlay-config";
   sourcePath: string;
@@ -102,6 +116,8 @@ type Invoke = (
   command: string,
   args?: Record<string, unknown>,
 ) => Promise<unknown>;
+
+export const DESKTOP_CLIPBOARD_HOTKEY = "CommandOrControl+Shift+C";
 
 export async function getDesktopPoe2Paths({
   globals = globalThis as TauriGlobals,
@@ -224,6 +240,38 @@ export async function captureDesktopClipboardItem(
   };
 }
 
+export async function subscribeDesktopClipboardHotkey(
+  onPressed: () => void,
+  {
+    globals = globalThis as TauriGlobals,
+    shortcut = DESKTOP_CLIPBOARD_HOTKEY,
+    register,
+    unregister,
+  }: {
+    globals?: TauriGlobals;
+    shortcut?: string;
+    register?: DesktopClipboardHotkeyRegister;
+    unregister?: DesktopClipboardHotkeyUnregister;
+  } = {},
+): Promise<(() => Promise<void>) | undefined> {
+  if (!isTauriRuntime(globals)) {
+    return undefined;
+  }
+
+  const { registerShortcut, unregisterShortcut } =
+    register && unregister
+      ? { registerShortcut: register, unregisterShortcut: unregister }
+      : await loadGlobalShortcutApi();
+
+  await registerShortcut(shortcut, (event) => {
+    if (event.state === "Pressed") {
+      onPressed();
+    }
+  });
+
+  return () => unregisterShortcut(shortcut);
+}
+
 export async function runDesktopLocalConfigBackup(
   request: DesktopLocalConfigBackupRequest,
   {
@@ -280,4 +328,18 @@ async function loadTauriInvoke(): Promise<Invoke> {
   const { invoke } = await import("@tauri-apps/api/core");
 
   return (command, args) => invoke(command, args);
+}
+
+async function loadGlobalShortcutApi(): Promise<{
+  registerShortcut: DesktopClipboardHotkeyRegister;
+  unregisterShortcut: DesktopClipboardHotkeyUnregister;
+}> {
+  const { register, unregister } = await import(
+    "@tauri-apps/plugin-global-shortcut"
+  );
+
+  return {
+    registerShortcut: register as DesktopClipboardHotkeyRegister,
+    unregisterShortcut: unregister as DesktopClipboardHotkeyUnregister,
+  };
 }

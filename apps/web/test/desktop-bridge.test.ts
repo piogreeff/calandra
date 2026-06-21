@@ -7,6 +7,8 @@ import {
   isTauriRuntime,
   readDesktopClientLogAppend,
   runDesktopLocalConfigBackup,
+  subscribeDesktopClipboardHotkey,
+  type DesktopClipboardHotkeyEvent,
   writeDesktopBuildFile,
 } from "../src/lib/desktop-bridge";
 
@@ -309,6 +311,60 @@ Item Level: 67
       capturedAt: "2026-06-21T18:45:00.000Z",
       userInitiated: true,
     });
+  });
+
+  it("subscribes to pressed desktop clipboard hotkey events", async () => {
+    const register = vi.fn(
+      async (
+        _shortcut: string,
+        _handler: (event: DesktopClipboardHotkeyEvent) => void,
+      ) => undefined,
+    );
+    const unregister = vi.fn(async (_shortcut: string) => undefined);
+    const onPressed = vi.fn();
+
+    const cleanup = await subscribeDesktopClipboardHotkey(onPressed, {
+      globals: { __TAURI_INTERNALS__: {} },
+      shortcut: "CommandOrControl+Shift+C",
+      register,
+      unregister,
+    });
+
+    expect(cleanup).toEqual(expect.any(Function));
+
+    expect(register).toHaveBeenCalledWith(
+      "CommandOrControl+Shift+C",
+      expect.any(Function),
+    );
+
+    const handler = register.mock.calls[0]?.[1];
+    handler?.({
+      shortcut: "CommandOrControl+Shift+C",
+      state: "Pressed",
+    });
+    handler?.({
+      shortcut: "CommandOrControl+Shift+C",
+      state: "Released",
+    });
+
+    expect(onPressed).toHaveBeenCalledTimes(1);
+    await cleanup?.();
+    expect(unregister).toHaveBeenCalledWith("CommandOrControl+Shift+C");
+  });
+
+  it("skips desktop clipboard hotkey registration outside Tauri", async () => {
+    const register = vi.fn(async () => undefined);
+    const unregister = vi.fn(async () => undefined);
+
+    await expect(
+      subscribeDesktopClipboardHotkey(vi.fn(), {
+        globals: {},
+        register,
+        unregister,
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(register).not.toHaveBeenCalled();
   });
 
   it("detects both Tauri runtime global shapes", () => {

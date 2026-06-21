@@ -164,6 +164,7 @@ pub fn resolve_default_poe2_paths(home_directory: impl AsRef<Path>) -> Poe2Paths
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             get_default_poe2_paths,
             get_theme_preference,

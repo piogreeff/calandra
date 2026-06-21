@@ -8,12 +8,13 @@ import {
   Loader2,
   XCircle,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   captureDesktopClipboardItem,
   discoverDesktopLocalConfigBackupFiles,
   getDesktopPoe2Paths,
   runDesktopLocalConfigBackup,
+  subscribeDesktopClipboardHotkey,
   type DesktopClipboardItemCapture,
   type DesktopClipboardItemCaptureRequest,
   type DesktopLocalBackupFileRequest,
@@ -43,14 +44,18 @@ type ClipboardCaptureState =
 export function DesktopPathsPanel({
   loadPaths = getDesktopPoe2Paths,
   captureClipboardItem = captureDesktopClipboardItem,
+  subscribeClipboardHotkey = subscribeDesktopClipboardHotkey,
   discoverBackupFiles = discoverDesktopLocalConfigBackupFiles,
   runBackup = runDesktopLocalConfigBackup,
-  now = () => new Date(),
+  now = defaultNow,
 }: {
   loadPaths?: () => Promise<DesktopPoe2PathState>;
   captureClipboardItem?: (
     request: DesktopClipboardItemCaptureRequest,
   ) => Promise<DesktopClipboardItemCapture>;
+  subscribeClipboardHotkey?: (
+    onPressed: () => void,
+  ) => Promise<(() => Promise<void>) | undefined>;
   discoverBackupFiles?: (request: {
     gameDirectory: string;
   }) => Promise<DesktopLocalBackupFileRequest[]>;
@@ -125,24 +130,58 @@ export function DesktopPathsPanel({
     }
   }
 
-  async function handleClipboardCapture() {
-    setClipboardState({ status: "running" });
+  const handleClipboardCapture = useCallback(
+    async (source: "button" | "hotkey" = "button") => {
+      setClipboardState({ status: "running" });
 
-    try {
-      const capturedAt = now().toISOString();
-      const capture = await captureClipboardItem(
-        createClipboardCaptureRequest(capturedAt),
-      );
+      try {
+        const capturedAt = now().toISOString();
+        const request =
+          source === "hotkey"
+            ? createClipboardHotkeyCaptureRequest(capturedAt)
+            : createClipboardCaptureRequest(capturedAt);
+        const capture = await captureClipboardItem(request);
 
-      setClipboardState({ status: "success", capture });
-    } catch (error) {
-      setClipboardState({
-        status: "error",
-        message:
-          error instanceof Error ? error.message : "Clipboard capture failed",
-      });
+        setClipboardState({ status: "success", capture });
+      } catch (error) {
+        setClipboardState({
+          status: "error",
+          message:
+            error instanceof Error ? error.message : "Clipboard capture failed",
+        });
+      }
+    },
+    [captureClipboardItem, now],
+  );
+
+  useEffect(() => {
+    if (!paths) {
+      return;
     }
-  }
+
+    let cancelled = false;
+    let unsubscribe: (() => Promise<void>) | undefined;
+
+    void subscribeClipboardHotkey(() => {
+      void handleClipboardCapture("hotkey");
+    })
+      .then((registeredUnsubscribe) => {
+        if (cancelled) {
+          void registeredUnsubscribe?.();
+          return;
+        }
+
+        unsubscribe = registeredUnsubscribe;
+      })
+      .catch(() => {
+        if (cancelled) return;
+      });
+
+    return () => {
+      cancelled = true;
+      void unsubscribe?.();
+    };
+  }, [handleClipboardCapture, paths, subscribeClipboardHotkey]);
 
   return (
     <section className="min-w-0 rounded-lg border border-base-300/70 bg-base-200/72 p-4 shadow-sm shadow-black/10">
@@ -172,6 +211,7 @@ export function DesktopPathsPanel({
             type="button"
             className="btn btn-secondary btn-sm w-full"
             disabled={clipboardState.status === "running"}
+            aria-keyshortcuts="Control+Shift+C Meta+Shift+C"
             onClick={() => void handleClipboardCapture()}
           >
             {clipboardState.status === "running" ? (
@@ -210,11 +250,28 @@ export function DesktopPathsPanel({
 export function createClipboardCaptureRequest(
   capturedAt: string,
 ): DesktopClipboardItemCaptureRequest {
+  return createClipboardCaptureRequestWithPrefix("clipboard", capturedAt);
+}
+
+export function createClipboardHotkeyCaptureRequest(
+  capturedAt: string,
+): DesktopClipboardItemCaptureRequest {
+  return createClipboardCaptureRequestWithPrefix("clipboard-hotkey", capturedAt);
+}
+
+function createClipboardCaptureRequestWithPrefix(
+  prefix: string,
+  capturedAt: string,
+): DesktopClipboardItemCaptureRequest {
   return {
-    actionId: `clipboard-${capturedAt.replace(/[:.]/g, "-")}`,
+    actionId: `${prefix}-${capturedAt.replace(/[:.]/g, "-")}`,
     capturedAt,
     userInitiated: true,
   };
+}
+
+function defaultNow() {
+  return new Date();
 }
 
 export function createLocalConfigBackupRequest({

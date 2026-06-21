@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createClipboardCaptureRequest,
+  createClipboardHotkeyCaptureRequest,
   createLocalConfigBackupRequest,
   defaultLocalBackupDirectory,
 } from "../src/components/DesktopPathsPanel";
@@ -9,6 +10,16 @@ describe("DesktopPathsPanel helpers", () => {
   it("builds a user-initiated clipboard capture request", () => {
     expect(createClipboardCaptureRequest("2026-06-21T18:45:00.000Z")).toEqual({
       actionId: "clipboard-2026-06-21T18-45-00-000Z",
+      capturedAt: "2026-06-21T18:45:00.000Z",
+      userInitiated: true,
+    });
+  });
+
+  it("builds a user-initiated clipboard hotkey capture request", () => {
+    expect(
+      createClipboardHotkeyCaptureRequest("2026-06-21T18:45:00.000Z"),
+    ).toEqual({
+      actionId: "clipboard-hotkey-2026-06-21T18-45-00-000Z",
       capturedAt: "2026-06-21T18:45:00.000Z",
       userInitiated: true,
     });
