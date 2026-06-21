@@ -1,7 +1,7 @@
 import {
   accountSnapshotDiffSchema,
   accountSnapshotListResponseSchema,
-  accountSnapshotSchema,
+  accountSnapshotStoredDiffRequestSchema,
   datasetManifestSchema,
   economyCollectionSchema,
   itemCollectionSchema,
@@ -199,32 +199,22 @@ export async function getDashboardSnapshotDiff(
   }
 
   try {
-    const [before, after] = await Promise.all([
-      fetchJson(
-        fetchImplementation,
-        `${apiBaseUrl}/snapshots/${encodeURIComponent(account)}/${encodeURIComponent(
-          beforeSnapshot.snapshotId,
-        )}`,
-        accountSnapshotSchema.parse,
-      ),
-      fetchJson(
-        fetchImplementation,
-        `${apiBaseUrl}/snapshots/${encodeURIComponent(account)}/${encodeURIComponent(
-          afterSnapshot.snapshotId,
-        )}`,
-        accountSnapshotSchema.parse,
-      ),
-    ]);
+    const request = accountSnapshotStoredDiffRequestSchema.parse({
+      account,
+      beforeSnapshotId: beforeSnapshot.snapshotId,
+      afterSnapshotId: afterSnapshot.snapshotId,
+    });
+    const query = new URLSearchParams({
+      beforeSnapshotId: request.beforeSnapshotId,
+      afterSnapshotId: request.afterSnapshotId,
+    });
 
     const diff = await fetchJson(
       fetchImplementation,
-      `${apiBaseUrl}/snapshots/diff`,
+      `${apiBaseUrl}/snapshots/${encodeURIComponent(
+        request.account,
+      )}/diff?${query.toString()}`,
       accountSnapshotDiffSchema.parse,
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ before, after }),
-      },
     );
 
     return {

@@ -120,6 +120,43 @@ function mockDashboardFetch() {
       });
     }
 
+    if (url.includes("/snapshots/example/diff?")) {
+      return Response.json({
+        beforeSnapshotId: "snapshot-2026-06-21T09-00-00Z",
+        afterSnapshotId: "snapshot-2026-06-21T10-00-00Z",
+        beforeCapturedAt: "2026-06-21T09:00:00.000Z",
+        afterCapturedAt: "2026-06-21T10:00:00.000Z",
+        characterChanges: [
+          {
+            id: "char-1",
+            name: "Monkette",
+            type: "changed",
+            beforeLevel: 43,
+            afterLevel: 45,
+            levelDelta: 2,
+            equipmentChanges: [
+              {
+                type: "changed",
+                slot: "Gloves",
+                beforeName: "Frayed Mail Mitts",
+                afterName: "Duskthread Grips",
+              },
+            ],
+          },
+        ],
+        stashChanges: [
+          {
+            id: "stash-1",
+            name: "Currency Tab",
+            type: "changed",
+            beforeItemCount: 1,
+            afterItemCount: 8,
+            itemCountDelta: 7,
+          },
+        ],
+      });
+    }
+
     if (url.includes("/snapshots/example/snapshot-2026-06-21T09-00-00Z")) {
       return Response.json({
         id: "snapshot-2026-06-21T09-00-00Z",
@@ -180,43 +217,6 @@ function mockDashboardFetch() {
               { slot: "stash", name: "Mirror Shard" },
               { slot: "stash", name: "Gemcutter Prism" },
             ],
-          },
-        ],
-      });
-    }
-
-    if (url.includes("/snapshots/diff")) {
-      return Response.json({
-        beforeSnapshotId: "snapshot-2026-06-21T09-00-00Z",
-        afterSnapshotId: "snapshot-2026-06-21T10-00-00Z",
-        beforeCapturedAt: "2026-06-21T09:00:00.000Z",
-        afterCapturedAt: "2026-06-21T10:00:00.000Z",
-        characterChanges: [
-          {
-            id: "char-1",
-            name: "Monkette",
-            type: "changed",
-            beforeLevel: 43,
-            afterLevel: 45,
-            levelDelta: 2,
-            equipmentChanges: [
-              {
-                type: "changed",
-                slot: "Gloves",
-                beforeName: "Frayed Mail Mitts",
-                afterName: "Duskthread Grips",
-              },
-            ],
-          },
-        ],
-        stashChanges: [
-          {
-            id: "stash-1",
-            name: "Currency Tab",
-            type: "changed",
-            beforeItemCount: 1,
-            afterItemCount: 8,
-            itemCountDelta: 7,
           },
         ],
       });

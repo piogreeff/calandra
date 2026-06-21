@@ -155,73 +155,10 @@ describe("dashboard read API client", () => {
     const fetchImplementation = vi.fn(async (input: RequestInfo | URL, init) => {
       const url = String(input);
 
-      if (url.endsWith("/snapshots/example/snapshot-before")) {
-        return Response.json({
-          id: "snapshot-before",
-          account: "example",
-          capturedAt: "2026-06-21T09:00:00.000Z",
-          source: "manual-import",
-          capabilities: { characters: true, stashes: true },
-          characters: [
-            {
-              id: "char-1",
-              name: "Monkette",
-              className: "Monk",
-              level: 43,
-              league: "Dawn of the Hunt",
-              equipment: [{ slot: "Gloves", name: "Frayed Mail Mitts" }],
-            },
-          ],
-          stashes: [
-            {
-              id: "stash-1",
-              name: "Currency Tab",
-              league: "Dawn of the Hunt",
-              items: [{ slot: "stash", name: "Exalted Orb" }],
-            },
-          ],
-        });
-      }
-
-      if (url.endsWith("/snapshots/example/snapshot-after")) {
-        return Response.json({
-          id: "snapshot-after",
-          account: "example",
-          capturedAt: "2026-06-21T10:00:00.000Z",
-          source: "manual-import",
-          capabilities: { characters: true, stashes: true },
-          characters: [
-            {
-              id: "char-1",
-              name: "Monkette",
-              className: "Monk",
-              level: 45,
-              league: "Dawn of the Hunt",
-              equipment: [{ slot: "Gloves", name: "Duskthread Grips" }],
-            },
-          ],
-          stashes: [
-            {
-              id: "stash-1",
-              name: "Currency Tab",
-              league: "Dawn of the Hunt",
-              items: [
-                { slot: "stash", name: "Exalted Orb" },
-                { slot: "stash", name: "Divine Orb" },
-              ],
-            },
-          ],
-        });
-      }
-
       expect(url).toBe(
-        "https://calandra-api.piogreeff.workers.dev/snapshots/diff",
+        "https://calandra-api.piogreeff.workers.dev/snapshots/example/diff?beforeSnapshotId=snapshot-before&afterSnapshotId=snapshot-after",
       );
-      expect(init?.method).toBe("POST");
-      expect(JSON.parse(String(init?.body))).toMatchObject({
-        before: { id: "snapshot-before" },
-        after: { id: "snapshot-after" },
-      });
+      expect(init).toBeUndefined();
 
       return Response.json({
         beforeSnapshotId: "snapshot-before",
@@ -281,6 +218,7 @@ describe("dashboard read API client", () => {
     expect(diff.reason).toBe("ready");
     expect(diff.diff?.characterChanges[0]?.levelDelta).toBe(2);
     expect(diff.diff?.stashChanges[0]?.itemCountDelta).toBe(1);
+    expect(fetchImplementation).toHaveBeenCalledTimes(1);
   });
 
   it("does not request a snapshot diff until two snapshots are available", async () => {

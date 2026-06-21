@@ -1175,6 +1175,146 @@ describe("api routes", () => {
     });
   });
 
+  it("diffs persisted account snapshots by snapshot id from the snapshot bucket", async () => {
+    const requestedKeys: string[] = [];
+    const snapshotsByKey = new Map([
+      [
+        "snapshots/example/snapshot-before.json",
+        {
+          id: "snapshot-before",
+          account: "example",
+          capturedAt: "2026-06-21T10:00:00.000Z",
+          source: "official-poe2-character",
+          capabilities: { characters: true, stashes: true },
+          characters: [
+            {
+              id: "character-1",
+              name: "CalandraTest",
+              className: "Deadeye",
+              level: 72,
+              league: "Dawn of the Hunt",
+              equipment: [
+                {
+                  slot: "gloves",
+                  name: "Frayed Mail Mitts",
+                  stats: { life: 40 },
+                },
+              ],
+            },
+          ],
+          stashes: [
+            {
+              id: "currency",
+              name: "Currency",
+              league: "Dawn of the Hunt",
+              items: [{ slot: "stash", name: "Exalted Orb" }],
+            },
+          ],
+        },
+      ],
+      [
+        "snapshots/example/snapshot-after.json",
+        {
+          id: "snapshot-after",
+          account: "example",
+          capturedAt: "2026-06-21T11:00:00.000Z",
+          source: "official-poe2-character",
+          capabilities: { characters: true, stashes: true },
+          characters: [
+            {
+              id: "character-1",
+              name: "CalandraTest",
+              className: "Deadeye",
+              level: 73,
+              league: "Dawn of the Hunt",
+              equipment: [
+                {
+                  slot: "gloves",
+                  name: "Duskthread Grips",
+                  stats: { life: 65 },
+                },
+              ],
+            },
+          ],
+          stashes: [
+            {
+              id: "currency",
+              name: "Currency",
+              league: "Dawn of the Hunt",
+              items: [
+                { slot: "stash", name: "Exalted Orb" },
+                { slot: "stash", name: "Divine Orb" },
+              ],
+            },
+          ],
+        },
+      ],
+    ]);
+
+    const response = await api.request(
+      "/snapshots/example/diff?beforeSnapshotId=snapshot-before&afterSnapshotId=snapshot-after",
+      undefined,
+      {
+        APP_URL: "https://calandra.pages.dev",
+        SNAPSHOT_R2_PREFIX: "snapshots",
+        SNAPSHOT_BUCKET: {
+          async get(key: string) {
+            requestedKeys.push(key);
+            const snapshot = snapshotsByKey.get(key);
+
+            return snapshot
+              ? {
+                  async text() {
+                    return JSON.stringify(snapshot);
+                  },
+                }
+              : null;
+          },
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      beforeSnapshotId: "snapshot-before",
+      afterSnapshotId: "snapshot-after",
+      beforeCapturedAt: "2026-06-21T10:00:00.000Z",
+      afterCapturedAt: "2026-06-21T11:00:00.000Z",
+      characterChanges: [
+        {
+          id: "character-1",
+          name: "CalandraTest",
+          type: "changed",
+          beforeLevel: 72,
+          afterLevel: 73,
+          levelDelta: 1,
+          equipmentChanges: [
+            {
+              type: "changed",
+              slot: "gloves",
+              beforeName: "Frayed Mail Mitts",
+              afterName: "Duskthread Grips",
+            },
+          ],
+        },
+      ],
+      stashChanges: [
+        {
+          id: "currency",
+          name: "Currency",
+          type: "changed",
+          beforeItemCount: 1,
+          afterItemCount: 2,
+          itemCountDelta: 1,
+        },
+      ],
+    });
+    expect(requestedKeys).toEqual([
+      "snapshots/example/snapshot-before.json",
+      "snapshots/example/snapshot-after.json",
+    ]);
+  });
+
   it("diffs account snapshots with deterministic engine output", async () => {
     const response = await api.request(
       "/snapshots/diff",

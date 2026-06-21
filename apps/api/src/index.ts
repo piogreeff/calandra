@@ -3,6 +3,7 @@ import {
   accountSnapshotDiffSchema,
   accountSnapshotListResponseSchema,
   accountSnapshotSchema,
+  accountSnapshotStoredDiffRequestSchema,
   accountSnapshotWriteResponseSchema,
   buyVsCraftRequestSchema,
   buyVsCraftResponseSchema,
@@ -102,26 +103,93 @@ api.post("/snapshots/diff", async (context) => {
   );
 });
 
+api.get("/snapshots/:account/diff", async (context) => {
+  const parsed = accountSnapshotStoredDiffRequestSchema.safeParse({
+    account: context.req.param("account"),
+    beforeSnapshotId: context.req.query("beforeSnapshotId"),
+    afterSnapshotId: context.req.query("afterSnapshotId"),
+  });
+
+  if (!parsed.success) {
+    return context.json(
+      { error: "invalid stored account snapshot diff request" },
+      400,
+    );
+  }
+
+  const before = await getStoredAccountSnapshot(context, {
+    account: parsed.data.account,
+    snapshotId: parsed.data.beforeSnapshotId,
+  });
+
+  if (!before.ok) {
+    return context.json(before.body, before.status);
+  }
+
+  const after = await getStoredAccountSnapshot(context, {
+    account: parsed.data.account,
+    snapshotId: parsed.data.afterSnapshotId,
+  });
+
+  if (!after.ok) {
+    return context.json(after.body, after.status);
+  }
+
+  return context.json(
+    accountSnapshotDiffSchema.parse(
+      diffAccountSnapshots(before.snapshot, after.snapshot),
+    ),
+  );
+});
+
 api.get("/snapshots/:account/:snapshotId", async (context) => {
+  const account = context.req.param("account");
+  const snapshotId = context.req.param("snapshotId");
+  const result = await getStoredAccountSnapshot(context, {
+    account,
+    snapshotId,
+  });
+
+  if (!result.ok) {
+    return context.json(result.body, result.status);
+  }
+
+  return context.json(result.snapshot);
+});
+
+async function getStoredAccountSnapshot(
+  context: Context<{ Bindings: Bindings }>,
+  {
+    account,
+    snapshotId,
+  }: {
+    account: string;
+    snapshotId: string;
+  },
+) {
   const snapshotBucket = context.env.SNAPSHOT_BUCKET;
 
   if (!snapshotBucket?.get) {
-    return context.json({ error: "snapshot bucket is not configured" }, 503);
+    return {
+      ok: false as const,
+      status: 503 as const,
+      body: { error: "snapshot bucket is not configured" },
+    };
   }
 
-  const account = context.req.param("account");
-  const snapshotId = context.req.param("snapshotId");
-  const objectKey = getSnapshotObjectKey(context, {
-    account,
-    id: snapshotId,
-  });
-  const object = await snapshotBucket.get(objectKey);
+  const object = await snapshotBucket.get(
+    getSnapshotObjectKey(context, {
+      account,
+      id: snapshotId,
+    }),
+  );
 
   if (!object) {
-    return context.json(
-      { error: "account snapshot not found", account, snapshotId },
-      404,
-    );
+    return {
+      ok: false as const,
+      status: 404 as const,
+      body: { error: "account snapshot not found", account, snapshotId },
+    };
   }
 
   let rawSnapshot: unknown;
@@ -129,23 +197,28 @@ api.get("/snapshots/:account/:snapshotId", async (context) => {
   try {
     rawSnapshot = JSON.parse((await object.text()).replace(/^\uFEFF/, ""));
   } catch {
-    return context.json(
-      { error: "stored account snapshot failed validation" },
-      502,
-    );
+    return {
+      ok: false as const,
+      status: 502 as const,
+      body: { error: "stored account snapshot failed validation" },
+    };
   }
 
   const parsed = accountSnapshotSchema.safeParse(rawSnapshot);
 
   if (!parsed.success) {
-    return context.json(
-      { error: "stored account snapshot failed validation" },
-      502,
-    );
+    return {
+      ok: false as const,
+      status: 502 as const,
+      body: { error: "stored account snapshot failed validation" },
+    };
   }
 
-  return context.json(parsed.data);
-});
+  return {
+    ok: true as const,
+    snapshot: parsed.data,
+  };
+}
 
 api.get("/snapshots/:account", async (context) => {
   const snapshotBucket = context.env.SNAPSHOT_BUCKET;

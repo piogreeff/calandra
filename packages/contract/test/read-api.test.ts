@@ -3,6 +3,7 @@ import {
   accountSnapshotDiffRequestSchema,
   accountSnapshotDiffSchema,
   accountSnapshotListResponseSchema,
+  accountSnapshotStoredDiffRequestSchema,
   accountSnapshotWriteResponseSchema,
   accountSnapshotSchema,
   buyVsCraftRequestSchema,
@@ -470,6 +471,9 @@ describe("account snapshot contract", () => {
       "diffAccountSnapshots",
     );
     expect(
+      openApiDocument.paths["/snapshots/{account}/diff"]?.get?.operationId,
+    ).toBe("diffStoredAccountSnapshots");
+    expect(
       openApiDocument.components.schemas.AccountSnapshotListResponse,
     ).toBeDefined();
     expect(
@@ -477,6 +481,9 @@ describe("account snapshot contract", () => {
     ).toBeDefined();
     expect(
       openApiDocument.components.schemas.AccountSnapshotDiffRequest,
+    ).toBeDefined();
+    expect(
+      openApiDocument.components.schemas.AccountSnapshotStoredDiffRequest,
     ).toBeDefined();
     expect(
       openApiDocument.components.schemas.AccountSnapshotDiff,
@@ -605,5 +612,19 @@ describe("account snapshot contract", () => {
         stashChanges: [],
       }).characterChanges[0]?.levelDelta,
     ).toBe(1);
+  });
+
+  it("models stored account snapshot diff requests by snapshot id", () => {
+    const request = accountSnapshotStoredDiffRequestSchema.parse({
+      account: "example",
+      beforeSnapshotId: "snapshot-before",
+      afterSnapshotId: "snapshot-after",
+    });
+
+    expect(request).toEqual({
+      account: "example",
+      beforeSnapshotId: "snapshot-before",
+      afterSnapshotId: "snapshot-after",
+    });
   });
 });

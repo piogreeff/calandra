@@ -239,6 +239,12 @@ export const accountSnapshotDiffRequestSchema = z.object({
   after: accountSnapshotSchema,
 });
 
+export const accountSnapshotStoredDiffRequestSchema = z.object({
+  account: z.string().min(1),
+  beforeSnapshotId: z.string().min(1),
+  afterSnapshotId: z.string().min(1),
+});
+
 export const advisorStatsSchema = z.record(z.number());
 
 export const advisorGearItemSchema = z.object({
@@ -592,6 +598,54 @@ export const openApiDocument = {
           },
           "400": {
             description: "Invalid account snapshot diff request",
+          },
+        },
+      },
+    },
+    "/snapshots/{account}/diff": {
+      get: {
+        operationId: "diffStoredAccountSnapshots",
+        summary: "Compare two persisted account snapshots by snapshot id",
+        parameters: [
+          {
+            name: "account",
+            in: "path",
+            required: true,
+            schema: { type: "string", minLength: 1 },
+          },
+          {
+            name: "beforeSnapshotId",
+            in: "query",
+            required: true,
+            schema: { type: "string", minLength: 1 },
+          },
+          {
+            name: "afterSnapshotId",
+            in: "query",
+            required: true,
+            schema: { type: "string", minLength: 1 },
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Deterministic account snapshot diff",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/AccountSnapshotDiff" },
+              },
+            },
+          },
+          "400": {
+            description: "Missing or invalid stored snapshot diff parameters",
+          },
+          "404": {
+            description: "Account snapshot not found",
+          },
+          "502": {
+            description: "Stored account snapshot failed validation",
+          },
+          "503": {
+            description: "Snapshot storage is not configured",
           },
         },
       },
@@ -1176,6 +1230,15 @@ export const openApiDocument = {
           after: { $ref: "#/components/schemas/AccountSnapshot" },
         },
       },
+      AccountSnapshotStoredDiffRequest: {
+        type: "object",
+        required: ["account", "beforeSnapshotId", "afterSnapshotId"],
+        properties: {
+          account: { type: "string", minLength: 1 },
+          beforeSnapshotId: { type: "string", minLength: 1 },
+          afterSnapshotId: { type: "string", minLength: 1 },
+        },
+      },
       AdvisorGearItem: {
         type: "object",
         required: ["slot", "name", "stats"],
@@ -1454,6 +1517,9 @@ export type SnapshotStashChange = z.infer<typeof snapshotStashChangeSchema>;
 export type AccountSnapshotDiff = z.infer<typeof accountSnapshotDiffSchema>;
 export type AccountSnapshotDiffRequest = z.infer<
   typeof accountSnapshotDiffRequestSchema
+>;
+export type AccountSnapshotStoredDiffRequest = z.infer<
+  typeof accountSnapshotStoredDiffRequestSchema
 >;
 export type AdvisorStats = z.infer<typeof advisorStatsSchema>;
 export type AdvisorGearItem = z.infer<typeof advisorGearItemSchema>;
