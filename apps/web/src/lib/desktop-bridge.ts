@@ -1,3 +1,7 @@
+import { parseItemText, toContractItem } from "@calandra/parser";
+import type { Item } from "@calandra/contract";
+import type { ParsedClipboardItem } from "@calandra/parser";
+
 export type DesktopPoe2Paths = {
   gameDirectory: string;
   clientLogPath: string;
@@ -41,6 +45,23 @@ export type DesktopClientLogAppendRequest = {
 export type DesktopClientLogAppendResult = {
   cursorOffset: number;
   content: string;
+};
+
+export type DesktopClipboardItemCaptureRequest = {
+  actionId: string;
+  capturedAt: string;
+  userInitiated: boolean;
+};
+
+export type DesktopClipboardTextCapture = {
+  actionId: string;
+  capturedAt: string;
+  text: string;
+};
+
+export type DesktopClipboardItemCapture = DesktopClipboardTextCapture & {
+  item: ParsedClipboardItem;
+  contractItem: Item;
 };
 
 export type DesktopLocalBackupFileRequest = {
@@ -171,6 +192,36 @@ export async function readDesktopClientLogAppend(
     "read_client_log_append",
     request,
   )) as DesktopClientLogAppendResult;
+}
+
+export async function captureDesktopClipboardItem(
+  request: DesktopClipboardItemCaptureRequest,
+  {
+    globals = globalThis as TauriGlobals,
+    invoke,
+  }: {
+    globals?: TauriGlobals;
+    invoke?: Invoke;
+  } = {},
+): Promise<DesktopClipboardItemCapture> {
+  if (!isTauriRuntime(globals)) {
+    throw new Error(
+      "Clipboard item capture requires the Calandra desktop shell",
+    );
+  }
+
+  const invokeCommand = invoke ?? (await loadTauriInvoke());
+  const capture = (await invokeCommand(
+    "capture_clipboard_text",
+    request,
+  )) as DesktopClipboardTextCapture;
+  const item = parseItemText(capture.text);
+
+  return {
+    ...capture,
+    item,
+    contractItem: toContractItem(item),
+  };
 }
 
 export async function runDesktopLocalConfigBackup(

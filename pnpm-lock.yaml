@@ -75,6 +75,9 @@ importers:
       '@calandra/contract':
         specifier: workspace:*
         version: link:../../packages/contract
+      '@calandra/parser':
+        specifier: workspace:*
+        version: link:../../packages/parser
       '@calandra/ui':
         specifier: workspace:*
         version: link:../../packages/ui

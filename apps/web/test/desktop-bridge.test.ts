@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  captureDesktopClipboardItem,
   createDesktopThemeStore,
   discoverDesktopLocalConfigBackupFiles,
   getDesktopPoe2Paths,
@@ -260,6 +261,53 @@ describe("desktop bridge", () => {
     ]);
     expect(invoke).toHaveBeenCalledWith("discover_local_config_backup_files", {
       gameDirectory: "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2",
+    });
+  });
+
+  it("captures and parses a user-initiated clipboard item through Tauri", async () => {
+    const invoke = vi.fn(async () => ({
+      actionId: "clipboard-001",
+      capturedAt: "2026-06-21T18:45:00.000Z",
+      text: `
+Item Class: Body Armours
+Rarity: Rare
+Dragon Shelter
+Advanced Altar Robe
+--------
+Item Level: 67
+--------
++72 to maximum Life
+`,
+    }));
+
+    await expect(
+      captureDesktopClipboardItem(
+        {
+          actionId: "clipboard-001",
+          capturedAt: "2026-06-21T18:45:00.000Z",
+          userInitiated: true,
+        },
+        {
+          globals: { __TAURI_INTERNALS__: {} },
+          invoke,
+        },
+      ),
+    ).resolves.toMatchObject({
+      actionId: "clipboard-001",
+      item: {
+        name: "Dragon Shelter",
+        baseType: "Advanced Altar Robe",
+        itemLevel: 67,
+      },
+      contractItem: {
+        id: "body-armour/dragon-shelter",
+        name: "Dragon Shelter",
+      },
+    });
+    expect(invoke).toHaveBeenCalledWith("capture_clipboard_text", {
+      actionId: "clipboard-001",
+      capturedAt: "2026-06-21T18:45:00.000Z",
+      userInitiated: true,
     });
   });
 

@@ -24,6 +24,14 @@ pub struct ClientLogAppendResult {
     pub content: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClipboardTextCapture {
+    pub action_id: String,
+    pub captured_at: String,
+    pub text: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LocalBackupFileRequest {
@@ -99,6 +107,20 @@ fn read_client_log_append(
 }
 
 #[tauri::command]
+fn capture_clipboard_text(
+    action_id: String,
+    captured_at: String,
+    user_initiated: bool,
+) -> Result<ClipboardTextCapture, String> {
+    capture_clipboard_text_from_reader(
+        action_id,
+        captured_at,
+        user_initiated,
+        read_system_clipboard_text,
+    )
+}
+
+#[tauri::command]
 fn copy_local_config_backup(
     game_directory: String,
     backup_directory: String,
@@ -146,6 +168,7 @@ pub fn run() {
             get_default_poe2_paths,
             get_theme_preference,
             set_theme_preference,
+            capture_clipboard_text,
             copy_local_config_backup,
             discover_local_config_backup_files,
             read_client_log_append,
@@ -227,6 +250,38 @@ fn read_client_log_append_from_path(
     Ok(ClientLogAppendResult {
         cursor_offset: starting_offset + complete_length,
         content: appended_content[..complete_length].to_string(),
+    })
+}
+
+fn capture_clipboard_text_from_reader(
+    action_id: String,
+    captured_at: String,
+    user_initiated: bool,
+    read_clipboard_text: impl FnOnce() -> Result<String, String>,
+) -> Result<ClipboardTextCapture, String> {
+    if !user_initiated {
+        return Err("Clipboard text capture must be initiated by a user action".to_string());
+    }
+
+    let action_id = action_id.trim().to_string();
+    if action_id.is_empty() {
+        return Err("Clipboard text capture requires an action id".to_string());
+    }
+
+    let captured_at = captured_at.trim().to_string();
+    if captured_at.is_empty() {
+        return Err("Clipboard text capture requires a timestamp".to_string());
+    }
+
+    let text = read_clipboard_text()?;
+    if text.trim().is_empty() {
+        return Err("Clipboard text is empty".to_string());
+    }
+
+    Ok(ClipboardTextCapture {
+        action_id,
+        captured_at,
+        text,
     })
 }
 
@@ -533,6 +588,17 @@ fn path_to_string(path: PathBuf) -> String {
     path.to_string_lossy().into_owned()
 }
 
+#[cfg(windows)]
+fn read_system_clipboard_text() -> Result<String, String> {
+    clipboard_win::get_clipboard_string()
+        .map_err(|error| format!("Unable to read Windows clipboard text: {error}"))
+}
+
+#[cfg(not(windows))]
+fn read_system_clipboard_text() -> Result<String, String> {
+    Err("Clipboard text capture is only supported in the Windows desktop shell".to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -730,6 +796,53 @@ mod tests {
             error,
             "Client.txt read path must be the PoE2 Client.txt file"
         );
+    }
+
+    #[test]
+    fn captures_user_initiated_clipboard_text() {
+        let capture = capture_clipboard_text_from_reader(
+            "clipboard-001".to_string(),
+            "2026-06-21T18:45:00.000Z".to_string(),
+            true,
+            || Ok("Item Class: Wands\nRarity: Magic\nStorm Wand\n".to_string()),
+        )
+        .unwrap();
+
+        assert_eq!(capture.action_id, "clipboard-001");
+        assert_eq!(capture.captured_at, "2026-06-21T18:45:00.000Z");
+        assert_eq!(
+            capture.text,
+            "Item Class: Wands\nRarity: Magic\nStorm Wand\n"
+        );
+    }
+
+    #[test]
+    fn rejects_background_clipboard_text_capture() {
+        let error = capture_clipboard_text_from_reader(
+            "background-clipboard".to_string(),
+            "2026-06-21T18:45:00.000Z".to_string(),
+            false,
+            || Ok("Item Class: Wands\nRarity: Magic\nStorm Wand\n".to_string()),
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            "Clipboard text capture must be initiated by a user action"
+        );
+    }
+
+    #[test]
+    fn rejects_empty_clipboard_text_capture() {
+        let error = capture_clipboard_text_from_reader(
+            "clipboard-002".to_string(),
+            "2026-06-21T18:45:00.000Z".to_string(),
+            true,
+            || Ok("   ".to_string()),
+        )
+        .unwrap_err();
+
+        assert_eq!(error, "Clipboard text is empty");
     }
 
     #[test]

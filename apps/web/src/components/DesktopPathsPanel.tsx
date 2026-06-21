@@ -3,15 +3,19 @@
 import {
   Archive,
   CheckCircle2,
+  Clipboard,
   FolderOpen,
   Loader2,
   XCircle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
+  captureDesktopClipboardItem,
   discoverDesktopLocalConfigBackupFiles,
   getDesktopPoe2Paths,
   runDesktopLocalConfigBackup,
+  type DesktopClipboardItemCapture,
+  type DesktopClipboardItemCaptureRequest,
   type DesktopLocalBackupFileRequest,
   type DesktopLocalConfigBackupPlan,
   type DesktopLocalConfigBackupRequest,
@@ -30,13 +34,23 @@ type LocalBackupState =
   | { status: "empty" }
   | { status: "error"; message: string };
 
+type ClipboardCaptureState =
+  | { status: "idle" }
+  | { status: "running" }
+  | { status: "success"; capture: DesktopClipboardItemCapture }
+  | { status: "error"; message: string };
+
 export function DesktopPathsPanel({
   loadPaths = getDesktopPoe2Paths,
+  captureClipboardItem = captureDesktopClipboardItem,
   discoverBackupFiles = discoverDesktopLocalConfigBackupFiles,
   runBackup = runDesktopLocalConfigBackup,
   now = () => new Date(),
 }: {
   loadPaths?: () => Promise<DesktopPoe2PathState>;
+  captureClipboardItem?: (
+    request: DesktopClipboardItemCaptureRequest,
+  ) => Promise<DesktopClipboardItemCapture>;
   discoverBackupFiles?: (request: {
     gameDirectory: string;
   }) => Promise<DesktopLocalBackupFileRequest[]>;
@@ -49,6 +63,9 @@ export function DesktopPathsPanel({
     status: "loading",
   });
   const [backupState, setBackupState] = useState<LocalBackupState>({
+    status: "idle",
+  });
+  const [clipboardState, setClipboardState] = useState<ClipboardCaptureState>({
     status: "idle",
   });
 
@@ -108,6 +125,25 @@ export function DesktopPathsPanel({
     }
   }
 
+  async function handleClipboardCapture() {
+    setClipboardState({ status: "running" });
+
+    try {
+      const capturedAt = now().toISOString();
+      const capture = await captureClipboardItem(
+        createClipboardCaptureRequest(capturedAt),
+      );
+
+      setClipboardState({ status: "success", capture });
+    } catch (error) {
+      setClipboardState({
+        status: "error",
+        message:
+          error instanceof Error ? error.message : "Clipboard capture failed",
+      });
+    }
+  }
+
   return (
     <section className="min-w-0 rounded-lg border border-base-300/70 bg-base-200/72 p-4 shadow-sm shadow-black/10">
       <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-base-content">
@@ -134,6 +170,20 @@ export function DesktopPathsPanel({
           <PathRow label="BuildPlanner" value={paths.buildPlannerDirectory} />
           <button
             type="button"
+            className="btn btn-secondary btn-sm w-full"
+            disabled={clipboardState.status === "running"}
+            onClick={() => void handleClipboardCapture()}
+          >
+            {clipboardState.status === "running" ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <Clipboard className="size-4" aria-hidden="true" />
+            )}
+            Capture clipboard item
+          </button>
+          <ClipboardCaptureStatus state={clipboardState} />
+          <button
+            type="button"
             className="btn btn-primary btn-sm w-full"
             disabled={backupState.status === "running"}
             onClick={() => void handleLocalBackup()}
@@ -155,6 +205,16 @@ export function DesktopPathsPanel({
       )}
     </section>
   );
+}
+
+export function createClipboardCaptureRequest(
+  capturedAt: string,
+): DesktopClipboardItemCaptureRequest {
+  return {
+    actionId: `clipboard-${capturedAt.replace(/[:.]/g, "-")}`,
+    capturedAt,
+    userInitiated: true,
+  };
 }
 
 export function createLocalConfigBackupRequest({
@@ -188,6 +248,35 @@ export function defaultLocalBackupDirectory(gameDirectory: string): string {
   }
 
   return `${trimmed.slice(0, lastSlash)}${trimmed[lastSlash]}Calandra Backups`;
+}
+
+function ClipboardCaptureStatus({ state }: { state: ClipboardCaptureState }) {
+  if (state.status === "idle" || state.status === "running") {
+    return null;
+  }
+
+  if (state.status === "success") {
+    return (
+      <div className="rounded-md border border-info/30 bg-info/10 p-3 text-xs text-info">
+        <div className="mb-1 flex items-center gap-2 font-semibold">
+          <CheckCircle2 className="size-4" aria-hidden="true" />
+          <span>{state.capture.contractItem.name}</span>
+        </div>
+        <p className="text-info/85">
+          {state.capture.item.rarity} {state.capture.item.category}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-md border border-error/35 bg-error/10 p-3 text-xs text-error">
+      <div className="flex items-center gap-2 font-semibold">
+        <XCircle className="size-4" aria-hidden="true" />
+        <span>{state.message}</span>
+      </div>
+    </div>
+  );
 }
 
 function LocalBackupStatus({ state }: { state: LocalBackupState }) {
