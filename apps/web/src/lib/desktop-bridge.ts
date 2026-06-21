@@ -57,6 +57,10 @@ export type DesktopLocalConfigBackupRequest = {
   files: DesktopLocalBackupFileRequest[];
 };
 
+export type DesktopLocalConfigBackupDiscoveryRequest = {
+  gameDirectory: string;
+};
+
 export type DesktopLocalBackupEntry = DesktopLocalBackupFileRequest & {
   destinationPath: string;
 };
@@ -191,10 +195,33 @@ export async function runDesktopLocalConfigBackup(
   )) as DesktopLocalConfigBackupPlan;
 }
 
+export async function discoverDesktopLocalConfigBackupFiles(
+  request: DesktopLocalConfigBackupDiscoveryRequest,
+  {
+    globals = globalThis as TauriGlobals,
+    invoke,
+  }: {
+    globals?: TauriGlobals;
+    invoke?: Invoke;
+  } = {},
+): Promise<DesktopLocalBackupFileRequest[]> {
+  if (!isTauriRuntime(globals)) {
+    throw new Error(
+      "Local backup discovery requires the Calandra desktop shell",
+    );
+  }
+
+  const invokeCommand = invoke ?? (await loadTauriInvoke());
+
+  return (await invokeCommand(
+    "discover_local_config_backup_files",
+    request,
+  )) as DesktopLocalBackupFileRequest[];
+}
+
 export function isTauriRuntime(globals: TauriGlobals): boolean {
   return (
-    globals.__TAURI__ !== undefined ||
-    globals.__TAURI_INTERNALS__ !== undefined
+    globals.__TAURI__ !== undefined || globals.__TAURI_INTERNALS__ !== undefined
   );
 }
 

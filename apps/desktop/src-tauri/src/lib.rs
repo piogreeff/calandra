@@ -24,7 +24,7 @@ pub struct ClientLogAppendResult {
     pub content: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LocalBackupFileRequest {
     pub kind: String,
@@ -117,6 +117,13 @@ fn copy_local_config_backup(
     )
 }
 
+#[tauri::command]
+fn discover_local_config_backup_files(
+    game_directory: String,
+) -> Result<Vec<LocalBackupFileRequest>, String> {
+    discover_local_config_backup_files_from_path(game_directory)
+}
+
 pub fn resolve_default_poe2_paths(home_directory: impl AsRef<Path>) -> Poe2Paths {
     let game_directory = home_directory
         .as_ref()
@@ -140,6 +147,7 @@ pub fn run() {
             get_theme_preference,
             set_theme_preference,
             copy_local_config_backup,
+            discover_local_config_backup_files,
             read_client_log_append,
             write_build_file
         ])
@@ -321,6 +329,35 @@ fn plan_local_config_backup(
     })
 }
 
+fn discover_local_config_backup_files_from_path(
+    game_directory: String,
+) -> Result<Vec<LocalBackupFileRequest>, String> {
+    let game_directory = normalize_path_lexically(PathBuf::from(game_directory));
+    let build_planner_directory = game_directory.join("BuildPlanner");
+    let overlay_config_path = game_directory.join("Calandra").join("overlay.json");
+    let mut files = Vec::new();
+
+    files.extend(discover_directory_files(
+        &game_directory,
+        ".filter",
+        "loot-filter",
+    )?);
+    files.extend(discover_directory_files(
+        &build_planner_directory,
+        ".build",
+        "build-file",
+    )?);
+
+    if is_regular_file(&overlay_config_path)? {
+        files.push(LocalBackupFileRequest {
+            kind: "overlay-config".to_string(),
+            source_path: path_to_string(overlay_config_path),
+        });
+    }
+
+    Ok(files)
+}
+
 fn write_build_file_to_path(
     build_planner_directory: String,
     file_name: String,
@@ -446,6 +483,50 @@ fn normalize_path_lexically(path: PathBuf) -> PathBuf {
     }
 
     normalized
+}
+
+fn discover_directory_files(
+    directory: &Path,
+    extension: &str,
+    kind: &str,
+) -> Result<Vec<LocalBackupFileRequest>, String> {
+    let entries = match std::fs::read_dir(directory) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => return Err(format!("Unable to read local backup directory: {error}")),
+    };
+
+    let mut files = entries
+        .filter_map(|entry| entry.ok())
+        .filter_map(|entry| {
+            let file_type = entry.file_type().ok()?;
+            if !file_type.is_file() {
+                return None;
+            }
+
+            let file_name = entry.file_name().to_string_lossy().to_ascii_lowercase();
+            if !file_name.ends_with(extension) {
+                return None;
+            }
+
+            Some(LocalBackupFileRequest {
+                kind: kind.to_string(),
+                source_path: path_to_string(entry.path()),
+            })
+        })
+        .collect::<Vec<_>>();
+
+    files.sort_by(|left, right| left.source_path.cmp(&right.source_path));
+
+    Ok(files)
+}
+
+fn is_regular_file(path: &Path) -> Result<bool, String> {
+    match std::fs::symlink_metadata(path) {
+        Ok(metadata) => Ok(metadata.is_file()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(format!("Unable to inspect local backup file: {error}")),
+    }
 }
 
 fn path_to_string(path: PathBuf) -> String {
@@ -770,6 +851,53 @@ mod tests {
         assert_eq!(
             std::fs::read_to_string(PathBuf::from(&plan.entries[1].destination_path)).unwrap(),
             "[build]\n"
+        );
+
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn discovers_supported_local_config_backup_files() {
+        let root = unique_settings_path("local-backup-discovery")
+            .parent()
+            .unwrap()
+            .to_path_buf();
+        let game_directory = root.join("Path of Exile 2");
+        let filter_path = game_directory.join("NeverSink.filter");
+        let build_path = game_directory.join("BuildPlanner").join("Storm Monk.build");
+        let overlay_path = game_directory.join("Calandra").join("overlay.json");
+        let ignored_log_path = game_directory.join("Client.txt");
+        let ignored_nested_filter_path = game_directory.join("Filters").join("nested.filter");
+
+        std::fs::create_dir_all(filter_path.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(build_path.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(overlay_path.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(ignored_nested_filter_path.parent().unwrap()).unwrap();
+        std::fs::write(&filter_path, "filter").unwrap();
+        std::fs::write(&build_path, "[build]\n").unwrap();
+        std::fs::write(&overlay_path, "{\"opacity\":0.8}\n").unwrap();
+        std::fs::write(&ignored_log_path, "log").unwrap();
+        std::fs::write(&ignored_nested_filter_path, "nested").unwrap();
+
+        let files =
+            discover_local_config_backup_files_from_path(path_to_string(game_directory)).unwrap();
+
+        assert_eq!(
+            files,
+            vec![
+                LocalBackupFileRequest {
+                    kind: "loot-filter".to_string(),
+                    source_path: path_to_string(filter_path),
+                },
+                LocalBackupFileRequest {
+                    kind: "build-file".to_string(),
+                    source_path: path_to_string(build_path),
+                },
+                LocalBackupFileRequest {
+                    kind: "overlay-config".to_string(),
+                    source_path: path_to_string(overlay_path),
+                },
+            ]
         );
 
         let _ = std::fs::remove_dir_all(root);

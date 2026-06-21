@@ -9,6 +9,7 @@ import {
   captureClipboardItemText,
   copyLocalConfigBackup,
   createInitialClientLogCursor,
+  discoverLocalConfigBackupFiles,
   getDefaultPoe2Paths,
   planLocalConfigBackup,
   planBuildFileWrite,
@@ -460,6 +461,46 @@ Item Level: 67
           "utf8",
         ),
       ).resolves.toBe('{"opacity":0.8}\n');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("discovers supported local config backup files without recursive scraping", async () => {
+    const root = await createTempWindowsTree();
+    const gameDirectory = win32.join(root, "Path of Exile 2");
+    const lootFilterPath = win32.join(gameDirectory, "NeverSink.filter");
+    const buildPath = win32.join(
+      gameDirectory,
+      "BuildPlanner",
+      "Storm Monk.build",
+    );
+    const overlayPath = win32.join(gameDirectory, "Calandra", "overlay.json");
+    const ignoredLogPath = win32.join(gameDirectory, "Client.txt");
+    const ignoredNestedFilterPath = win32.join(
+      gameDirectory,
+      "Filters",
+      "nested.filter",
+    );
+
+    try {
+      await mkdir(win32.dirname(lootFilterPath), { recursive: true });
+      await mkdir(win32.dirname(buildPath), { recursive: true });
+      await mkdir(win32.dirname(overlayPath), { recursive: true });
+      await mkdir(win32.dirname(ignoredNestedFilterPath), { recursive: true });
+      await writeFile(lootFilterPath, "filter", "utf8");
+      await writeFile(buildPath, "[build]\n", "utf8");
+      await writeFile(overlayPath, '{"opacity":0.8}\n', "utf8");
+      await writeFile(ignoredLogPath, "log", "utf8");
+      await writeFile(ignoredNestedFilterPath, "nested", "utf8");
+
+      await expect(
+        discoverLocalConfigBackupFiles(gameDirectory),
+      ).resolves.toEqual([
+        { kind: "loot-filter", sourcePath: lootFilterPath },
+        { kind: "build-file", sourcePath: buildPath },
+        { kind: "overlay-config", sourcePath: overlayPath },
+      ]);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

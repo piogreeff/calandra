@@ -1,4 +1,4 @@
-import { copyFile, mkdir, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readdir, writeFile } from "node:fs/promises";
 import { win32 } from "node:path";
 import {
   priceCheckRequestSchema,
@@ -342,6 +342,33 @@ export async function copyLocalConfigBackup(
   return plan;
 }
 
+export async function discoverLocalConfigBackupFiles(
+  gameDirectory: string,
+): Promise<LocalBackupFileRequest[]> {
+  const gameRoot = win32.resolve(gameDirectory);
+  const buildPlannerDirectory = win32.join(gameRoot, "BuildPlanner");
+  const overlayConfigPath = win32.join(gameRoot, "Calandra", "overlay.json");
+  const files: LocalBackupFileRequest[] = [];
+
+  files.push(
+    ...(await discoverDirectoryFiles(gameRoot, ".filter", "loot-filter")),
+    ...(await discoverDirectoryFiles(
+      buildPlannerDirectory,
+      ".build",
+      "build-file",
+    )),
+  );
+
+  if (await isRegularFile(overlayConfigPath)) {
+    files.push({
+      kind: "overlay-config",
+      sourcePath: overlayConfigPath,
+    });
+  }
+
+  return files;
+}
+
 function completeLineLength(content: string): number {
   const lastNewlineIndex = content.lastIndexOf("\n");
   return lastNewlineIndex === -1 ? 0 : lastNewlineIndex + 1;
@@ -391,5 +418,59 @@ function isPathInsideDirectory(path: string, directory: string): boolean {
     relative.length > 0 &&
     !relative.startsWith("..") &&
     !win32.isAbsolute(relative)
+  );
+}
+
+async function discoverDirectoryFiles(
+  directory: string,
+  extension: string,
+  kind: LocalBackupFileKind,
+): Promise<LocalBackupFileRequest[]> {
+  try {
+    const entries = await readdir(directory, { withFileTypes: true });
+
+    return entries
+      .filter(
+        (entry) =>
+          entry.isFile() && entry.name.toLowerCase().endsWith(extension),
+      )
+      .sort((left, right) => left.name.localeCompare(right.name))
+      .map((entry) => ({
+        kind,
+        sourcePath: win32.join(directory, entry.name),
+      }));
+  } catch (error) {
+    if (isMissingFileError(error)) {
+      return [];
+    }
+
+    throw error;
+  }
+}
+
+async function isRegularFile(path: string): Promise<boolean> {
+  try {
+    const [entry] = await readdir(win32.dirname(path), {
+      withFileTypes: true,
+    }).then((entries) =>
+      entries.filter((entry) => entry.name === win32.basename(path)),
+    );
+
+    return entry?.isFile() ?? false;
+  } catch (error) {
+    if (isMissingFileError(error)) {
+      return false;
+    }
+
+    throw error;
+  }
+}
+
+function isMissingFileError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "ENOENT"
   );
 }

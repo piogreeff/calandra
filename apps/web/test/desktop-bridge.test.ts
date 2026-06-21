@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createDesktopThemeStore,
+  discoverDesktopLocalConfigBackupFiles,
   getDesktopPoe2Paths,
   isTauriRuntime,
   readDesktopClientLogAppend,
@@ -183,8 +184,7 @@ describe("desktop bridge", () => {
     await expect(
       runDesktopLocalConfigBackup(
         {
-          gameDirectory:
-            "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2",
+          gameDirectory: "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2",
           backupDirectory: "D:\\Calandra Backups",
           actionId: "backup-001",
           capturedAt: "2026-06-21T15:00:00.000Z",
@@ -219,6 +219,47 @@ describe("desktop bridge", () => {
             "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2\\NeverSink.filter",
         },
       ],
+    });
+  });
+
+  it("discovers local config backup files through the Tauri desktop command", async () => {
+    const invoke = vi.fn(async () => [
+      {
+        kind: "loot-filter",
+        sourcePath:
+          "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2\\NeverSink.filter",
+      },
+      {
+        kind: "build-file",
+        sourcePath:
+          "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2\\BuildPlanner\\Storm Monk.build",
+      },
+    ]);
+
+    await expect(
+      discoverDesktopLocalConfigBackupFiles(
+        {
+          gameDirectory: "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2",
+        },
+        {
+          globals: { __TAURI_INTERNALS__: {} },
+          invoke,
+        },
+      ),
+    ).resolves.toEqual([
+      {
+        kind: "loot-filter",
+        sourcePath:
+          "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2\\NeverSink.filter",
+      },
+      {
+        kind: "build-file",
+        sourcePath:
+          "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2\\BuildPlanner\\Storm Monk.build",
+      },
+    ]);
+    expect(invoke).toHaveBeenCalledWith("discover_local_config_backup_files", {
+      gameDirectory: "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2",
     });
   });
 
