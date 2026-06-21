@@ -51,6 +51,9 @@ describe("home dashboard", () => {
     expect(html).toContain("Duskthread Grips");
     expect(html).toContain("Currency Tab");
     expect(html).toContain("+7 items");
+    expect(html).toContain("Desktop shell");
+    expect(html).toContain("Checking desktop shell");
+    expect(html).toContain("Loot filters, BuildPlanner files");
   });
 });
 

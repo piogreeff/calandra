@@ -1,6 +1,5 @@
 import {
   Activity,
-  Archive,
   Bot,
   ChevronRight,
   Database,
@@ -18,6 +17,7 @@ import {
 import type { UpgradeAdvisorResponse } from "@calandra/contract";
 import { defaultTheme } from "../lib/theme";
 import { DatasetSearchPanel } from "../components/DatasetSearchPanel";
+import { DesktopPathsPanel } from "../components/DesktopPathsPanel";
 import { ThemeSelector } from "../components/ThemeSelector";
 import {
   dashboardDatasetVersion,
@@ -530,15 +530,7 @@ export default async function Home() {
                 </p>
               </Panel>
 
-              <Panel
-                title="Local backup"
-                icon={<Archive className="size-4" aria-hidden="true" />}
-              >
-                <p className="text-sm text-base-content/70">
-                  Loot filters, BuildPlanner files, and overlay config will stay
-                  local-first in the desktop phase.
-                </p>
-              </Panel>
+              <DesktopPathsPanel />
             </aside>
           </div>
         </section>
