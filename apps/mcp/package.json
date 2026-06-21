@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx src/index.ts",
+    "dev": "tsx src/stdio.ts",
+    "stdio": "tsx src/stdio.ts",
     "build": "tsc --noEmit",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
@@ -12,6 +13,7 @@
   },
   "dependencies": {
     "@calandra/contract": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.29.0",
     "zod": "^3.25.0"
   }
 }

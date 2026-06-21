@@ -1,3 +1,10 @@
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+  type CallToolResult,
+  type Tool,
+} from "@modelcontextprotocol/sdk/types.js";
 import {
   accountSnapshotDiffRequestSchema,
   accountSnapshotDiffSchema,
@@ -29,17 +36,12 @@ export interface CalandraMcpTool {
   description: string;
   inputSchema: {
     type: "object";
-    properties: Record<string, unknown>;
+    properties: Record<string, object>;
     required: string[];
   };
 }
 
-export interface McpToolResult {
-  content: Array<{
-    type: "text";
-    text: string;
-  }>;
-}
+export type McpToolResult = CallToolResult;
 
 export interface CalandraMcpServerOptions {
   apiBaseUrl: string;
@@ -227,6 +229,35 @@ export function createCalandraMcpServer(options: CalandraMcpServerOptions) {
   };
 }
 
+export function createCalandraMcpProtocolServer(
+  options: CalandraMcpServerOptions,
+) {
+  const registry = createCalandraMcpServer(options);
+  const server = new Server(
+    { name: "calandra", version: "0.0.0" },
+    {
+      capabilities: {
+        tools: {},
+      },
+      instructions:
+        "Use Calandra tools for read-only Path of Exile 2 item, economy, snapshot, crafting, and upgrade-advisor queries.",
+    },
+  );
+
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({
+    tools: listCalandraMcpTools().map(toMcpTool),
+  }));
+
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    return registry.callTool(
+      request.params.name as CalandraMcpToolName,
+      request.params.arguments ?? {},
+    );
+  });
+
+  return server;
+}
+
 async function searchItems(
   apiBaseUrl: string,
   fetchImplementation: FetchLike,
@@ -389,6 +420,20 @@ function versionedQuery(input: { league: string; patch: string }) {
 
 function normalizeBaseUrl(apiBaseUrl: string) {
   return apiBaseUrl.replace(/\/+$/, "");
+}
+
+function toMcpTool(tool: CalandraMcpTool): Tool {
+  return {
+    name: tool.name,
+    description: tool.description,
+    inputSchema: tool.inputSchema,
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+  };
 }
 
 function jsonToolResult(value: unknown): McpToolResult {

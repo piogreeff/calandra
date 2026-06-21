@@ -36,6 +36,14 @@ pnpm dev                    # run the backend + web locally
 
 Until a permanent domain is purchased, the default hosted URLs use Cloudflare temporary domains: `https://calandra.pages.dev` for the app and `https://calandra-api.piogreeff.workers.dev` for the API. Replace those in `.env` once the real domain is available.
 
+To expose Calandra to a local MCP-capable agent, point the stdio server at your API and register this command with the host:
+
+```bash
+CALANDRA_API_BASE_URL=http://127.0.0.1:8787 pnpm --filter @calandra/mcp stdio
+```
+
+If `CALANDRA_API_BASE_URL` is unset, the MCP server uses the temporary hosted API at `https://calandra-api.piogreeff.workers.dev`.
+
 ## Configuration
 
 Every environment variable is documented in [`.env.example`](../.env.example) â€” app, AI/AI Gateway, GGG OAuth, Cloudflare bindings, Neon, and Better Auth. Nothing is secret in that file; copy it to `.env` and fill it in.
@@ -45,6 +53,7 @@ Every environment variable is documented in [`.env.example`](../.env.example) â€
 | `NODE_ENV`                | Runtime mode for local scripts and apps.                                                                                         |
 | `APP_URL`                 | Public web app URL; defaults to the temporary Cloudflare Pages URL until a permanent domain exists.                              |
 | `API_URL`                 | Public API URL; defaults to the temporary Workers URL until a permanent domain exists.                                           |
+| `CALANDRA_API_BASE_URL`   | API base URL used by the local MCP stdio server; defaults to the temporary hosted Worker if unset.                               |
 | `DATASET_VERSION`         | Published `{league, patch}` dataset version to import; `latest` follows the newest published artifact.                           |
 | `DATASET_R2_PREFIX`       | R2 object prefix for published artifacts; the API reads `${DATASET_R2_PREFIX}/{league}/{patch}.json`.                            |
 | `DATASET_ARTIFACT_JSON`   | Optional dev/self-host Worker binding for a published artifact JSON payload; production should load published artifacts from R2. |

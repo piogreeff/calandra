@@ -1,5 +1,11 @@
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { describe, expect, it, vi } from "vitest";
-import { createCalandraMcpServer, listCalandraMcpTools } from "../src/index";
+import {
+  createCalandraMcpProtocolServer,
+  createCalandraMcpServer,
+  listCalandraMcpTools,
+} from "../src/index";
 
 describe("Calandra MCP tools", () => {
   it("lists the public data and advisor tools", () => {
@@ -571,6 +577,72 @@ describe("Calandra MCP tools", () => {
       "Unknown Calandra MCP tool: unknown_tool",
     );
   });
+
+  it("exposes Calandra tools through the MCP protocol", async () => {
+    const fetch = vi.fn(async () =>
+      jsonResponse({
+        league: "Dawn of the Hunt",
+        patch: "0.2.0",
+        prices: [
+          {
+            id: "divine-orb",
+            name: "Divine Orb",
+            chaosEquivalent: 142,
+            updatedAt: "2026-06-21T00:00:00.000Z",
+          },
+        ],
+      }),
+    );
+    const server = createCalandraMcpProtocolServer({
+      apiBaseUrl: "https://calandra-api.workers.dev",
+      fetch,
+    });
+    const client = new Client(
+      { name: "calandra-test-client", version: "0.0.0" },
+      { capabilities: {} },
+    );
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
+
+    try {
+      await Promise.all([
+        server.connect(serverTransport),
+        client.connect(clientTransport),
+      ]);
+
+      await expect(client.ping()).resolves.toEqual({});
+      const tools = await client.listTools();
+      expect(tools.tools.map((tool) => tool.name)).toEqual([
+        "search_items",
+        "price_item",
+        "recommend_upgrade",
+        "estimate_crafting",
+        "compare_buy_vs_craft",
+        "diff_snapshots",
+        "check_price",
+        "get_economy",
+      ]);
+
+      const result = await client.callTool({
+        name: "price_item",
+        arguments: {
+          league: "Dawn of the Hunt",
+          patch: "0.2.0",
+          item: "divine",
+        },
+      });
+
+      expect(parseToolJson(result)).toEqual({
+        id: "divine-orb",
+        name: "Divine Orb",
+        chaosEquivalent: 142,
+        updatedAt: "2026-06-21T00:00:00.000Z",
+      });
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
 });
 
 function jsonResponse(body: unknown): Response {
@@ -580,6 +652,12 @@ function jsonResponse(body: unknown): Response {
   });
 }
 
-function parseToolJson(result: { content: Array<{ text: string }> }) {
-  return JSON.parse(result.content[0]?.text ?? "null");
+function parseToolJson(result: unknown) {
+  const firstContent = (
+    result as { content?: Array<{ type: string; text?: string }> }
+  ).content?.[0];
+
+  return firstContent?.type === "text"
+    ? JSON.parse(firstContent.text ?? "null")
+    : null;
 }
