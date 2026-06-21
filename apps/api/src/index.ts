@@ -1,4 +1,6 @@
 import {
+  accountSnapshotDiffRequestSchema,
+  accountSnapshotDiffSchema,
   datasetArtifactSchema,
   datasetManifestSchema,
   type DatasetArtifact,
@@ -13,7 +15,7 @@ import {
   upgradeAdvisorResponseSchema,
   uniqueCollectionSchema,
 } from "@calandra/contract";
-import { rankLoadoutUpgrades } from "@calandra/engine";
+import { diffAccountSnapshots, rankLoadoutUpgrades } from "@calandra/engine";
 import { Hono, type Context } from "hono";
 
 type Bindings = {
@@ -63,6 +65,24 @@ api.post("/advisor/upgrades", async (context) => {
       source: "deterministic-engine",
       upgrades,
     }),
+  );
+});
+
+api.post("/snapshots/diff", async (context) => {
+  const rawBody = await readJsonBody(context);
+  const parsed = accountSnapshotDiffRequestSchema.safeParse(rawBody);
+
+  if (!parsed.success) {
+    return context.json(
+      { error: "invalid account snapshot diff request" },
+      400,
+    );
+  }
+
+  return context.json(
+    accountSnapshotDiffSchema.parse(
+      diffAccountSnapshots(parsed.data.before, parsed.data.after),
+    ),
   );
 });
 
@@ -234,10 +254,7 @@ async function getMatchingDatasetManifest(
   const artifactRaw = await object.text();
   const artifact = parseDatasetArtifact(artifactRaw);
 
-  if (
-    artifact.league !== version.league ||
-    artifact.patch !== version.patch
-  ) {
+  if (artifact.league !== version.league || artifact.patch !== version.patch) {
     return undefined;
   }
 

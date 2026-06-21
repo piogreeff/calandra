@@ -625,6 +625,112 @@ describe("api routes", () => {
       error: "invalid upgrade advisor request",
     });
   });
+
+  it("diffs account snapshots with deterministic engine output", async () => {
+    const response = await api.request(
+      "/snapshots/diff",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          before: {
+            id: "snapshot-before",
+            account: "example",
+            capturedAt: "2026-06-21T10:00:00.000Z",
+            source: "official-poe2-character",
+            capabilities: { characters: true, stashes: false },
+            characters: [
+              {
+                id: "character-1",
+                name: "CalandraTest",
+                className: "Deadeye",
+                level: 72,
+                league: "Dawn of the Hunt",
+                equipment: [
+                  {
+                    slot: "gloves",
+                    name: "Frayed Mail Mitts",
+                    stats: { life: 40 },
+                  },
+                ],
+              },
+            ],
+          },
+          after: {
+            id: "snapshot-after",
+            account: "example",
+            capturedAt: "2026-06-21T11:00:00.000Z",
+            source: "official-poe2-character",
+            capabilities: { characters: true, stashes: false },
+            characters: [
+              {
+                id: "character-1",
+                name: "CalandraTest",
+                className: "Deadeye",
+                level: 73,
+                league: "Dawn of the Hunt",
+                equipment: [
+                  {
+                    slot: "gloves",
+                    name: "Duskthread Grips",
+                    stats: { life: 65 },
+                  },
+                ],
+              },
+            ],
+          },
+        }),
+      },
+      { APP_URL: "https://calandra.pages.dev" },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      beforeSnapshotId: "snapshot-before",
+      afterSnapshotId: "snapshot-after",
+      beforeCapturedAt: "2026-06-21T10:00:00.000Z",
+      afterCapturedAt: "2026-06-21T11:00:00.000Z",
+      characterChanges: [
+        {
+          id: "character-1",
+          name: "CalandraTest",
+          type: "changed",
+          beforeLevel: 72,
+          afterLevel: 73,
+          levelDelta: 1,
+          equipmentChanges: [
+            {
+              type: "changed",
+              slot: "gloves",
+              beforeName: "Frayed Mail Mitts",
+              afterName: "Duskthread Grips",
+            },
+          ],
+        },
+      ],
+      stashChanges: [],
+    });
+  });
+
+  it("rejects malformed account snapshot diff payloads", async () => {
+    const response = await api.request(
+      "/snapshots/diff",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          before: { id: "snapshot-before" },
+          after: "not-a-snapshot",
+        }),
+      },
+      { APP_URL: "https://calandra.pages.dev" },
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "invalid account snapshot diff request",
+    });
+  });
 });
 
 async function expectJson(

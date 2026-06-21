@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  accountSnapshotDiffRequestSchema,
+  accountSnapshotDiffSchema,
   accountSnapshotSchema,
   datasetArtifactSchema,
   datasetManifestSchema,
@@ -304,6 +306,15 @@ describe("account snapshot contract", () => {
 
   it("exports account snapshot schemas in OpenAPI", () => {
     expect(openApiDocument.components.schemas.AccountSnapshot).toBeDefined();
+    expect(openApiDocument.paths["/snapshots/diff"]?.post?.operationId).toBe(
+      "diffAccountSnapshots",
+    );
+    expect(
+      openApiDocument.components.schemas.AccountSnapshotDiffRequest,
+    ).toBeDefined();
+    expect(
+      openApiDocument.components.schemas.AccountSnapshotDiff,
+    ).toBeDefined();
     expect(
       openApiDocument.components.schemas.AccountSnapshot.properties.source,
     ).toEqual({
@@ -316,5 +327,71 @@ describe("account snapshot contract", () => {
     ).toEqual({
       $ref: "#/components/schemas/AccountSnapshotCapabilities",
     });
+  });
+
+  it("models deterministic account snapshot diff requests and responses", () => {
+    const before = accountSnapshotSchema.parse({
+      id: "snapshot-before",
+      account: "example",
+      capturedAt: "2026-06-21T10:00:00.000Z",
+      source: "official-poe2-character",
+      capabilities: { characters: true, stashes: false },
+      characters: [
+        {
+          id: "character-1",
+          name: "CalandraTest",
+          className: "Deadeye",
+          level: 72,
+          league: "Dawn of the Hunt",
+          equipment: [{ slot: "gloves", name: "Frayed Mail Mitts" }],
+        },
+      ],
+    });
+    const after = accountSnapshotSchema.parse({
+      ...before,
+      id: "snapshot-after",
+      capturedAt: "2026-06-21T11:00:00.000Z",
+      characters: [
+        {
+          id: "character-1",
+          name: "CalandraTest",
+          className: "Deadeye",
+          level: 73,
+          league: "Dawn of the Hunt",
+          equipment: [{ slot: "gloves", name: "Duskthread Grips" }],
+        },
+      ],
+    });
+
+    expect(
+      accountSnapshotDiffRequestSchema.parse({ before, after }).before.id,
+    ).toBe("snapshot-before");
+    expect(
+      accountSnapshotDiffSchema.parse({
+        beforeSnapshotId: "snapshot-before",
+        afterSnapshotId: "snapshot-after",
+        beforeCapturedAt: "2026-06-21T10:00:00.000Z",
+        afterCapturedAt: "2026-06-21T11:00:00.000Z",
+        characterChanges: [
+          {
+            id: "character-1",
+            name: "CalandraTest",
+            type: "changed",
+            beforeLevel: 72,
+            afterLevel: 73,
+            levelDelta: 1,
+            equipmentChanges: [
+              {
+                type: "changed",
+                slot: "gloves",
+                beforeName: "Frayed Mail Mitts",
+                afterName: "Duskthread Grips",
+              },
+            ],
+          },
+        ],
+        stashChanges: [],
+      }).characterChanges[0]?.levelDelta,
+    ).toBe(1);
   });
 });

@@ -158,6 +158,52 @@ export const accountSnapshotSchema = z.object({
   stashes: z.array(accountSnapshotStashSchema).optional(),
 });
 
+export const snapshotEntityChangeTypeSchema = z.enum([
+  "added",
+  "removed",
+  "changed",
+]);
+
+export const snapshotEquipmentChangeSchema = z.object({
+  type: snapshotEntityChangeTypeSchema,
+  slot: z.string().min(1),
+  beforeName: z.string().min(1).optional(),
+  afterName: z.string().min(1).optional(),
+});
+
+export const snapshotCharacterChangeSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  type: snapshotEntityChangeTypeSchema,
+  beforeLevel: z.number().int().positive().optional(),
+  afterLevel: z.number().int().positive().optional(),
+  levelDelta: z.number().int(),
+  equipmentChanges: z.array(snapshotEquipmentChangeSchema),
+});
+
+export const snapshotStashChangeSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  type: snapshotEntityChangeTypeSchema,
+  beforeItemCount: z.number().int().nonnegative().optional(),
+  afterItemCount: z.number().int().nonnegative().optional(),
+  itemCountDelta: z.number().int(),
+});
+
+export const accountSnapshotDiffSchema = z.object({
+  beforeSnapshotId: z.string().min(1),
+  afterSnapshotId: z.string().min(1),
+  beforeCapturedAt: z.string().datetime(),
+  afterCapturedAt: z.string().datetime(),
+  characterChanges: z.array(snapshotCharacterChangeSchema),
+  stashChanges: z.array(snapshotStashChangeSchema),
+});
+
+export const accountSnapshotDiffRequestSchema = z.object({
+  before: accountSnapshotSchema,
+  after: accountSnapshotSchema,
+});
+
 export const advisorStatsSchema = z.record(z.number());
 
 export const advisorGearItemSchema = z.object({
@@ -412,6 +458,35 @@ export const openApiDocument = {
           },
           "404": {
             description: "Dataset manifest not found for league and patch",
+          },
+        },
+      },
+    },
+    "/snapshots/diff": {
+      post: {
+        operationId: "diffAccountSnapshots",
+        summary: "Compare two account snapshots with the deterministic engine",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                $ref: "#/components/schemas/AccountSnapshotDiffRequest",
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Deterministic account snapshot diff",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/AccountSnapshotDiff" },
+              },
+            },
+          },
+          "400": {
+            description: "Invalid account snapshot diff request",
           },
         },
       },
@@ -709,6 +784,77 @@ export const openApiDocument = {
           },
         },
       },
+      SnapshotEquipmentChange: {
+        type: "object",
+        required: ["type", "slot"],
+        properties: {
+          type: { type: "string", enum: ["added", "removed", "changed"] },
+          slot: { type: "string", minLength: 1 },
+          beforeName: { type: "string", minLength: 1 },
+          afterName: { type: "string", minLength: 1 },
+        },
+      },
+      SnapshotCharacterChange: {
+        type: "object",
+        required: ["id", "name", "type", "levelDelta", "equipmentChanges"],
+        properties: {
+          id: { type: "string", minLength: 1 },
+          name: { type: "string", minLength: 1 },
+          type: { type: "string", enum: ["added", "removed", "changed"] },
+          beforeLevel: { type: "integer", minimum: 1 },
+          afterLevel: { type: "integer", minimum: 1 },
+          levelDelta: { type: "integer" },
+          equipmentChanges: {
+            type: "array",
+            items: { $ref: "#/components/schemas/SnapshotEquipmentChange" },
+          },
+        },
+      },
+      SnapshotStashChange: {
+        type: "object",
+        required: ["id", "name", "type", "itemCountDelta"],
+        properties: {
+          id: { type: "string", minLength: 1 },
+          name: { type: "string", minLength: 1 },
+          type: { type: "string", enum: ["added", "removed", "changed"] },
+          beforeItemCount: { type: "integer", minimum: 0 },
+          afterItemCount: { type: "integer", minimum: 0 },
+          itemCountDelta: { type: "integer" },
+        },
+      },
+      AccountSnapshotDiff: {
+        type: "object",
+        required: [
+          "beforeSnapshotId",
+          "afterSnapshotId",
+          "beforeCapturedAt",
+          "afterCapturedAt",
+          "characterChanges",
+          "stashChanges",
+        ],
+        properties: {
+          beforeSnapshotId: { type: "string", minLength: 1 },
+          afterSnapshotId: { type: "string", minLength: 1 },
+          beforeCapturedAt: { type: "string", format: "date-time" },
+          afterCapturedAt: { type: "string", format: "date-time" },
+          characterChanges: {
+            type: "array",
+            items: { $ref: "#/components/schemas/SnapshotCharacterChange" },
+          },
+          stashChanges: {
+            type: "array",
+            items: { $ref: "#/components/schemas/SnapshotStashChange" },
+          },
+        },
+      },
+      AccountSnapshotDiffRequest: {
+        type: "object",
+        required: ["before", "after"],
+        properties: {
+          before: { $ref: "#/components/schemas/AccountSnapshot" },
+          after: { $ref: "#/components/schemas/AccountSnapshot" },
+        },
+      },
       AdvisorGearItem: {
         type: "object",
         required: ["slot", "name", "stats"],
@@ -848,6 +994,20 @@ export type AccountSnapshotCharacter = z.infer<
 >;
 export type AccountSnapshotStash = z.infer<typeof accountSnapshotStashSchema>;
 export type AccountSnapshot = z.infer<typeof accountSnapshotSchema>;
+export type SnapshotEntityChangeType = z.infer<
+  typeof snapshotEntityChangeTypeSchema
+>;
+export type SnapshotEquipmentChange = z.infer<
+  typeof snapshotEquipmentChangeSchema
+>;
+export type SnapshotCharacterChange = z.infer<
+  typeof snapshotCharacterChangeSchema
+>;
+export type SnapshotStashChange = z.infer<typeof snapshotStashChangeSchema>;
+export type AccountSnapshotDiff = z.infer<typeof accountSnapshotDiffSchema>;
+export type AccountSnapshotDiffRequest = z.infer<
+  typeof accountSnapshotDiffRequestSchema
+>;
 export type AdvisorStats = z.infer<typeof advisorStatsSchema>;
 export type AdvisorGearItem = z.infer<typeof advisorGearItemSchema>;
 export type UpgradeAdvisorCandidate = z.infer<
