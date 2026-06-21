@@ -56,10 +56,32 @@ describe("api routes", () => {
           id: "mod-life-1",
           name: "+# to maximum Life",
           domain: "item",
+          generationType: "prefix",
+          family: "Life",
           minItemLevel: 1,
+          tier: 1,
+          tags: ["life"],
+          stats: [
+            {
+              id: "base_maximum_life",
+              text: "+# to maximum Life",
+              min: 80,
+              max: 99,
+            },
+          ],
         },
       ],
-      gems: [{ id: "spark", name: "Spark", kind: "skill", level: 1 }],
+      gems: [
+        {
+          id: "spark",
+          name: "Spark",
+          kind: "skill",
+          level: 1,
+          requiredLevel: 1,
+          tags: ["spell", "lightning"],
+          attributeRequirements: { intelligence: 10 },
+        },
+      ],
       economy: [
         {
           id: "divine-orb",
@@ -248,7 +270,19 @@ describe("api routes", () => {
             id: "mod-life-1",
             name: "+# to maximum Life",
             domain: "item",
+            generationType: "prefix",
+            family: "Life",
             minItemLevel: 1,
+            tier: 1,
+            tags: ["life"],
+            stats: [
+              {
+                id: "base_maximum_life",
+                text: "+# to maximum Life",
+                min: 80,
+                max: 99,
+              },
+            ],
           },
         ],
       },
@@ -259,7 +293,17 @@ describe("api routes", () => {
       {
         league: "Dawn of the Hunt",
         patch: "0.2.0",
-        gems: [{ id: "spark", name: "Spark", kind: "skill", level: 1 }],
+        gems: [
+          {
+            id: "spark",
+            name: "Spark",
+            kind: "skill",
+            level: 1,
+            requiredLevel: 1,
+            tags: ["spell", "lightning"],
+            attributeRequirements: { intelligence: 10 },
+          },
+        ],
       },
     );
     await expectJson(

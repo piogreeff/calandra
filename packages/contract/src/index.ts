@@ -40,12 +40,25 @@ export const uniqueCollectionSchema = z.object({
   uniques: z.array(uniqueItemSchema),
 });
 
+export const modStatSchema = z.object({
+  id: z.string().min(1),
+  text: z.string().min(1),
+  min: z.number(),
+  max: z.number(),
+});
+
 export const modSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   domain: z.string().min(1),
+  generationType: z
+    .enum(["prefix", "suffix", "implicit", "enchant", "unique", "rune"])
+    .optional(),
+  family: z.string().min(1).optional(),
   minItemLevel: z.number().int().nonnegative(),
   tier: z.number().int().positive().optional(),
+  tags: z.array(z.string().min(1)).optional(),
+  stats: z.array(modStatSchema).optional(),
 });
 
 export const modCollectionSchema = z.object({
@@ -58,6 +71,15 @@ export const gemSchema = z.object({
   name: z.string().min(1),
   kind: z.enum(["skill", "support", "spirit"]),
   level: z.number().int().positive(),
+  requiredLevel: z.number().int().nonnegative().optional(),
+  tags: z.array(z.string().min(1)).optional(),
+  attributeRequirements: z
+    .object({
+      strength: z.number().int().nonnegative().optional(),
+      dexterity: z.number().int().nonnegative().optional(),
+      intelligence: z.number().int().nonnegative().optional(),
+    })
+    .optional(),
 });
 
 export const gemCollectionSchema = z.object({
@@ -443,8 +465,31 @@ export const openApiDocument = {
           id: { type: "string", minLength: 1 },
           name: { type: "string", minLength: 1 },
           domain: { type: "string", minLength: 1 },
+          generationType: {
+            type: "string",
+            enum: ["prefix", "suffix", "implicit", "enchant", "unique", "rune"],
+          },
+          family: { type: "string", minLength: 1 },
           minItemLevel: { type: "integer", minimum: 0 },
           tier: { type: "integer", minimum: 1 },
+          tags: {
+            type: "array",
+            items: { type: "string", minLength: 1 },
+          },
+          stats: {
+            type: "array",
+            items: { $ref: "#/components/schemas/ModStat" },
+          },
+        },
+      },
+      ModStat: {
+        type: "object",
+        required: ["id", "text", "min", "max"],
+        properties: {
+          id: { type: "string", minLength: 1 },
+          text: { type: "string", minLength: 1 },
+          min: { type: "number" },
+          max: { type: "number" },
         },
       },
       ModCollection: {
@@ -464,6 +509,19 @@ export const openApiDocument = {
           name: { type: "string", minLength: 1 },
           kind: { type: "string", enum: ["skill", "support", "spirit"] },
           level: { type: "integer", minimum: 1 },
+          requiredLevel: { type: "integer", minimum: 0 },
+          tags: {
+            type: "array",
+            items: { type: "string", minLength: 1 },
+          },
+          attributeRequirements: {
+            type: "object",
+            properties: {
+              strength: { type: "integer", minimum: 0 },
+              dexterity: { type: "integer", minimum: 0 },
+              intelligence: { type: "integer", minimum: 0 },
+            },
+          },
         },
       },
       GemCollection: {
@@ -593,7 +651,14 @@ export const openApiDocument = {
       },
       DatasetCounts: {
         type: "object",
-        required: ["items", "uniques", "mods", "gems", "economy", "ladderBuilds"],
+        required: [
+          "items",
+          "uniques",
+          "mods",
+          "gems",
+          "economy",
+          "ladderBuilds",
+        ],
         properties: {
           items: { type: "integer", minimum: 0 },
           uniques: { type: "integer", minimum: 0 },
@@ -631,6 +696,7 @@ export type Item = z.infer<typeof itemSchema>;
 export type ItemCollection = z.infer<typeof itemCollectionSchema>;
 export type UniqueItem = z.infer<typeof uniqueItemSchema>;
 export type UniqueCollection = z.infer<typeof uniqueCollectionSchema>;
+export type ModStat = z.infer<typeof modStatSchema>;
 export type Mod = z.infer<typeof modSchema>;
 export type ModCollection = z.infer<typeof modCollectionSchema>;
 export type Gem = z.infer<typeof gemSchema>;

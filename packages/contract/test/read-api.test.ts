@@ -100,7 +100,19 @@ describe("phase 1 read API contract", () => {
             id: "mod-life-1",
             name: "+# to maximum Life",
             domain: "item",
+            generationType: "prefix",
+            family: "Life",
             minItemLevel: 1,
+            tier: 1,
+            tags: ["life", "defences"],
+            stats: [
+              {
+                id: "base_maximum_life",
+                text: "+# to maximum Life",
+                min: 80,
+                max: 99,
+              },
+            ],
           },
         ],
       }).mods,
@@ -110,7 +122,17 @@ describe("phase 1 read API contract", () => {
       gemCollectionSchema.parse({
         league: "Dawn of the Hunt",
         patch: "0.2.0",
-        gems: [{ id: "spark", name: "Spark", kind: "skill", level: 1 }],
+        gems: [
+          {
+            id: "spark",
+            name: "Spark",
+            kind: "skill",
+            level: 1,
+            requiredLevel: 1,
+            tags: ["spell", "lightning", "projectile"],
+            attributeRequirements: { intelligence: 10 },
+          },
+        ],
       }).gems,
     ).toHaveLength(1);
 
@@ -154,6 +176,14 @@ describe("phase 1 read API contract", () => {
     expect(openApiDocument.paths["/economy/{league}"]).toBeDefined();
     expect(openApiDocument.paths["/builds/ladder"]).toBeDefined();
     expect(openApiDocument.paths["/datasets/manifest"]).toBeDefined();
+    expect(openApiDocument.components.schemas.ModStat).toBeDefined();
+    expect(openApiDocument.components.schemas.Mod.properties.stats).toEqual({
+      type: "array",
+      items: { $ref: "#/components/schemas/ModStat" },
+    });
+    expect(
+      openApiDocument.components.schemas.Gem.properties.attributeRequirements,
+    ).toBeDefined();
     expect(openApiDocument.components.schemas.DatasetManifest).toBeDefined();
   });
 

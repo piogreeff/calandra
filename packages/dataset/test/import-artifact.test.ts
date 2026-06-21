@@ -47,10 +47,32 @@ describe("dataset artifact import", () => {
             id: "mod-life-1",
             name: "+# to maximum Life",
             domain: "item",
+            generationType: "prefix",
+            family: "Life",
             minItemLevel: 1,
+            tier: 1,
+            tags: ["life"],
+            stats: [
+              {
+                id: "base_maximum_life",
+                text: "+# to maximum Life",
+                min: 80,
+                max: 99,
+              },
+            ],
           },
         ],
-        gems: [{ id: "spark", name: "Spark", kind: "skill", level: 1 }],
+        gems: [
+          {
+            id: "spark",
+            name: "Spark",
+            kind: "skill",
+            level: 1,
+            requiredLevel: 1,
+            tags: ["spell", "lightning"],
+            attributeRequirements: { intelligence: 10 },
+          },
+        ],
         economy: [
           {
             id: "divine-orb",
@@ -83,6 +105,14 @@ describe("dataset artifact import", () => {
       gems: 1,
       economy: 1,
       ladderBuilds: 1,
+    });
+    expect(result.artifact.mods[0]?.stats?.[0]).toMatchObject({
+      id: "base_maximum_life",
+      min: 80,
+      max: 99,
+    });
+    expect(result.artifact.gems[0]?.attributeRequirements).toEqual({
+      intelligence: 10,
     });
   });
 
