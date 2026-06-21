@@ -1,5 +1,6 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { win32 } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -467,27 +468,23 @@ Item Level: 67
   });
 
   it("discovers supported local config backup files without recursive scraping", async () => {
-    const root = await createTempWindowsTree();
-    const gameDirectory = win32.join(root, "Path of Exile 2");
-    const lootFilterPath = win32.join(gameDirectory, "NeverSink.filter");
-    const buildPath = win32.join(
-      gameDirectory,
-      "BuildPlanner",
-      "Storm Monk.build",
-    );
-    const overlayPath = win32.join(gameDirectory, "Calandra", "overlay.json");
-    const ignoredLogPath = win32.join(gameDirectory, "Client.txt");
-    const ignoredNestedFilterPath = win32.join(
+    const root = await mkdtemp(join(tmpdir(), "calandra-desktop-"));
+    const gameDirectory = join(root, "Path of Exile 2");
+    const lootFilterPath = join(gameDirectory, "NeverSink.filter");
+    const buildPath = join(gameDirectory, "BuildPlanner", "Storm Monk.build");
+    const overlayPath = join(gameDirectory, "Calandra", "overlay.json");
+    const ignoredLogPath = join(gameDirectory, "Client.txt");
+    const ignoredNestedFilterPath = join(
       gameDirectory,
       "Filters",
       "nested.filter",
     );
 
     try {
-      await mkdir(win32.dirname(lootFilterPath), { recursive: true });
-      await mkdir(win32.dirname(buildPath), { recursive: true });
-      await mkdir(win32.dirname(overlayPath), { recursive: true });
-      await mkdir(win32.dirname(ignoredNestedFilterPath), { recursive: true });
+      await mkdir(dirname(lootFilterPath), { recursive: true });
+      await mkdir(dirname(buildPath), { recursive: true });
+      await mkdir(dirname(overlayPath), { recursive: true });
+      await mkdir(dirname(ignoredNestedFilterPath), { recursive: true });
       await writeFile(lootFilterPath, "filter", "utf8");
       await writeFile(buildPath, "[build]\n", "utf8");
       await writeFile(overlayPath, '{"opacity":0.8}\n', "utf8");

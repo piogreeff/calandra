@@ -1,4 +1,5 @@
 import { copyFile, mkdir, readdir, writeFile } from "node:fs/promises";
+import * as nativePath from "node:path";
 import { win32 } from "node:path";
 import {
   priceCheckRequestSchema,
@@ -345,21 +346,28 @@ export async function copyLocalConfigBackup(
 export async function discoverLocalConfigBackupFiles(
   gameDirectory: string,
 ): Promise<LocalBackupFileRequest[]> {
-  const gameRoot = win32.resolve(gameDirectory);
-  const buildPlannerDirectory = win32.join(gameRoot, "BuildPlanner");
-  const overlayConfigPath = win32.join(gameRoot, "Calandra", "overlay.json");
+  const pathApi = getFilesystemPathApi(gameDirectory);
+  const gameRoot = pathApi.resolve(gameDirectory);
+  const buildPlannerDirectory = pathApi.join(gameRoot, "BuildPlanner");
+  const overlayConfigPath = pathApi.join(gameRoot, "Calandra", "overlay.json");
   const files: LocalBackupFileRequest[] = [];
 
   files.push(
-    ...(await discoverDirectoryFiles(gameRoot, ".filter", "loot-filter")),
+    ...(await discoverDirectoryFiles(
+      gameRoot,
+      ".filter",
+      "loot-filter",
+      pathApi,
+    )),
     ...(await discoverDirectoryFiles(
       buildPlannerDirectory,
       ".build",
       "build-file",
+      pathApi,
     )),
   );
 
-  if (await isRegularFile(overlayConfigPath)) {
+  if (await isRegularFile(overlayConfigPath, pathApi)) {
     files.push({
       kind: "overlay-config",
       sourcePath: overlayConfigPath,
@@ -425,6 +433,7 @@ async function discoverDirectoryFiles(
   directory: string,
   extension: string,
   kind: LocalBackupFileKind,
+  pathApi: PathApi,
 ): Promise<LocalBackupFileRequest[]> {
   try {
     const entries = await readdir(directory, { withFileTypes: true });
@@ -437,7 +446,7 @@ async function discoverDirectoryFiles(
       .sort((left, right) => left.name.localeCompare(right.name))
       .map((entry) => ({
         kind,
-        sourcePath: win32.join(directory, entry.name),
+        sourcePath: pathApi.join(directory, entry.name),
       }));
   } catch (error) {
     if (isMissingFileError(error)) {
@@ -448,12 +457,12 @@ async function discoverDirectoryFiles(
   }
 }
 
-async function isRegularFile(path: string): Promise<boolean> {
+async function isRegularFile(path: string, pathApi: PathApi): Promise<boolean> {
   try {
-    const [entry] = await readdir(win32.dirname(path), {
+    const [entry] = await readdir(pathApi.dirname(path), {
       withFileTypes: true,
     }).then((entries) =>
-      entries.filter((entry) => entry.name === win32.basename(path)),
+      entries.filter((entry) => entry.name === pathApi.basename(path)),
     );
 
     return entry?.isFile() ?? false;
@@ -473,4 +482,15 @@ function isMissingFileError(error: unknown): boolean {
     "code" in error &&
     error.code === "ENOENT"
   );
+}
+
+type PathApi = Pick<
+  typeof nativePath,
+  "basename" | "dirname" | "join" | "resolve"
+>;
+
+function getFilesystemPathApi(path: string): PathApi {
+  return path.includes("\\") || /^[A-Za-z]:[\\/]/.test(path)
+    ? win32
+    : nativePath;
 }
