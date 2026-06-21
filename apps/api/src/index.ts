@@ -11,6 +11,7 @@ import {
   craftingEstimateResponseSchema,
   datasetArtifactSchema,
   datasetManifestSchema,
+  datasetSearchResponseSchema,
   type DatasetArtifact,
   type DatasetManifest,
   type UniqueImageCoverage,
@@ -397,6 +398,26 @@ api.get("/economy/:league", async (context) => {
       league,
       patch,
       prices: artifact?.economy ?? [],
+    }),
+  );
+});
+
+api.get("/search", async (context) => {
+  const search = getDatasetSearchQuery(context);
+  if (!search.ok) return context.json(search.body, 400);
+  const artifact = await getMatchingArtifact(context, search);
+  const query = normalizeSearchValue(search.q);
+
+  return context.json(
+    datasetSearchResponseSchema.parse({
+      league: search.league,
+      patch: search.patch,
+      query: search.q,
+      items: artifact?.items.filter((item) => matchesItem(item, query)) ?? [],
+      uniques:
+        artifact?.uniques.filter((item) => matchesItem(item, query)) ?? [],
+      mods: artifact?.mods.filter((mod) => matchesMod(mod, query)) ?? [],
+      gems: artifact?.gems.filter((gem) => matchesGem(gem, query)) ?? [],
     }),
   );
 });
@@ -802,6 +823,33 @@ function findPriceMatch(
   return nameMatch ? { price: nameMatch, matchedBy: "name" as const } : null;
 }
 
+function matchesItem(item: DatasetArtifact["items"][number], query: string) {
+  return [item.id, item.name, item.category, item.rarity].some((value) =>
+    normalizeSearchValue(value).includes(query),
+  );
+}
+
+function matchesMod(mod: DatasetArtifact["mods"][number], query: string) {
+  return [
+    mod.id,
+    mod.name,
+    mod.domain,
+    mod.generationType,
+    mod.family,
+    ...(mod.tags ?? []),
+    ...(mod.stats?.flatMap((stat) => [stat.id, stat.text]) ?? []),
+  ].some((value) => value && normalizeSearchValue(value).includes(query));
+}
+
+function matchesGem(gem: DatasetArtifact["gems"][number], query: string) {
+  return [
+    gem.id,
+    gem.name,
+    gem.kind,
+    ...(gem.tags ?? []),
+  ].some((value) => normalizeSearchValue(value).includes(query));
+}
+
 async function sha256Hex(value: string) {
   const digest = await crypto.subtle.digest(
     "SHA-256",
@@ -829,6 +877,20 @@ function getVersionedQuery(context: Context<{ Bindings: Bindings }>) {
   }
 
   return { ok: true as const, league, patch };
+}
+
+function getDatasetSearchQuery(context: Context<{ Bindings: Bindings }>) {
+  const version = getVersionedQuery(context);
+  const q = context.req.query("q")?.trim();
+
+  if (!version.ok || !q) {
+    return {
+      ok: false as const,
+      body: { error: "league, patch, and q query parameters are required" },
+    };
+  }
+
+  return { ok: true as const, league: version.league, patch: version.patch, q };
 }
 
 type DatasetBucket = {

@@ -353,6 +353,57 @@ describe("api routes", () => {
     );
   });
 
+  it("searches items, uniques, mods, and gems in one patch-versioned dataset query", async () => {
+    const response = await api.request(
+      "/search?league=Dawn%20of%20the%20Hunt&patch=0.2.0&q=life",
+      undefined,
+      datasetEnv,
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      league: "Dawn of the Hunt",
+      patch: "0.2.0",
+      query: "life",
+      items: [],
+      uniques: [],
+      mods: [
+        {
+          id: "mod-life-1",
+          name: "+# to maximum Life",
+          domain: "item",
+          generationType: "prefix",
+          family: "Life",
+          minItemLevel: 1,
+          tier: 1,
+          tags: ["life"],
+          stats: [
+            {
+              id: "base_maximum_life",
+              text: "+# to maximum Life",
+              min: 80,
+              max: 99,
+            },
+          ],
+        },
+      ],
+      gems: [],
+    });
+  });
+
+  it("requires a non-empty dataset search query", async () => {
+    const response = await api.request(
+      "/search?league=Dawn%20of%20the%20Hunt&patch=0.2.0&q=%20",
+      undefined,
+      datasetEnv,
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "league, patch, and q query parameters are required",
+    });
+  });
+
   it("synthesizes a manifest for an inline dev dataset artifact", async () => {
     const response = await api.request(
       "/datasets/manifest?league=Dawn%20of%20the%20Hunt&patch=0.2.0",

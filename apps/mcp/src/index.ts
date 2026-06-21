@@ -14,8 +14,8 @@ import {
   buyVsCraftResponseSchema,
   craftingEstimateRequestSchema,
   craftingEstimateResponseSchema,
+  datasetSearchResponseSchema,
   economyCollectionSchema,
-  itemCollectionSchema,
   priceCheckRequestSchema,
   priceCheckResponseSchema,
   upgradeAdvisorRequestSchema,
@@ -87,7 +87,7 @@ export function listCalandraMcpTools(): CalandraMcpTool[] {
     {
       name: "search_items",
       description:
-        "Search Calandra's patch-versioned item database by item name, id, category, or rarity.",
+        "Search Calandra's patch-versioned dataset across items, uniques, modifiers, and gems.",
       inputSchema: {
         type: "object",
         properties: {
@@ -309,17 +309,11 @@ async function searchItems(
   input: unknown,
 ) {
   const parsed = searchItemsInputSchema.parse(input);
-  const collection = itemCollectionSchema.parse(
+
+  return datasetSearchResponseSchema.parse(
     await fetchJson(
       fetchImplementation,
-      `${apiBaseUrl}/items?${versionedQuery(parsed)}`,
-    ),
-  );
-  const query = parsed.query.toLowerCase();
-
-  return collection.items.filter((item) =>
-    [item.id, item.name, item.category, item.rarity].some((value) =>
-      value.toLowerCase().includes(query),
+      `${apiBaseUrl}/search?${datasetSearchQuery(parsed)}`,
     ),
   );
 }
@@ -488,6 +482,20 @@ function versionedQuery(input: { league: string; patch: string }) {
   const params = new URLSearchParams({
     league: input.league,
     patch: input.patch,
+  });
+
+  return params.toString();
+}
+
+function datasetSearchQuery(input: {
+  league: string;
+  patch: string;
+  query: string;
+}) {
+  const params = new URLSearchParams({
+    league: input.league,
+    patch: input.patch,
+    q: input.query,
   });
 
   return params.toString();

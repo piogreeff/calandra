@@ -12,6 +12,7 @@ import {
   craftingEstimateResponseSchema,
   datasetArtifactSchema,
   datasetManifestSchema,
+  datasetSearchResponseSchema,
   economyCollectionSchema,
   gemCollectionSchema,
   ladderBuildCollectionSchema,
@@ -259,12 +260,57 @@ describe("phase 1 read API contract", () => {
     ).toHaveLength(1);
   });
 
+  it("models grouped dataset search results for the patch-versioned item database", () => {
+    const results = datasetSearchResponseSchema.parse({
+      league: "Dawn of the Hunt",
+      patch: "0.2.0",
+      query: "storm",
+      items: [],
+      uniques: [
+        {
+          id: "choir-of-the-storm",
+          name: "Choir of the Storm",
+          category: "amulet",
+          rarity: "unique",
+          iconUrl: "https://web.poecdn.com/image/example.png",
+          iconAttribution:
+            "Game art and item data are property of Grinding Gear Games.",
+        },
+      ],
+      mods: [
+        {
+          id: "storm-damage-prefix",
+          name: "+#% increased Storm Damage",
+          domain: "item",
+          minItemLevel: 1,
+        },
+      ],
+      gems: [
+        {
+          id: "storm-wave",
+          name: "Storm Wave",
+          kind: "skill",
+          level: 1,
+        },
+      ],
+    });
+
+    expect(results.query).toBe("storm");
+    expect(results.uniques[0]?.rarity).toBe("unique");
+    expect(results.mods[0]?.id).toBe("storm-damage-prefix");
+    expect(results.gems[0]?.name).toBe("Storm Wave");
+  });
+
   it("exports Phase 1 read endpoints in OpenAPI", () => {
     expect(openApiDocument.paths["/items/{id}"]).toBeDefined();
     expect(openApiDocument.paths["/uniques"]).toBeDefined();
     expect(openApiDocument.paths["/mods"]).toBeDefined();
     expect(openApiDocument.paths["/gems"]).toBeDefined();
     expect(openApiDocument.paths["/economy/{league}"]).toBeDefined();
+    expect(openApiDocument.paths["/search"]).toBeDefined();
+    expect(openApiDocument.paths["/search"]?.get?.operationId).toBe(
+      "searchDataset",
+    );
     expect(openApiDocument.paths["/builds/ladder"]).toBeDefined();
     expect(openApiDocument.paths["/datasets/manifest"]).toBeDefined();
     expect(openApiDocument.components.schemas.ModStat).toBeDefined();
@@ -276,6 +322,7 @@ describe("phase 1 read API contract", () => {
       openApiDocument.components.schemas.Gem.properties.attributeRequirements,
     ).toBeDefined();
     expect(openApiDocument.components.schemas.DatasetManifest).toBeDefined();
+    expect(openApiDocument.components.schemas.DatasetSearchResponse).toBeDefined();
     expect(
       openApiDocument.components.schemas.DatasetManifest.properties
         .qualityGates,

@@ -127,6 +127,15 @@ export const ladderBuildCollectionSchema = z.object({
   builds: z.array(ladderBuildSchema),
 });
 
+export const datasetSearchResponseSchema = z.object({
+  ...versionedCollectionFields,
+  query: z.string().min(1),
+  items: z.array(itemSchema),
+  uniques: z.array(uniqueItemSchema),
+  mods: z.array(modSchema),
+  gems: z.array(gemSchema),
+});
+
 export const accountSnapshotSourceSchema = z.enum([
   "official-poe2-character",
   "clipboard",
@@ -533,6 +542,36 @@ export const openApiDocument = {
                 schema: { $ref: "#/components/schemas/EconomyCollection" },
               },
             },
+          },
+        },
+      },
+    },
+    "/search": {
+      get: {
+        operationId: "searchDataset",
+        summary: "Search the patch-versioned item database",
+        parameters: [
+          ...versionedQueryParameters,
+          {
+            name: "q",
+            in: "query",
+            required: true,
+            schema: { type: "string", minLength: 1 },
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Grouped search results from the selected dataset",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/DatasetSearchResponse",
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Missing required league, patch, or q query parameter",
           },
         },
       },
@@ -1070,6 +1109,33 @@ export const openApiDocument = {
           },
         },
       },
+      DatasetSearchResponse: {
+        type: "object",
+        required: [
+          "league",
+          "patch",
+          "query",
+          "items",
+          "uniques",
+          "mods",
+          "gems",
+        ],
+        properties: {
+          league: { type: "string", minLength: 1 },
+          patch: { type: "string", minLength: 1 },
+          query: { type: "string", minLength: 1 },
+          items: {
+            type: "array",
+            items: { $ref: "#/components/schemas/Item" },
+          },
+          uniques: {
+            type: "array",
+            items: { $ref: "#/components/schemas/UniqueItem" },
+          },
+          mods: { type: "array", items: { $ref: "#/components/schemas/Mod" } },
+          gems: { type: "array", items: { $ref: "#/components/schemas/Gem" } },
+        },
+      },
       AccountSnapshotCapabilities: {
         type: "object",
         required: ["characters", "stashes"],
@@ -1549,6 +1615,9 @@ export type PriceCheckRequest = z.infer<typeof priceCheckRequestSchema>;
 export type PriceCheckResponse = z.infer<typeof priceCheckResponseSchema>;
 export type LadderBuild = z.infer<typeof ladderBuildSchema>;
 export type LadderBuildCollection = z.infer<typeof ladderBuildCollectionSchema>;
+export type DatasetSearchResponse = z.infer<
+  typeof datasetSearchResponseSchema
+>;
 export type AccountSnapshotSource = z.infer<typeof accountSnapshotSourceSchema>;
 export type AccountSnapshotCapabilities = z.infer<
   typeof accountSnapshotCapabilitiesSchema

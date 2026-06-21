@@ -23,11 +23,12 @@ describe("Calandra MCP tools", () => {
     ]);
   });
 
-  it("searches patch-versioned items through the Calandra API", async () => {
+  it("searches the patch-versioned dataset through the Calandra API", async () => {
     const fetch = vi.fn(async () =>
       jsonResponse({
         league: "Dawn of the Hunt",
         patch: "0.2.0",
+        query: "wand",
         items: [
           {
             id: "expert-siphoning-wand",
@@ -35,13 +36,10 @@ describe("Calandra MCP tools", () => {
             category: "wand",
             rarity: "magic",
           },
-          {
-            id: "advanced-altar-robe",
-            name: "Advanced Altar Robe",
-            category: "body-armour",
-            rarity: "normal",
-          },
         ],
+        uniques: [],
+        mods: [],
+        gems: [],
       }),
     );
     const server = createCalandraMcpServer({
@@ -56,17 +54,25 @@ describe("Calandra MCP tools", () => {
     });
 
     expect(fetch).toHaveBeenCalledWith(
-      "https://calandra-api.workers.dev/items?league=Dawn+of+the+Hunt&patch=0.2.0",
+      "https://calandra-api.workers.dev/search?league=Dawn+of+the+Hunt&patch=0.2.0&q=wand",
       undefined,
     );
-    expect(parseToolJson(result)).toEqual([
-      {
-        id: "expert-siphoning-wand",
-        name: "Expert Siphoning Wand",
-        category: "wand",
-        rarity: "magic",
-      },
-    ]);
+    expect(parseToolJson(result)).toEqual({
+      league: "Dawn of the Hunt",
+      patch: "0.2.0",
+      query: "wand",
+      items: [
+        {
+          id: "expert-siphoning-wand",
+          name: "Expert Siphoning Wand",
+          category: "wand",
+          rarity: "magic",
+        },
+      ],
+      uniques: [],
+      mods: [],
+      gems: [],
+    });
   });
 
   it("prices one item from the economy endpoint", async () => {
