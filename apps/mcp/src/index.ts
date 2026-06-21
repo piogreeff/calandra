@@ -8,6 +8,8 @@ import {
 import {
   accountSnapshotDiffRequestSchema,
   accountSnapshotDiffSchema,
+  accountSnapshotListResponseSchema,
+  accountSnapshotSchema,
   buyVsCraftRequestSchema,
   buyVsCraftResponseSchema,
   craftingEstimateRequestSchema,
@@ -28,6 +30,8 @@ export type CalandraMcpToolName =
   | "estimate_crafting"
   | "compare_buy_vs_craft"
   | "diff_snapshots"
+  | "list_snapshots"
+  | "get_snapshot"
   | "check_price"
   | "get_economy";
 
@@ -68,6 +72,14 @@ const economyInputSchema = z.object({
 
 const priceItemInputSchema = economyInputSchema.extend({
   item: z.string().min(1),
+});
+
+const listSnapshotsInputSchema = z.object({
+  account: z.string().min(1),
+});
+
+const getSnapshotInputSchema = listSnapshotsInputSchema.extend({
+  snapshotId: z.string().min(1),
 });
 
 export function listCalandraMcpTools(): CalandraMcpTool[] {
@@ -155,6 +167,31 @@ export function listCalandraMcpTools(): CalandraMcpTool[] {
       },
     },
     {
+      name: "list_snapshots",
+      description:
+        "List persisted Calandra account snapshots available for restore or diffing.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          account: { type: "string", minLength: 1 },
+        },
+        required: ["account"],
+      },
+    },
+    {
+      name: "get_snapshot",
+      description:
+        "Fetch one persisted Calandra account snapshot for restore or diffing.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          account: { type: "string", minLength: 1 },
+          snapshotId: { type: "string", minLength: 1 },
+        },
+        required: ["account", "snapshotId"],
+      },
+    },
+    {
       name: "check_price",
       description:
         "Check a parsed item against Calandra's patch-versioned economy data.",
@@ -213,6 +250,14 @@ export function createCalandraMcpServer(options: CalandraMcpServerOptions) {
         case "diff_snapshots":
           return jsonToolResult(
             await diffSnapshots(apiBaseUrl, fetchImplementation, input),
+          );
+        case "list_snapshots":
+          return jsonToolResult(
+            await listSnapshots(apiBaseUrl, fetchImplementation, input),
+          );
+        case "get_snapshot":
+          return jsonToolResult(
+            await getSnapshot(apiBaseUrl, fetchImplementation, input),
           );
         case "check_price":
           return jsonToolResult(
@@ -362,6 +407,36 @@ async function diffSnapshots(
       headers: { "content-type": "application/json" },
       body: JSON.stringify(request),
     }),
+  );
+}
+
+async function listSnapshots(
+  apiBaseUrl: string,
+  fetchImplementation: FetchLike,
+  input: unknown,
+) {
+  const parsed = listSnapshotsInputSchema.parse(input);
+
+  return accountSnapshotListResponseSchema.parse(
+    await fetchJson(
+      fetchImplementation,
+      `${apiBaseUrl}/snapshots/${encodeURIComponent(parsed.account)}`,
+    ),
+  );
+}
+
+async function getSnapshot(
+  apiBaseUrl: string,
+  fetchImplementation: FetchLike,
+  input: unknown,
+) {
+  const parsed = getSnapshotInputSchema.parse(input);
+
+  return accountSnapshotSchema.parse(
+    await fetchJson(
+      fetchImplementation,
+      `${apiBaseUrl}/snapshots/${encodeURIComponent(parsed.account)}/${encodeURIComponent(parsed.snapshotId)}`,
+    ),
   );
 }
 

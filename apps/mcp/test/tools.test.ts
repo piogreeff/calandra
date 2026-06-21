@@ -16,6 +16,8 @@ describe("Calandra MCP tools", () => {
       "estimate_crafting",
       "compare_buy_vs_craft",
       "diff_snapshots",
+      "list_snapshots",
+      "get_snapshot",
       "check_price",
       "get_economy",
     ]);
@@ -493,6 +495,92 @@ describe("Calandra MCP tools", () => {
     });
   });
 
+  it("routes account snapshot listings to the snapshot list endpoint", async () => {
+    const fetch = vi.fn(async () =>
+      jsonResponse({
+        source: "snapshot-store",
+        account: "example",
+        snapshots: [
+          {
+            account: "example",
+            snapshotId: "snapshot-2026-06-21T10-00-00Z",
+            objectKey: "snapshots/example/snapshot-2026-06-21T10-00-00Z.json",
+            uploadedAt: "2026-06-21T10:01:00.000Z",
+            size: 512,
+          },
+        ],
+      }),
+    );
+    const server = createCalandraMcpServer({
+      apiBaseUrl: "https://calandra-api.workers.dev",
+      fetch,
+    });
+
+    const result = await server.callTool("list_snapshots", {
+      account: "example",
+    });
+
+    expect(fetch).toHaveBeenCalledWith(
+      "https://calandra-api.workers.dev/snapshots/example",
+      undefined,
+    );
+    expect(parseToolJson(result)).toEqual({
+      source: "snapshot-store",
+      account: "example",
+      snapshots: [
+        {
+          account: "example",
+          snapshotId: "snapshot-2026-06-21T10-00-00Z",
+          objectKey: "snapshots/example/snapshot-2026-06-21T10-00-00Z.json",
+          uploadedAt: "2026-06-21T10:01:00.000Z",
+          size: 512,
+        },
+      ],
+    });
+  });
+
+  it("routes account snapshot restore reads to the snapshot endpoint", async () => {
+    const snapshot = {
+      id: "snapshot-2026-06-21T10-00-00Z",
+      account: "example",
+      capturedAt: "2026-06-21T10:00:00.000Z",
+      source: "official-poe2-character",
+      capabilities: { characters: true, stashes: false },
+      characters: [
+        {
+          id: "character-1",
+          name: "CalandraTest",
+          className: "Deadeye",
+          level: 73,
+          league: "Dawn of the Hunt",
+          equipment: [
+            {
+              slot: "gloves",
+              name: "Duskthread Grips",
+              stats: { life: 65 },
+            },
+          ],
+        },
+      ],
+    };
+    const fetch = vi.fn(async () => jsonResponse(snapshot));
+    const server = createCalandraMcpServer({
+      apiBaseUrl: "https://calandra-api.workers.dev",
+      fetch,
+    });
+
+    const result = await server.callTool("get_snapshot", {
+      account: "example",
+      snapshotId: "snapshot-2026-06-21T10-00-00Z",
+    });
+
+    expect(fetch).toHaveBeenCalledWith(
+      "https://calandra-api.workers.dev/snapshots/example/snapshot-2026-06-21T10-00-00Z",
+      undefined,
+    );
+    expect(parseToolJson(result)).toEqual(snapshot);
+  });
+
   it("routes parsed item price checks to the deterministic price endpoint", async () => {
     const fetch = vi.fn(async () =>
       jsonResponse({
@@ -619,6 +707,8 @@ describe("Calandra MCP tools", () => {
         "estimate_crafting",
         "compare_buy_vs_craft",
         "diff_snapshots",
+        "list_snapshots",
+        "get_snapshot",
         "check_price",
         "get_economy",
       ]);
