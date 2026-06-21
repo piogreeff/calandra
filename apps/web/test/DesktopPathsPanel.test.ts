@@ -5,6 +5,7 @@ import {
   createLocalConfigBackupRequest,
   createOverlayModeRequest,
   defaultLocalBackupDirectory,
+  formatClientLogEventLabel,
 } from "../src/components/DesktopPathsPanel";
 
 describe("DesktopPathsPanel helpers", () => {
@@ -66,6 +67,38 @@ describe("DesktopPathsPanel helpers", () => {
       overlayEnabled: true,
       userInitiated: true,
     });
+  });
+
+  it("formats watched Client.txt events for the desktop panel", () => {
+    expect(
+      formatClientLogEventLabel({
+        timestamp: "2026/06/21 13:52:10",
+        uptimeMs: 12345678,
+        channel: "INFO Client 1234",
+        message: "You have entered Clearfell.",
+        raw: "2026/06/21 13:52:10 12345678 abc [INFO Client 1234] : You have entered Clearfell.",
+        event: {
+          type: "area-entered",
+          areaName: "Clearfell",
+        },
+      }),
+    ).toBe("Entered Clearfell");
+
+    expect(
+      formatClientLogEventLabel({
+        timestamp: "2026/06/21 13:52:11",
+        uptimeMs: 12345679,
+        channel: "INFO Client 1234",
+        message: 'Generating level 68 area "The Riverbank" with seed 987654321',
+        raw: '2026/06/21 13:52:11 12345679 abc [INFO Client 1234] : Generating level 68 area "The Riverbank" with seed 987654321',
+        event: {
+          type: "area-generated",
+          areaName: "The Riverbank",
+          areaLevel: 68,
+          seed: "987654321",
+        },
+      }),
+    ).toBe("Generated The Riverbank level 68");
   });
 
   it("normalizes trailing separators before deriving the backup directory", () => {

@@ -6,6 +6,7 @@ import {
   getDesktopPoe2Paths,
   isTauriRuntime,
   readDesktopClientLogAppend,
+  readDesktopClientLogEvents,
   runDesktopLocalConfigBackup,
   setDesktopOverlayMode,
   subscribeDesktopClipboardHotkey,
@@ -165,6 +166,44 @@ describe("desktop bridge", () => {
       clientLogPath:
         "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2\\Client.txt",
       offset: 0,
+    });
+  });
+
+  it("reads and parses appended Client.txt events through the desktop bridge", async () => {
+    const invoke = vi.fn(async () => ({
+      cursorOffset: 178,
+      content:
+        "2026/06/21 13:52:11 12345679 abc [INFO Client 1234] : You have entered The Riverbank.\n",
+    }));
+
+    await expect(
+      readDesktopClientLogEvents(
+        {
+          clientLogPath:
+            "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2\\Client.txt",
+          offset: 91,
+        },
+        {
+          globals: { __TAURI_INTERNALS__: {} },
+          invoke,
+        },
+      ),
+    ).resolves.toMatchObject({
+      cursorOffset: 178,
+      lines: [
+        {
+          timestamp: "2026/06/21 13:52:11",
+          event: {
+            type: "area-entered",
+            areaName: "The Riverbank",
+          },
+        },
+      ],
+    });
+    expect(invoke).toHaveBeenCalledWith("read_client_log_append", {
+      clientLogPath:
+        "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2\\Client.txt",
+      offset: 91,
     });
   });
 

@@ -1,6 +1,13 @@
-import { parseItemText, toContractItem } from "@calandra/parser";
+import {
+  parseClientLogText,
+  parseItemText,
+  toContractItem,
+} from "@calandra/parser";
 import type { Item } from "@calandra/contract";
-import type { ParsedClipboardItem } from "@calandra/parser";
+import type {
+  ParsedClientLogLine,
+  ParsedClipboardItem,
+} from "@calandra/parser";
 
 export type DesktopPoe2Paths = {
   gameDirectory: string;
@@ -45,6 +52,11 @@ export type DesktopClientLogAppendRequest = {
 export type DesktopClientLogAppendResult = {
   cursorOffset: number;
   content: string;
+};
+
+export type DesktopClientLogEventsResult = {
+  cursorOffset: number;
+  lines: ParsedClientLogLine[];
 };
 
 export type DesktopClipboardItemCaptureRequest = {
@@ -222,6 +234,24 @@ export async function readDesktopClientLogAppend(
     "read_client_log_append",
     request,
   )) as DesktopClientLogAppendResult;
+}
+
+export async function readDesktopClientLogEvents(
+  request: DesktopClientLogAppendRequest,
+  options: {
+    globals?: TauriGlobals;
+    invoke?: Invoke;
+  } = {},
+): Promise<DesktopClientLogEventsResult> {
+  const append = await readDesktopClientLogAppend(request, options);
+
+  return {
+    cursorOffset: append.cursorOffset,
+    lines:
+      append.content.trim().length > 0
+        ? parseClientLogText(append.content)
+        : [],
+  };
 }
 
 export async function captureDesktopClipboardItem(

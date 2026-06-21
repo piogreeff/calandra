@@ -7,6 +7,7 @@ import {
   FolderOpen,
   Loader2,
   MonitorUp,
+  ScrollText,
   XCircle,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -14,6 +15,7 @@ import {
   captureDesktopClipboardItem,
   discoverDesktopLocalConfigBackupFiles,
   getDesktopPoe2Paths,
+  readDesktopClientLogEvents,
   runDesktopLocalConfigBackup,
   setDesktopOverlayMode,
   subscribeDesktopClipboardHotkey,
@@ -26,6 +28,7 @@ import {
   type DesktopOverlayModeRequest,
   type DesktopPoe2PathState,
 } from "../lib/desktop-bridge";
+import type { ParsedClientLogLine } from "@calandra/parser";
 
 type DesktopPathsPanelState =
   | { status: "loading" }
@@ -51,19 +54,37 @@ type OverlayModeState =
   | { status: "success"; plan: DesktopOverlayModePlan }
   | { status: "error"; overlayEnabled: boolean; message: string };
 
+type ClientLogWatchState =
+  | { status: "idle" }
+  | {
+      status: "watching";
+      cursorOffset: number;
+      events: ParsedClientLogLine[];
+    }
+  | { status: "error"; message: string };
+
 export function DesktopPathsPanel({
   loadPaths = getDesktopPoe2Paths,
   captureClipboardItem = captureDesktopClipboardItem,
+  readClientLogEvents = readDesktopClientLogEvents,
   setOverlayMode = setDesktopOverlayMode,
   subscribeClipboardHotkey = subscribeDesktopClipboardHotkey,
   discoverBackupFiles = discoverDesktopLocalConfigBackupFiles,
   runBackup = runDesktopLocalConfigBackup,
+  clientLogPollIntervalMs = defaultClientLogPollIntervalMs,
   now = defaultNow,
 }: {
   loadPaths?: () => Promise<DesktopPoe2PathState>;
   captureClipboardItem?: (
     request: DesktopClipboardItemCaptureRequest,
   ) => Promise<DesktopClipboardItemCapture>;
+  readClientLogEvents?: (request: {
+    clientLogPath: string;
+    offset: number;
+  }) => Promise<{
+    cursorOffset: number;
+    lines: ParsedClientLogLine[];
+  }>;
   setOverlayMode?: (
     request: DesktopOverlayModeRequest,
   ) => Promise<DesktopOverlayModePlan>;
@@ -76,6 +97,7 @@ export function DesktopPathsPanel({
   runBackup?: (
     request: DesktopLocalConfigBackupRequest,
   ) => Promise<DesktopLocalConfigBackupPlan>;
+  clientLogPollIntervalMs?: number;
   now?: () => Date;
 }) {
   const [state, setState] = useState<DesktopPathsPanelState>({
@@ -90,6 +112,9 @@ export function DesktopPathsPanel({
   const [overlayState, setOverlayState] = useState<OverlayModeState>({
     status: "idle",
     overlayEnabled: false,
+  });
+  const [clientLogState, setClientLogState] = useState<ClientLogWatchState>({
+    status: "idle",
   });
 
   useEffect(() => {
@@ -226,6 +251,69 @@ export function DesktopPathsPanel({
     };
   }, [handleClipboardCapture, paths, subscribeClipboardHotkey]);
 
+  useEffect(() => {
+    if (!paths) {
+      setClientLogState({ status: "idle" });
+      return;
+    }
+
+    let cancelled = false;
+    let initialized = false;
+    let cursorOffset = 0;
+    const clientLogPath = paths.clientLogPath;
+
+    async function pollClientLog() {
+      try {
+        const result = await readClientLogEvents({
+          clientLogPath,
+          offset: cursorOffset,
+        });
+
+        if (cancelled) return;
+
+        cursorOffset = result.cursorOffset;
+        if (!initialized) {
+          initialized = true;
+          setClientLogState({
+            status: "watching",
+            cursorOffset,
+            events: [],
+          });
+          return;
+        }
+
+        setClientLogState((current) => ({
+          status: "watching",
+          cursorOffset,
+          events: [
+            ...result.lines,
+            ...(current.status === "watching" ? current.events : []),
+          ].slice(0, 4),
+        }));
+      } catch (error) {
+        if (cancelled) return;
+        setClientLogState({
+          status: "error",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Client.txt watcher unavailable",
+        });
+      }
+    }
+
+    void pollClientLog();
+    const interval = window.setInterval(
+      () => void pollClientLog(),
+      clientLogPollIntervalMs,
+    );
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [clientLogPollIntervalMs, paths, readClientLogEvents]);
+
   return (
     <section className="min-w-0 rounded-lg border border-base-300/70 bg-base-200/72 p-4 shadow-sm shadow-black/10">
       <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-base-content">
@@ -250,6 +338,7 @@ export function DesktopPathsPanel({
           <PathRow label="Game folder" value={paths.gameDirectory} />
           <PathRow label="Client.txt" value={paths.clientLogPath} />
           <PathRow label="BuildPlanner" value={paths.buildPlannerDirectory} />
+          <ClientLogWatchStatus state={clientLogState} />
           <button
             type="button"
             className="btn btn-accent btn-sm w-full"
@@ -332,6 +421,8 @@ function defaultNow() {
   return new Date();
 }
 
+const defaultClientLogPollIntervalMs = 3_000;
+
 export function createLocalConfigBackupRequest({
   gameDirectory,
   capturedAt,
@@ -406,6 +497,61 @@ function ClipboardCaptureStatus({ state }: { state: ClipboardCaptureState }) {
       </div>
     </div>
   );
+}
+
+function ClientLogWatchStatus({ state }: { state: ClientLogWatchState }) {
+  if (state.status === "idle") {
+    return null;
+  }
+
+  if (state.status === "error") {
+    return (
+      <div className="rounded-md border border-error/35 bg-error/10 p-3 text-xs text-error">
+        <div className="flex items-center gap-2 font-semibold">
+          <XCircle className="size-4" aria-hidden="true" />
+          <span>{state.message}</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-md border border-base-300/70 bg-base-100/45 p-3 text-xs text-base-content/75">
+      <div className="mb-2 flex items-center gap-2 font-semibold text-base-content">
+        <ScrollText className="size-4 text-primary" aria-hidden="true" />
+        <span>Watching Client.txt</span>
+      </div>
+      {state.events.length > 0 ? (
+        <div className="space-y-2">
+          {state.events.map((event) => (
+            <div
+              key={`${event.timestamp}-${event.uptimeMs}-${event.message}`}
+              className="rounded-md bg-base-200/80 p-2"
+            >
+              <p className="font-medium text-base-content">
+                {formatClientLogEventLabel(event)}
+              </p>
+              <p className="mt-1 text-base-content/55">{event.timestamp}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-base-content/60">Waiting for new complete lines</p>
+      )}
+    </div>
+  );
+}
+
+export function formatClientLogEventLabel(event: ParsedClientLogLine) {
+  if (event.event.type === "area-entered") {
+    return `Entered ${event.event.areaName}`;
+  }
+
+  if (event.event.type === "area-generated") {
+    return `Generated ${event.event.areaName} level ${event.event.areaLevel}`;
+  }
+
+  return event.message;
 }
 
 function OverlayModeStatus({ state }: { state: OverlayModeState }) {
