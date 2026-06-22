@@ -1832,6 +1832,67 @@ Stack Size: 1/10
     });
   });
 
+  it("falls back to base type when price-checking rare clipboard items", async () => {
+    const response = await api.request(
+      "/price/check-text",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          league: "Dawn of the Hunt",
+          patch: "0.2.0",
+          text: `
+Item Class: Body Armours
+Rarity: Rare
+Dragon Shelter
+Advanced Altar Robe
+--------
+Item Level: 67
+--------
++72 to maximum Life
+`,
+        }),
+      },
+      {
+        APP_URL: "https://calandra.pages.dev",
+        DATASET_ARTIFACT_JSON: JSON.stringify({
+          league: "Dawn of the Hunt",
+          patch: "0.2.0",
+          generatedAt: "2026-06-21T00:00:00.000Z",
+          source: "published-artifact",
+          sources: datasetSources,
+          items: [],
+          uniques: [],
+          mods: [],
+          gems: [],
+          economy: [
+            {
+              id: "base/advanced-altar-robe",
+              name: "Advanced Altar Robe",
+              chaosEquivalent: 18,
+              updatedAt: "2026-06-21T00:00:00.000Z",
+            },
+          ],
+          ladderBuilds: [],
+        }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      price: {
+        id: "base/advanced-altar-robe",
+        name: "Advanced Altar Robe",
+        chaosEquivalent: 18,
+      },
+      matchedBy: "name",
+      parsedItem: {
+        name: "Dragon Shelter",
+        baseType: "Advanced Altar Robe",
+      },
+    });
+  });
+
   it("rejects raw clipboard text that is not a Path of Exile item", async () => {
     const response = await api.request(
       "/price/check-text",

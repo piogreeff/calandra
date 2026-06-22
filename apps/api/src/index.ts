@@ -1334,6 +1334,9 @@ api.post("/price/check-text", async (context) => {
   const artifact = await getMatchingArtifact(context, parsed.data);
   const responseVersion = getDatasetResponseVersion(artifact, parsed.data);
   const priceMatch = findPriceMatch(artifact?.economy ?? [], item);
+  const baseTypePriceMatch = priceMatch
+    ? null
+    : findParsedItemBaseTypePriceMatch(artifact?.economy ?? [], parsedItem);
 
   return context.json(
     priceCheckTextResponseSchema.parse({
@@ -1341,8 +1344,9 @@ api.post("/price/check-text", async (context) => {
       ...responseVersion,
       item,
       parsedItem,
-      price: priceMatch?.price ?? null,
-      matchedBy: priceMatch?.matchedBy ?? null,
+      price: priceMatch?.price ?? baseTypePriceMatch?.price ?? null,
+      matchedBy:
+        priceMatch?.matchedBy ?? baseTypePriceMatch?.matchedBy ?? null,
     }),
   );
 });
@@ -2054,6 +2058,23 @@ function findPriceMatch(
   );
 
   return nameMatch ? { price: nameMatch, matchedBy: "name" as const } : null;
+}
+
+function findParsedItemBaseTypePriceMatch(
+  prices: DatasetArtifact["economy"],
+  item: ReturnType<typeof parseItemText>,
+) {
+  const baseType = item.baseType;
+  if (!baseType) {
+    return null;
+  }
+
+  const normalizedBaseType = normalizeSearchValue(baseType);
+  const price = prices.find(
+    (candidate) => normalizeSearchValue(candidate.name) === normalizedBaseType,
+  );
+
+  return price ? { price, matchedBy: "name" as const } : null;
 }
 
 function toCraftingModPool(mods: DatasetArtifact["mods"]) {
