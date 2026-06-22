@@ -73,13 +73,24 @@ export function parseStatusResponse(raw: string): HostedOAuthStatus {
 export function evaluateHostedOAuthReadiness(input: {
   secretNames: readonly string[];
   status: HostedOAuthStatus;
+  expectedRedirectUri?: string;
 }) {
   const secretSet = new Set(input.secretNames);
   const issues: string[] = [];
   const warnings: string[] = [];
+  const expectedRedirectUri = input.expectedRedirectUri?.trim();
 
   if (!input.status.configured) {
     issues.push("live API reports GGG OAuth is not configured");
+  }
+
+  if (
+    expectedRedirectUri &&
+    input.status.redirectUri !== expectedRedirectUri
+  ) {
+    issues.push(
+      `live API redirect URI ${input.status.redirectUri} does not match registered GGG redirect URI ${expectedRedirectUri}`,
+    );
   }
 
   for (const name of requiredSecretNames) {
@@ -115,6 +126,9 @@ async function main() {
   }
 
   const apiUrl = getArgValue("--api-url") ?? defaultApiUrl;
+  const expectedRedirectUri =
+    getArgValue("--registered-redirect-uri") ??
+    process.env.GGG_OAUTH_REDIRECT_URI;
   const wrangler = getWranglerSecretListCommand();
   const secretListOutput = execFileSync(wrangler.command, wrangler.args, {
     cwd: wrangler.cwd,
@@ -126,11 +140,18 @@ async function main() {
   const statusBody = await statusResponse.text();
   const secretNames = parseSecretList(secretListOutput);
   const status = parseStatusResponse(statusBody);
-  const readiness = evaluateHostedOAuthReadiness({ secretNames, status });
+  const readiness = evaluateHostedOAuthReadiness({
+    secretNames,
+    status,
+    expectedRedirectUri,
+  });
 
   console.log(`Calandra hosted OAuth readiness`);
   console.log(`API: ${apiUrl}`);
   console.log(`Redirect: ${status.redirectUri}`);
+  if (expectedRedirectUri) {
+    console.log(`Registered redirect: ${expectedRedirectUri}`);
+  }
   console.log(
     `Account linking: ${status.accountLinking ? "enabled" : "disabled"}`,
   );
@@ -159,7 +180,7 @@ function getArgValue(name: string) {
 
 function printHelp() {
   console.log(
-    "Usage: pnpm hosted:oauth:check [--api-url=https://calandra-api.piogreeff.workers.dev]",
+    "Usage: pnpm hosted:oauth:check [--api-url=https://calandra-api.piogreeff.workers.dev] [--registered-redirect-uri=https://calandra.pages.dev/auth/ggg/callback]",
   );
 }
 

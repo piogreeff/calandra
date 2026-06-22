@@ -73,6 +73,7 @@ type Bindings = {
   GGG_API_BASE_URL?: string;
   GGG_OAUTH_CLIENT_ID?: string;
   GGG_OAUTH_CLIENT_SECRET?: string;
+  GGG_OAUTH_REDIRECT_URI?: string;
   GGG_OAUTH_TOKEN_URL?: string;
   GGG_TOKEN_ENCRYPTION_KEY?: string;
   GGG_TOKEN_R2_PREFIX?: string;
@@ -1393,6 +1394,10 @@ function isGggOAuthSnapshotCaptureConfigured(
 }
 
 function getGggOAuthRedirectUri(context: Context<{ Bindings: Bindings }>) {
+  if (context.env.GGG_OAUTH_REDIRECT_URI?.trim()) {
+    return context.env.GGG_OAUTH_REDIRECT_URI.trim();
+  }
+
   const appUrl = context.env.APP_URL ?? "https://calandra.pages.dev";
 
   return `${appUrl.replace(/\/$/, "")}/auth/ggg/callback`;

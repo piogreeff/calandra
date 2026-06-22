@@ -236,6 +236,19 @@ describe("api routes", () => {
     expect(JSON.stringify(body)).not.toContain("SNAPSHOT_WRITE_TOKEN");
   });
 
+  it("returns the registered GGG OAuth redirect URI when it is configured explicitly", async () => {
+    const response = await api.request("/auth/ggg/status", undefined, {
+      APP_URL: "https://calandra.pages.dev",
+      GGG_OAUTH_REDIRECT_URI:
+        "https://oauth.calandra.pages.dev/auth/ggg/callback",
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      redirectUri: "https://oauth.calandra.pages.dev/auth/ggg/callback",
+    });
+  });
+
   it("returns disabled GGG OAuth status without exposing missing secrets", async () => {
     const response = await api.request("/auth/ggg/status", undefined, {
       APP_URL: "https://calandra.pages.dev",
@@ -1725,6 +1738,52 @@ describe("api routes", () => {
     expect(storedObjects).toHaveLength(1);
     expect(storedObjects[0]?.key).toBe(`oauth/ggg/pending/${body.state}.json`);
     expect(storedObjects[0]?.value).toContain("codeVerifier");
+  });
+
+  it("starts browser-safe GGG OAuth with the registered redirect URI from Worker config", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-21T10:00:00.000Z"));
+    const storedObjects: Array<{ key: string; value: string }> = [];
+
+    const response = await api.request(
+      "/auth/ggg/start",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ account: "example" }),
+      },
+      {
+        APP_URL: "https://calandra.pages.dev",
+        GGG_OAUTH_REDIRECT_URI:
+          "https://oauth.calandra.pages.dev/auth/ggg/callback",
+        GGG_OAUTH_CLIENT_ID: "calandra-client-id",
+        GGG_TOKEN_R2_PREFIX: "oauth/ggg",
+        SNAPSHOT_BUCKET: {
+          async put(key: string, value: string) {
+            storedObjects.push({ key, value });
+          },
+        },
+      },
+    );
+
+    expect(response.status).toBe(201);
+    const body = (await response.json()) as {
+      authorizationUrl: string;
+      state: string;
+      redirectUri: string;
+    };
+    const authorizationUrl = new URL(body.authorizationUrl);
+
+    expect(body.redirectUri).toBe(
+      "https://oauth.calandra.pages.dev/auth/ggg/callback",
+    );
+    expect(authorizationUrl.searchParams.get("redirect_uri")).toBe(
+      "https://oauth.calandra.pages.dev/auth/ggg/callback",
+    );
+    expect(storedObjects).toHaveLength(1);
+    expect(JSON.parse(storedObjects[0]?.value ?? "{}")).toMatchObject({
+      redirectUri: "https://oauth.calandra.pages.dev/auth/ggg/callback",
+    });
   });
 
   it("completes browser-safe GGG OAuth and stores encrypted tokens without a write token", async () => {

@@ -79,6 +79,31 @@ describe("hosted OAuth readiness check", () => {
     });
   });
 
+  it("reports a mismatched hosted OAuth redirect URI", () => {
+    expect(
+      evaluateHostedOAuthReadiness({
+        secretNames: ["GGG_OAUTH_CLIENT_ID", "GGG_TOKEN_ENCRYPTION_KEY"],
+        expectedRedirectUri:
+          "https://calandra.pages.dev/auth/ggg/callback",
+        status: {
+          configured: true,
+          redirectUri:
+            "https://wrong-calandra.pages.dev/auth/ggg/callback",
+          accountLinking: true,
+          snapshotCapture: true,
+        },
+      }),
+    ).toEqual({
+      ok: false,
+      issues: [
+        "live API redirect URI https://wrong-calandra.pages.dev/auth/ggg/callback does not match registered GGG redirect URI https://calandra.pages.dev/auth/ggg/callback",
+      ],
+      warnings: [
+        "GGG_OAUTH_CLIENT_SECRET is not present; token exchange only works if the GGG app is public",
+      ],
+    });
+  });
+
   it("starts as a tsx CLI without calling the network for help", () => {
     const output = execFileSync(
       process.execPath,

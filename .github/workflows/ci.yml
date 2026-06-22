@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Secret scan
-        run: docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest detect --no-git --source=/repo --redact --verbose
+        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:latest detect --no-git --source=/repo --redact --verbose
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
