@@ -1,4 +1,4 @@
-export type DatasetCliOptions = {
+export type DatasetArtifactCliOptions = {
   artifactPath: string;
   manifestPath?: string;
   publishDirectory?: string;
@@ -8,6 +8,18 @@ export type DatasetCliOptions = {
   expectedUniqueCount?: number;
   minimumUniqueImageCoverage?: number;
 };
+
+export type MaintainerArtifactBuildCliOptions = {
+  mode: "build-artifact";
+  normalizedPath: string;
+  outputArtifactPath: string;
+  executionContext: "maintainer" | "client" | "self-host";
+  sourceUrls: string[];
+};
+
+export type DatasetCliOptions =
+  | DatasetArtifactCliOptions
+  | MaintainerArtifactBuildCliOptions;
 
 export function parseDatasetCliArgs(args: string[]): DatasetCliOptions {
   const scrapeFlag = args.find(
@@ -19,6 +31,31 @@ export function parseDatasetCliArgs(args: string[]): DatasetCliOptions {
     throw new Error(
       "Self-host imports must consume a published dataset artifact; scraper targets are maintainer-only.",
     );
+  }
+
+  const normalizedPath = getFlagValue(args, "--maintainer-normalized");
+  if (normalizedPath) {
+    const outputArtifactPath = getFlagValue(args, "--output-artifact");
+    const executionContext = getFlagValue(args, "--execution-context");
+    const sourceUrls = getFlagValues(args, "--source-url");
+
+    if (!outputArtifactPath || !executionContext || sourceUrls.length === 0) {
+      throw new Error(
+        "Usage: pnpm dataset:import -- --maintainer-normalized <path> --output-artifact <path> --execution-context maintainer --source-url <url>",
+      );
+    }
+
+    if (!isDatasetExecutionContext(executionContext)) {
+      throw new Error("--execution-context must be maintainer, client, or self-host");
+    }
+
+    return {
+      mode: "build-artifact",
+      normalizedPath,
+      outputArtifactPath,
+      executionContext,
+      sourceUrls,
+    };
   }
 
   const artifactPath = getFlagValue(args, "--artifact");
@@ -63,6 +100,20 @@ function getFlagValue(args: string[], flag: string) {
   return index >= 0 ? args[index + 1] : undefined;
 }
 
+function getFlagValues(args: string[], flag: string) {
+  const values: string[] = [];
+
+  args.forEach((argument, index) => {
+    const value = args[index + 1];
+
+    if (argument === flag && value) {
+      values.push(value);
+    }
+  });
+
+  return values;
+}
+
 function getOptionalNumberFlag(args: string[], flag: string) {
   const value = getFlagValue(args, flag);
 
@@ -76,4 +127,10 @@ function getOptionalNumberFlag(args: string[], flag: string) {
   }
 
   return parsed;
+}
+
+function isDatasetExecutionContext(
+  value: string,
+): value is MaintainerArtifactBuildCliOptions["executionContext"] {
+  return value === "maintainer" || value === "client" || value === "self-host";
 }

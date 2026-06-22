@@ -34,6 +34,29 @@ describe("dataset CLI args", () => {
     });
   });
 
+  it("parses maintainer-normalized artifact build options", () => {
+    expect(
+      parseDatasetCliArgs([
+        "--maintainer-normalized",
+        "normalized.json",
+        "--output-artifact",
+        "artifact.json",
+        "--execution-context",
+        "maintainer",
+        "--source-url",
+        "https://poe2db.tw/us/",
+        "--source-url",
+        "https://poe.ninja/poe2",
+      ]),
+    ).toEqual({
+      mode: "build-artifact",
+      normalizedPath: "normalized.json",
+      outputArtifactPath: "artifact.json",
+      executionContext: "maintainer",
+      sourceUrls: ["https://poe2db.tw/us/", "https://poe.ninja/poe2"],
+    });
+  });
+
   it("rejects scraper-like flags", () => {
     expect(() =>
       parseDatasetCliArgs([
