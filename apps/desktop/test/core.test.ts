@@ -9,8 +9,10 @@ import {
   LocalBackupRejectedError,
   captureClipboardItemText,
   copyLocalConfigBackup,
+  createBuildPlannerFileContent,
   createInitialClientLogCursor,
   discoverLocalConfigBackupFiles,
+  exportBuildPlannerRecommendation,
   getDefaultPoe2Paths,
   planLocalConfigBackup,
   planBuildFileWrite,
@@ -307,6 +309,87 @@ Item Level: 67
       );
       await expect(readFile(plan.outputPath, "utf8")).resolves.toBe(
         "[build]\nname=Storm Monk\n",
+      );
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("generates deterministic BuildPlanner content from a recommendation", () => {
+    const content = createBuildPlannerFileContent({
+      name: "Storm Monk",
+      className: "Monk",
+      level: 73,
+      league: "Dawn of the Hunt",
+      patch: "0.2.0",
+      mainSkill: "Tempest Flurry",
+      passiveSkillIds: ["passive-1", "passive-2"],
+      equipment: [
+        { slot: "Gloves", name: "Duskthread Grips" },
+        { slot: "Boots", name: "Wanderstep Boots" },
+      ],
+      upgrades: [
+        {
+          slot: "Gloves",
+          currentName: "Frayed Mail Mitts",
+          candidateName: "Duskthread Grips",
+          scoreDelta: 60,
+          estimatedCostChaos: 12,
+        },
+      ],
+    });
+
+    expect(content).toBe(
+      [
+        "# Calandra BuildPlanner export",
+        "name=Storm Monk",
+        "class=Monk",
+        "level=73",
+        "league=Dawn of the Hunt",
+        "patch=0.2.0",
+        "mainSkill=Tempest Flurry",
+        "",
+        "[passives]",
+        "passive-1",
+        "passive-2",
+        "",
+        "[equipment]",
+        "Gloves=Duskthread Grips",
+        "Boots=Wanderstep Boots",
+        "",
+        "[upgrades]",
+        "Gloves=Duskthread Grips over Frayed Mail Mitts (+60, 12 chaos)",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  it("exports a generated BuildPlanner recommendation through the guarded write path", async () => {
+    const root = await createTempWindowsTree();
+    const buildPlannerDirectory = win32.join(root, "BuildPlanner");
+
+    try {
+      const plan = await exportBuildPlannerRecommendation({
+        buildPlannerDirectory,
+        actionId: "advisor-export-006",
+        userInitiated: true,
+        recommendation: {
+          name: "Storm Monk",
+          className: "Monk",
+          level: 73,
+          league: "Dawn of the Hunt",
+          patch: "0.2.0",
+          passiveSkillIds: ["passive-1"],
+          equipment: [{ slot: "Gloves", name: "Duskthread Grips" }],
+          upgrades: [],
+        },
+      });
+
+      expect(plan.outputPath).toBe(
+        win32.join(buildPlannerDirectory, "Storm Monk.build"),
+      );
+      await expect(readFile(plan.outputPath, "utf8")).resolves.toContain(
+        "name=Storm Monk\nclass=Monk",
       );
     } finally {
       await rm(root, { recursive: true, force: true });

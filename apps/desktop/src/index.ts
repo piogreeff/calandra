@@ -92,6 +92,38 @@ export interface BuildFileWritePlan {
   content: string;
 }
 
+export interface BuildPlannerEquipmentLine {
+  slot: string;
+  name: string;
+}
+
+export interface BuildPlannerUpgradeLine {
+  slot: string;
+  currentName: string;
+  candidateName: string;
+  scoreDelta: number;
+  estimatedCostChaos?: number;
+}
+
+export interface BuildPlannerRecommendation {
+  name: string;
+  className: string;
+  level: number;
+  league: string;
+  patch: string;
+  mainSkill?: string;
+  passiveSkillIds: string[];
+  equipment: BuildPlannerEquipmentLine[];
+  upgrades: BuildPlannerUpgradeLine[];
+}
+
+export interface BuildPlannerExportRequest {
+  buildPlannerDirectory: string;
+  actionId: string;
+  userInitiated: boolean;
+  recommendation: BuildPlannerRecommendation;
+}
+
 export type LocalBackupFileKind =
   | "loot-filter"
   | "build-file"
@@ -271,6 +303,42 @@ export async function writeBuildFile(
   return plan;
 }
 
+export function createBuildPlannerFileContent(
+  recommendation: BuildPlannerRecommendation,
+) {
+  return [
+    "# Calandra BuildPlanner export",
+    `name=${recommendation.name}`,
+    `class=${recommendation.className}`,
+    `level=${recommendation.level}`,
+    `league=${recommendation.league}`,
+    `patch=${recommendation.patch}`,
+    `mainSkill=${recommendation.mainSkill ?? ""}`,
+    "",
+    "[passives]",
+    ...recommendation.passiveSkillIds,
+    "",
+    "[equipment]",
+    ...recommendation.equipment.map((item) => `${item.slot}=${item.name}`),
+    "",
+    "[upgrades]",
+    ...recommendation.upgrades.map(formatBuildPlannerUpgrade),
+    "",
+  ].join("\n");
+}
+
+export async function exportBuildPlannerRecommendation(
+  request: BuildPlannerExportRequest,
+): Promise<BuildFileWritePlan> {
+  return writeBuildFile({
+    buildPlannerDirectory: request.buildPlannerDirectory,
+    fileName: request.recommendation.name,
+    content: createBuildPlannerFileContent(request.recommendation),
+    actionId: request.actionId,
+    userInitiated: request.userInitiated,
+  });
+}
+
 export function planLocalConfigBackup(
   request: LocalBackupRequest,
 ): LocalBackupPlan {
@@ -388,6 +456,15 @@ function stripTrailingSeparators(path: string): string {
 
 function normalizeBaseUrl(apiBaseUrl: string) {
   return apiBaseUrl.replace(/\/+$/, "");
+}
+
+function formatBuildPlannerUpgrade(upgrade: BuildPlannerUpgradeLine) {
+  const cost =
+    upgrade.estimatedCostChaos === undefined
+      ? "unpriced"
+      : `${upgrade.estimatedCostChaos} chaos`;
+
+  return `${upgrade.slot}=${upgrade.candidateName} over ${upgrade.currentName} (+${upgrade.scoreDelta}, ${cost})`;
 }
 
 function normalizeBuildFileName(fileName: string): string {
