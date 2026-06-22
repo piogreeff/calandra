@@ -170,13 +170,73 @@ describe("dashboard read API client", () => {
     );
 
     expect(fetchImplementation).toHaveBeenCalledWith(
-      "https://calandra-api.piogreeff.workers.dev/datasets/visual-summary?league=Dawn+of+the+Hunt&patch=0.2.0",
+      "https://calandra-api.piogreeff.workers.dev/datasets/visual-summary?league=Dawn+of+the+Hunt&patch=0.2.0&_calandraRev=2026-06-22-r2-visual-16",
     );
     expect(summary.source).toBe("api");
     expect(summary.response.totalVisualItems).toBe(3);
     expect(summary.response.categories[0]?.featured[0]?.name).toBe(
       "Choir of the Storm",
     );
+  });
+
+  it("opts out of Next build-time fetch caching for default dashboard reads", async () => {
+    const fetchImplementation = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        Response.json({
+          source: "published-dataset",
+          league: "Dawn of the Hunt",
+          patch: "0.2.0",
+          totalItems: 0,
+          totalUniques: 0,
+          totalVisualItems: 0,
+          categories: [],
+        }),
+    );
+    vi.stubGlobal("fetch", fetchImplementation);
+
+    await getDashboardDatasetVisualSummary(
+      "https://calandra-api.piogreeff.workers.dev",
+    );
+
+    expect(fetchImplementation).toHaveBeenCalledWith(
+      "https://calandra-api.piogreeff.workers.dev/datasets/visual-summary?league=Dawn+of+the+Hunt&patch=0.2.0&_calandraRev=2026-06-22-r2-visual-16",
+      { cache: "no-store" },
+    );
+  });
+
+  it("adds a static export dataset revision to artifact-backed dashboard reads", async () => {
+    const fetchImplementation = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        Response.json({
+          source: "published-dataset",
+          league: "Dawn of the Hunt",
+          patch: "0.2.0",
+          totalItems: 0,
+          totalUniques: 0,
+          totalVisualItems: 0,
+          categories: [],
+        }),
+    );
+    const originalNextOutput = process.env["NEXT_OUTPUT"];
+    process.env["NEXT_OUTPUT"] = "export";
+    vi.stubGlobal("fetch", fetchImplementation);
+
+    try {
+      await getDashboardDatasetVisualSummary(
+        "https://calandra-api.piogreeff.workers.dev",
+      );
+
+      expect(String(fetchImplementation.mock.calls[0]?.[0])).toContain(
+        "_calandraRev=2026-06-22-r2-visual-16",
+      );
+      expect(fetchImplementation.mock.calls[0]?.[1]).toBeUndefined();
+    } finally {
+      if (originalNextOutput === undefined) {
+        delete process.env["NEXT_OUTPUT"];
+      } else {
+        process.env["NEXT_OUTPUT"] = originalNextOutput;
+      }
+    }
   });
 
   it("falls back to a visual summary from demo dataset rows when the API is unavailable", async () => {
@@ -195,7 +255,7 @@ describe("dashboard read API client", () => {
     const fetchImplementation = vi.fn(
       async (input: RequestInfo | URL, init) => {
         expect(String(input)).toBe(
-          "https://calandra-api.piogreeff.workers.dev/crafting/estimate-from-dataset?league=Dawn+of+the+Hunt&patch=0.2.0",
+          "https://calandra-api.piogreeff.workers.dev/crafting/estimate-from-dataset?league=Dawn+of+the+Hunt&patch=0.2.0&_calandraRev=2026-06-22-r2-visual-16",
         );
         expect(init).toMatchObject({
           method: "POST",
@@ -389,7 +449,7 @@ describe("dashboard read API client", () => {
     );
 
     expect(fetchImplementation).toHaveBeenCalledWith(
-      "https://calandra-api.piogreeff.workers.dev/search?league=Dawn+of+the+Hunt&patch=0.2.0&q=demo",
+      "https://calandra-api.piogreeff.workers.dev/search?league=Dawn+of+the+Hunt&patch=0.2.0&q=demo&_calandraRev=2026-06-22-r2-visual-16",
     );
     expect(results.source).toBe("api");
     expect(results.items[0]?.name).toBe("Calandra Demo Wand");
@@ -433,7 +493,7 @@ describe("dashboard read API client", () => {
     );
 
     expect(fetchImplementation).toHaveBeenCalledWith(
-      "https://calandra-api.piogreeff.workers.dev/builds/ladder?league=Dawn+of+the+Hunt&patch=0.2.0&className=Deadeye&skill=Lightning&limit=10",
+      "https://calandra-api.piogreeff.workers.dev/builds/ladder?league=Dawn+of+the+Hunt&patch=0.2.0&_calandraRev=2026-06-22-r2-visual-16&className=Deadeye&skill=Lightning&limit=10",
     );
     expect(builds.source).toBe("api");
     expect(builds.builds[0]).toMatchObject({
@@ -485,7 +545,7 @@ describe("dashboard read API client", () => {
     );
 
     expect(fetchImplementation).toHaveBeenCalledWith(
-      "https://calandra-api.piogreeff.workers.dev/builds/ladder/deadeye-1?league=Dawn+of+the+Hunt&patch=0.2.0",
+      "https://calandra-api.piogreeff.workers.dev/builds/ladder/deadeye-1?league=Dawn+of+the+Hunt&patch=0.2.0&_calandraRev=2026-06-22-r2-visual-16",
     );
     expect(build.source).toBe("api");
     expect(build.build?.equipment?.[0]).toMatchObject({
@@ -520,7 +580,7 @@ describe("dashboard read API client", () => {
     const fetchImplementation = vi.fn(
       async (input: RequestInfo | URL, init) => {
         expect(String(input)).toBe(
-          "https://calandra-api.piogreeff.workers.dev/advisor/snapshots/example/snapshot-2026-06-21T10-00-00Z?league=Dawn+of+the+Hunt&patch=0.2.0",
+          "https://calandra-api.piogreeff.workers.dev/advisor/snapshots/example/snapshot-2026-06-21T10-00-00Z?league=Dawn+of+the+Hunt&patch=0.2.0&_calandraRev=2026-06-22-r2-visual-16",
         );
         expect(init).toMatchObject({
           method: "POST",

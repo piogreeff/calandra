@@ -382,6 +382,8 @@ export default async function Home({
             </div>
 
             <div className="min-w-0 space-y-4">
+              <DatasetVisualCatalogPanel visualSummary={datasetVisualSummary} />
+
               <section
                 className="grid grid-cols-[minmax(0,1fr)] gap-4 md:grid-cols-3"
                 aria-label="Readiness summary"
@@ -971,8 +973,6 @@ export default async function Home({
                 )}
               </Panel>
 
-              <DatasetVisualCatalogPanel visualSummary={datasetVisualSummary} />
-
               <Panel
                 title="Dataset manifest"
                 icon={<Database className="size-4" aria-hidden="true" />}
@@ -1338,27 +1338,53 @@ function DatasetVisualCatalogPanel({
 }: {
   visualSummary: DashboardDatasetVisualSummary;
 }) {
-  const categories = visualSummary.response.categories.slice(0, 4);
+  const categories = visualSummary.response.categories
+    .filter((category) =>
+      category.featured.some((item) => isUsableVisualIcon(item.iconUrl)),
+    )
+    .slice(0, 12);
+  const uniqueImageCoverage = visualSummary.response.uniqueImageCoverage;
 
   return (
     <Panel
-      title="Visual item catalog"
+      id="visual-catalog"
+      title="Browse image-backed gear"
       icon={<ImageIcon className="size-4" aria-hidden="true" />}
     >
-      <div className="mb-3 rounded-md border border-info/30 bg-info/10 p-3 text-xs font-medium text-info">
+      <div className="mb-4 grid gap-3 md:grid-cols-3">
+        <MetricTile
+          label="Visual item catalog"
+          value={`${visualSummary.response.totalVisualItems}`}
+        />
+        <MetricTile label="Categories" value={`${categories.length}`} />
+        <MetricTile
+          label="Unique images"
+          value={
+            uniqueImageCoverage
+              ? formatCoveragePercent(uniqueImageCoverage.ratio)
+              : "Unknown"
+          }
+        />
+      </div>
+
+      <div className="mb-4 rounded-md border border-info/30 bg-info/10 p-3 text-xs font-medium text-info">
         {visualSummary.source === "api"
           ? "Published R2 artifact"
           : "Demo fallback"}{" "}
         - {visualSummary.response.totalVisualItems} image-backed records
+        {uniqueImageCoverage
+          ? ` - ${uniqueImageCoverage.resolved} / ${uniqueImageCoverage.expected} unique images`
+          : ""}
       </div>
-      <div className="space-y-3">
+
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-3 md:grid-cols-2 2xl:grid-cols-3">
         {categories.map((category) => (
           <section
             key={category.category}
             className="rounded-md border border-base-300/70 bg-base-100/45 p-3"
           >
             <div className="flex items-start justify-between gap-3">
-              <div>
+              <div className="min-w-0">
                 <h3 className="text-sm font-semibold text-base-content">
                   {formatStatLabel(category.category)}
                 </h3>
@@ -1376,10 +1402,10 @@ function DatasetVisualCatalogPanel({
               <div className="mt-3 grid grid-cols-2 gap-2">
                 {category.featured
                   .filter((item) => isUsableVisualIcon(item.iconUrl))
-                  .slice(0, 4)
+                  .slice(0, 6)
                   .map((item) => (
                     <div key={item.id} className="min-w-0">
-                      <div className="aspect-square rounded-md border border-base-300/70 bg-base-300/35 p-2">
+                      <div className="aspect-square rounded-md border border-base-300/70 bg-base-300/35 p-3">
                         <img
                           src={item.iconUrl}
                           alt={`${item.name} icon`}
@@ -1402,6 +1428,12 @@ function DatasetVisualCatalogPanel({
           </section>
         ))}
       </div>
+
+      {categories.length === 0 ? (
+        <p className="rounded-md border border-dashed border-base-300/70 bg-base-100/45 p-4 text-sm text-base-content/65">
+          No image-backed records in this published artifact yet.
+        </p>
+      ) : null}
     </Panel>
   );
 }

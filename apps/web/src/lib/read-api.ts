@@ -50,6 +50,8 @@ export const dashboardDatasetVersion = {
   patch: "0.2.0",
 } as const;
 
+const staticExportDatasetRevision = "2026-06-22-r2-visual-16";
+
 export type DashboardDataset = {
   source: "api" | "fallback";
   items: Array<Item | UniqueItem>;
@@ -407,7 +409,11 @@ export async function getDashboardDataset(
   fetchImplementation: typeof fetch = fetch,
 ): Promise<DashboardDataset> {
   try {
-    const query = new URLSearchParams(dashboardDatasetVersion);
+    const query = createDashboardDatasetQuery();
+    const patchQuery = createDashboardDatasetQuery({
+      league: undefined,
+      patch: dashboardDatasetVersion.patch,
+    });
     const [itemCollection, uniqueCollection, economyCollection, manifest] =
       await Promise.all([
         fetchJson(
@@ -424,7 +430,7 @@ export async function getDashboardDataset(
           fetchImplementation,
           `${apiBaseUrl}/economy/${encodeURIComponent(
             dashboardDatasetVersion.league,
-          )}?patch=${encodeURIComponent(dashboardDatasetVersion.patch)}`,
+          )}?${patchQuery.toString()}`,
           economyCollectionSchema.parse,
         ),
         fetchJson(
@@ -450,7 +456,7 @@ export async function getDashboardDatasetVisualSummary(
   fetchImplementation: typeof fetch = fetch,
 ): Promise<DashboardDatasetVisualSummary> {
   try {
-    const query = new URLSearchParams(dashboardDatasetVersion);
+    const query = createDashboardDatasetQuery();
     const response = await fetchJson(
       fetchImplementation,
       `${apiBaseUrl}/datasets/visual-summary?${query.toString()}`,
@@ -520,7 +526,7 @@ export async function getDashboardCraftingEstimate(
   fetchImplementation: typeof fetch = fetch,
 ): Promise<DashboardCraftingEstimate> {
   try {
-    const query = new URLSearchParams(dashboardDatasetVersion);
+    const query = createDashboardDatasetQuery();
     const response = await fetchJson(
       fetchImplementation,
       `${apiBaseUrl}/crafting/estimate-from-dataset?${query.toString()}`,
@@ -663,8 +669,7 @@ export async function getDashboardSearch(
   }
 
   try {
-    const params = new URLSearchParams({
-      ...dashboardDatasetVersion,
+    const params = createDashboardDatasetQuery({
       q: normalizedQuery,
     });
     const results = await fetchJson(
@@ -688,7 +693,7 @@ export async function getDashboardLadderBuilds(
   filters: DashboardLadderBuildFilters = {},
 ): Promise<DashboardLadderBuilds> {
   try {
-    const query = new URLSearchParams(dashboardDatasetVersion);
+    const query = createDashboardDatasetQuery();
     if (filters.className) query.set("className", filters.className);
     if (filters.skill) query.set("skill", filters.skill);
     if (filters.limit) query.set("limit", String(filters.limit));
@@ -718,7 +723,7 @@ export async function getDashboardLadderBuild(
   if (!id) return { source: "fallback", build: null };
 
   try {
-    const query = new URLSearchParams(dashboardDatasetVersion);
+    const query = createDashboardDatasetQuery();
     const build = await fetchJson(
       fetchImplementation,
       `${apiBaseUrl}/builds/ladder/${encodeURIComponent(id)}?${query.toString()}`,
@@ -746,7 +751,7 @@ export async function getDashboardSnapshotAdvisor(
   }
 
   try {
-    const query = new URLSearchParams(dashboardDatasetVersion);
+    const query = createDashboardDatasetQuery();
     const response = await fetchJson(
       fetchImplementation,
       `${apiBaseUrl}/advisor/snapshots/${encodeURIComponent(
@@ -827,6 +832,30 @@ function fallbackSearchResults(query: string): DashboardSearchResults {
   };
 }
 
+function createDashboardDatasetQuery(
+  entries: Partial<
+    Record<
+      keyof typeof dashboardDatasetVersion | "_calandraRev" | "q",
+      string | undefined
+    >
+  > = dashboardDatasetVersion,
+) {
+  const query = new URLSearchParams();
+  const values = {
+    ...dashboardDatasetVersion,
+    ...entries,
+    _calandraRev: staticExportDatasetRevision,
+  };
+
+  for (const [key, value] of Object.entries(values)) {
+    if (value !== undefined) {
+      query.set(key, value);
+    }
+  }
+
+  return query;
+}
+
 function createDatasetVisualSummary(
   items: Array<Item | UniqueItem>,
 ): DatasetVisualSummary {
@@ -875,9 +904,10 @@ function createDatasetVisualSummary(
   };
 }
 
-function hasDashboardVisualItem(
-  item: Item | UniqueItem,
-): item is (Item | UniqueItem) & {
+function hasDashboardVisualItem(item: Item | UniqueItem): item is (
+  | Item
+  | UniqueItem
+) & {
   iconUrl: string;
   iconAttribution: string;
 } {
@@ -992,14 +1022,29 @@ async function fetchJson<T>(
   parse: (value: unknown) => T,
   init?: RequestInit,
 ) {
+  const requestInit = withDashboardFetchCachePolicy(fetchImplementation, init);
   const response =
-    init === undefined
+    requestInit === undefined
       ? await fetchImplementation(url)
-      : await fetchImplementation(url, init);
+      : await fetchImplementation(url, requestInit);
 
   if (!response.ok) {
     throw new Error(`Calandra API request failed with HTTP ${response.status}`);
   }
 
   return parse(await response.json());
+}
+
+function withDashboardFetchCachePolicy(
+  fetchImplementation: typeof fetch,
+  init: RequestInit | undefined,
+) {
+  if (
+    fetchImplementation !== fetch ||
+    process.env["NEXT_OUTPUT"] === "export"
+  ) {
+    return init;
+  }
+
+  return { ...init, cache: "no-store" as const };
 }

@@ -35,10 +35,10 @@ describe("home dashboard", () => {
       "https://calandra-api.piogreeff.workers.dev/snapshots/RealAccount/snapshot-2026-06-21T10-00-00Z",
     );
     expect(requestedUrls).toContain(
-      "https://calandra-api.piogreeff.workers.dev/advisor/snapshots/RealAccount/snapshot-2026-06-21T10-00-00Z?league=Dawn+of+the+Hunt&patch=0.2.0",
+      "https://calandra-api.piogreeff.workers.dev/advisor/snapshots/RealAccount/snapshot-2026-06-21T10-00-00Z?league=Dawn+of+the+Hunt&patch=0.2.0&_calandraRev=2026-06-22-r2-visual-16",
     );
     expect(requestedUrls).toContain(
-      "https://calandra-api.piogreeff.workers.dev/crafting/estimate-from-dataset?league=Dawn+of+the+Hunt&patch=0.2.0",
+      "https://calandra-api.piogreeff.workers.dev/crafting/estimate-from-dataset?league=Dawn+of+the+Hunt&patch=0.2.0&_calandraRev=2026-06-22-r2-visual-16",
     );
     expect(
       requestedUrls.some((url) => url.includes("/snapshots/example")),
@@ -105,7 +105,7 @@ describe("home dashboard", () => {
       "https://calandra-api.piogreeff.workers.dev/snapshots/RealAccount/snapshot-2026-06-21T09-00-00Z",
     );
     expect(requestedUrls).toContain(
-      "https://calandra-api.piogreeff.workers.dev/advisor/snapshots/RealAccount/snapshot-2026-06-21T09-00-00Z?league=Dawn+of+the+Hunt&patch=0.2.0",
+      "https://calandra-api.piogreeff.workers.dev/advisor/snapshots/RealAccount/snapshot-2026-06-21T09-00-00Z?league=Dawn+of+the+Hunt&patch=0.2.0&_calandraRev=2026-06-22-r2-visual-16",
     );
     expect(
       requestedUrls.some((url) =>
@@ -143,10 +143,10 @@ describe("home dashboard", () => {
     );
 
     expect(requestedUrls).toContain(
-      "https://calandra-api.piogreeff.workers.dev/builds/ladder?league=Dawn+of+the+Hunt&patch=0.2.0&className=Deadeye&skill=Lightning&limit=8",
+      "https://calandra-api.piogreeff.workers.dev/builds/ladder?league=Dawn+of+the+Hunt&patch=0.2.0&_calandraRev=2026-06-22-r2-visual-16&className=Deadeye&skill=Lightning&limit=8",
     );
     expect(requestedUrls).toContain(
-      "https://calandra-api.piogreeff.workers.dev/builds/ladder/stormweaver-2?league=Dawn+of+the+Hunt&patch=0.2.0",
+      "https://calandra-api.piogreeff.workers.dev/builds/ladder/stormweaver-2?league=Dawn+of+the+Hunt&patch=0.2.0&_calandraRev=2026-06-22-r2-visual-16",
     );
     expect(html).toContain("Ladder filters");
     expect(html).toContain('name="className"');
@@ -175,6 +175,7 @@ describe("home dashboard", () => {
 
     expect(html).toContain("Deterministic upgrade rankings");
     expect(html).toContain("Loadout workbench");
+    expect(html).toContain("Browse image-backed gear");
     expect(html).toContain("Gear with images");
     expect(html).toContain("Image-backed catalog samples");
     expect(html).toContain("3 equipped slots");
