@@ -37,6 +37,7 @@ import {
   getDashboardLadderBuild,
   getDashboardLadderBuilds,
   getDashboardLatestSnapshot,
+  getDashboardSnapshot,
   getDashboardPriceCheck,
   getDashboardSnapshotAdvisor,
   getDashboardSnapshotDiff,
@@ -177,6 +178,7 @@ type HomeSearchParams = {
   account?: string | string[];
   buildId?: string | string[];
   className?: string | string[];
+  snapshotId?: string | string[];
   skill?: string | string[];
 };
 
@@ -212,13 +214,23 @@ export default async function Home({
   ]);
   const latestSnapshot =
     snapshotList.snapshots[snapshotList.snapshots.length - 1];
+  const explicitSnapshotId = firstSearchParam(
+    resolvedSearchParams?.snapshotId,
+  )?.trim();
+  const selectedSnapshot =
+    resolveSelectedSnapshot(snapshotList.snapshots, explicitSnapshotId) ??
+    latestSnapshot;
+  const selectedSnapshotId = selectedSnapshot?.snapshotId;
+  const explicitBuildId = firstSearchParam(
+    resolvedSearchParams?.buildId,
+  )?.trim();
   const selectedLadderBuildId = resolveSelectedLadderBuildId(
     resolvedSearchParams,
     ladderBuilds.builds[0]?.id,
   );
   const [
     snapshotDiff,
-    latestSnapshotDetail,
+    selectedSnapshotDetail,
     ladderBuildDetail,
     snapshotAdvisor,
   ] = await Promise.all([
@@ -229,17 +241,25 @@ export default async function Home({
       fetch,
       snapshotReadOptions,
     ),
-    getDashboardLatestSnapshot(
-      snapshotList.account,
-      snapshotList.snapshots,
-      defaultApiBaseUrl,
-      fetch,
-      snapshotReadOptions,
-    ),
+    selectedSnapshotId
+      ? getDashboardSnapshot(
+          snapshotList.account,
+          selectedSnapshotId,
+          defaultApiBaseUrl,
+          fetch,
+          snapshotReadOptions,
+        )
+      : getDashboardLatestSnapshot(
+          snapshotList.account,
+          snapshotList.snapshots,
+          defaultApiBaseUrl,
+          fetch,
+          snapshotReadOptions,
+        ),
     getDashboardLadderBuild(selectedLadderBuildId),
     getDashboardSnapshotAdvisor(
       snapshotList.account,
-      latestSnapshot?.snapshotId,
+      selectedSnapshotId,
       defaultApiBaseUrl,
       fetch,
       snapshotReadOptions,
@@ -258,9 +278,17 @@ export default async function Home({
     dataset.manifest.qualityGates?.uniqueImageCoverage;
   const shortChecksum = dataset.manifest.sha256.slice(0, 12);
   const latestDiff = snapshotDiff.diff;
+  const hasExplicitSnapshotSelection = Boolean(explicitSnapshotId);
   const visualLoadoutPreview = createVisualLoadoutPreview(
-    latestSnapshotDetail.snapshot,
-    ladderBuildDetail.source === "api" ? ladderBuildDetail.build : null,
+    selectedSnapshotDetail.snapshot,
+    hasExplicitSnapshotSelection
+      ? null
+      : ladderBuildDetail.source === "api"
+        ? ladderBuildDetail.build
+        : null,
+    hasExplicitSnapshotSelection
+      ? "Selected account snapshot"
+      : "Latest account snapshot",
   );
 
   return (
@@ -589,40 +617,79 @@ export default async function Home({
                     {snapshotList.snapshots.length}
                   </span>
                 </div>
-                {latestSnapshot ? (
-                  <article className="rounded-md border border-base-300/70 bg-base-100/45 p-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-xs uppercase text-base-content/55">
-                          {snapshotList.account}
-                        </p>
-                        <h3 className="mt-1 break-all text-sm font-semibold text-base-content">
-                          {latestSnapshot.snapshotId}
-                        </h3>
-                        <p className="mt-1 break-all text-xs text-base-content/55">
-                          {latestSnapshot.objectKey}
-                        </p>
-                      </div>
-                      <RotateCcw
-                        className="size-4 shrink-0 text-primary"
-                        aria-hidden="true"
-                      />
-                    </div>
-                    <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                      <div className="rounded-md bg-base-200/80 p-2">
-                        <p className="text-xs text-base-content/55">Uploaded</p>
-                        <p className="truncate font-medium text-base-content">
-                          {formatSnapshotTimestamp(latestSnapshot.uploadedAt)}
-                        </p>
-                      </div>
-                      <div className="rounded-md bg-base-200/80 p-2">
-                        <p className="text-xs text-base-content/55">Size</p>
-                        <p className="font-medium text-base-content">
-                          {formatBytes(latestSnapshot.size)}
-                        </p>
-                      </div>
-                    </div>
-                  </article>
+                {selectedSnapshot ? (
+                  <div className="space-y-3">
+                    {[...snapshotList.snapshots].reverse().map((snapshot) => {
+                      const isSelected =
+                        snapshot.snapshotId === selectedSnapshotId;
+
+                      return (
+                        <article
+                          key={snapshot.snapshotId}
+                          className={`rounded-md border bg-base-100/45 p-3 ${
+                            isSelected
+                              ? "border-primary/60"
+                              : "border-base-300/70"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-xs uppercase text-base-content/55">
+                                {isSelected
+                                  ? "Selected snapshot"
+                                  : snapshotList.account}
+                              </p>
+                              <h3 className="mt-1 break-all text-sm font-semibold text-base-content">
+                                {snapshot.snapshotId}
+                              </h3>
+                              <p className="mt-1 break-all text-xs text-base-content/55">
+                                {snapshot.objectKey}
+                              </p>
+                            </div>
+                            <RotateCcw
+                              className="size-4 shrink-0 text-primary"
+                              aria-hidden="true"
+                            />
+                          </div>
+                          <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                            <div className="rounded-md bg-base-200/80 p-2">
+                              <p className="text-xs text-base-content/55">
+                                Uploaded
+                              </p>
+                              <p className="truncate font-medium text-base-content">
+                                {formatSnapshotTimestamp(snapshot.uploadedAt)}
+                              </p>
+                            </div>
+                            <div className="rounded-md bg-base-200/80 p-2">
+                              <p className="text-xs text-base-content/55">
+                                Size
+                              </p>
+                              <p className="font-medium text-base-content">
+                                {formatBytes(snapshot.size)}
+                              </p>
+                            </div>
+                          </div>
+                          <a
+                            className={`btn btn-xs mt-3 w-full ${
+                              isSelected ? "btn-outline" : "btn-primary"
+                            }`}
+                            href={buildSnapshotHref(
+                              snapshotList.account,
+                              ladderBuildFilters,
+                              snapshot.snapshotId,
+                              explicitBuildId,
+                            )}
+                          >
+                            {isSelected ? "Viewing snapshot" : "Restore view"}
+                            <ChevronRight
+                              className="size-3"
+                              aria-hidden="true"
+                            />
+                          </a>
+                        </article>
+                      );
+                    })}
+                  </div>
                 ) : (
                   <p className="rounded-md border border-base-300/70 bg-base-100/45 p-3 text-sm text-base-content/70">
                     No account snapshots stored yet.
@@ -1146,6 +1213,7 @@ function CharacterBuildPreviewPanel({
 function createVisualLoadoutPreview(
   snapshot: AccountSnapshot | null,
   ladderBuild: LadderBuild | null,
+  snapshotSourceLabel = "Latest account snapshot",
 ): VisualLoadoutPreview {
   if (ladderBuild && hasVisualBuildGear(ladderBuild)) {
     return createLadderBuildLoadoutPreview(ladderBuild);
@@ -1158,7 +1226,7 @@ function createVisualLoadoutPreview(
   }
 
   return {
-    sourceLabel: "Latest account snapshot",
+    sourceLabel: snapshotSourceLabel,
     character: {
       name: character.name,
       className: character.className,
@@ -1284,6 +1352,19 @@ function resolveSelectedLadderBuildId(
   return firstSearchParam(searchParams?.buildId)?.trim() || fallbackBuildId;
 }
 
+function resolveSelectedSnapshot(
+  snapshots: { snapshotId: string }[],
+  requestedSnapshotId: string | undefined,
+) {
+  if (!requestedSnapshotId) {
+    return undefined;
+  }
+
+  return snapshots.find(
+    (snapshot) => snapshot.snapshotId === requestedSnapshotId,
+  );
+}
+
 function buildLadderBuildHref(
   account: string,
   filters: DashboardLadderBuildFilters,
@@ -1294,6 +1375,21 @@ function buildLadderBuildHref(
   if (filters.className) query.set("className", filters.className);
   if (filters.skill) query.set("skill", filters.skill);
   query.set("buildId", buildId);
+
+  return `?${query.toString()}`;
+}
+
+function buildSnapshotHref(
+  account: string,
+  filters: DashboardLadderBuildFilters,
+  snapshotId: string,
+  buildId: string | undefined,
+) {
+  const query = new URLSearchParams({ account, snapshotId });
+
+  if (filters.className) query.set("className", filters.className);
+  if (filters.skill) query.set("skill", filters.skill);
+  if (buildId) query.set("buildId", buildId);
 
   return `?${query.toString()}`;
 }

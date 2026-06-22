@@ -544,7 +544,23 @@ export async function getDashboardLatestSnapshot(
 ): Promise<DashboardLatestSnapshot> {
   const latestSnapshot = snapshots[snapshots.length - 1];
 
-  if (!latestSnapshot) {
+  return getDashboardSnapshot(
+    account,
+    latestSnapshot?.snapshotId,
+    apiBaseUrl,
+    fetchImplementation,
+    options,
+  );
+}
+
+export async function getDashboardSnapshot(
+  account: string,
+  snapshotId: string | undefined,
+  apiBaseUrl = defaultApiBaseUrl,
+  fetchImplementation: typeof fetch = fetch,
+  options: DashboardSnapshotReadOptions = {},
+): Promise<DashboardLatestSnapshot> {
+  if (!snapshotId) {
     return fallbackLatestSnapshot(account, "no-snapshots");
   }
 
@@ -553,7 +569,7 @@ export async function getDashboardLatestSnapshot(
       fetchImplementation,
       `${apiBaseUrl}/snapshots/${encodeURIComponent(
         account,
-      )}/${encodeURIComponent(latestSnapshot.snapshotId)}`,
+      )}/${encodeURIComponent(snapshotId)}`,
       accountSnapshotSchema.parse,
       getSnapshotReadRequestInit(options),
     );

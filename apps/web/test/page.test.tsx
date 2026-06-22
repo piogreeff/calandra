@@ -47,6 +47,50 @@ describe("home dashboard", () => {
     expect(html).toContain("snapshots/RealAccount/");
   });
 
+  it("restores the selected account snapshot from query params", async () => {
+    const fetchImplementation = mockDashboardFetch();
+    vi.stubGlobal("fetch", fetchImplementation);
+
+    const html = renderToStaticMarkup(
+      await Home({
+        searchParams: Promise.resolve({
+          account: "RealAccount",
+          snapshotId: "snapshot-2026-06-21T09-00-00Z",
+        }),
+      }),
+    );
+
+    const requestedUrls = fetchImplementation.mock.calls.map(([input]) =>
+      String(input),
+    );
+
+    expect(requestedUrls).toContain(
+      "https://calandra-api.piogreeff.workers.dev/snapshots/RealAccount",
+    );
+    expect(requestedUrls).toContain(
+      "https://calandra-api.piogreeff.workers.dev/snapshots/RealAccount/snapshot-2026-06-21T09-00-00Z",
+    );
+    expect(requestedUrls).toContain(
+      "https://calandra-api.piogreeff.workers.dev/advisor/snapshots/RealAccount/snapshot-2026-06-21T09-00-00Z?league=Dawn+of+the+Hunt&patch=0.2.0",
+    );
+    expect(
+      requestedUrls.some((url) =>
+        url.endsWith(
+          "/snapshots/RealAccount/snapshot-2026-06-21T10-00-00Z",
+        ),
+      ),
+    ).toBe(false);
+    expect(html).toContain("Selected snapshot");
+    expect(html).toContain("snapshot-2026-06-21T09-00-00Z");
+    expect(html).toContain("RealMonkBefore");
+    expect(html).toContain("Level 43 Monk");
+    expect(html).toContain("Early Gloves");
+    expect(html).toContain("+22.0");
+    expect(html).toContain(
+      "?account=RealAccount&amp;snapshotId=snapshot-2026-06-21T10-00-00Z",
+    );
+  });
+
   it("filters ladder builds and previews the selected build from query params", async () => {
     const fetchImplementation = mockDashboardFetch();
     vi.stubGlobal("fetch", fetchImplementation);
@@ -563,6 +607,65 @@ function mockDashboardFetch() {
         afterCapturedAt: "2026-06-21T10:00:00.000Z",
         characterChanges: [],
         stashChanges: [],
+      });
+    }
+
+    if (
+      url.includes(
+        "/advisor/snapshots/RealAccount/snapshot-2026-06-21T09-00-00Z?",
+      )
+    ) {
+      return Response.json({
+        source: "deterministic-engine",
+        upgrades: [
+          {
+            slot: "Gloves",
+            currentName: "Threadbare Gloves",
+            candidateName: "Early Gloves",
+            currentScore: 20,
+            candidateScore: 42,
+            scoreDelta: 22,
+            estimatedCostChaos: 6,
+            valuePerChaos: 3.6667,
+            currentMissingStats: ["life"],
+            candidateMissingStats: [],
+          },
+        ],
+      });
+    }
+
+    if (url.includes("/snapshots/RealAccount/snapshot-2026-06-21T09-00-00Z")) {
+      return Response.json({
+        id: "snapshot-2026-06-21T09-00-00Z",
+        account: "RealAccount",
+        capturedAt: "2026-06-21T09:00:00.000Z",
+        source: "manual-import",
+        capabilities: { characters: true, stashes: true },
+        characters: [
+          {
+            id: "char-1",
+            name: "RealMonkBefore",
+            className: "Monk",
+            level: 43,
+            league: "Dawn of the Hunt",
+            passiveSkillIds: ["passive-before"],
+            equipment: [
+              {
+                slot: "Gloves",
+                name: "Threadbare Gloves",
+                rarity: "normal",
+              },
+            ],
+          },
+        ],
+        stashes: [
+          {
+            id: "stash-1",
+            name: "Currency Tab",
+            league: "Dawn of the Hunt",
+            items: [{ slot: "stash", name: "Exalted Orb" }],
+          },
+        ],
       });
     }
 
