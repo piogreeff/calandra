@@ -195,6 +195,11 @@ export const poe2CharacterSnapshotCaptureRequestSchema = z.object({
   capturedAt: z.string().datetime().optional(),
   snapshotId: z.string().min(1).optional(),
 });
+export const poe2StoredTokenSnapshotCaptureRequestSchema = z.object({
+  account: z.string().min(1),
+  capturedAt: z.string().datetime().optional(),
+  snapshotId: z.string().min(1).optional(),
+});
 export const gggOAuthTokenExchangeRequestSchema = z.object({
   account: z.string().min(1),
   code: z.string().min(1),
@@ -815,6 +820,50 @@ export const openApiDocument = {
         },
       },
     },
+    "/snapshots/capture/poe2-stored-token": {
+      post: {
+        operationId: "capturePoe2StoredTokenSnapshot",
+        summary:
+          "Capture and persist an official PoE2 character snapshot with a stored encrypted GGG OAuth token",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                $ref: "#/components/schemas/Poe2StoredTokenSnapshotCaptureRequest",
+              },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description:
+              "Persisted source-agnostic account snapshot captured from a stored encrypted GGG OAuth token",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/AccountSnapshotWriteResponse",
+                },
+              },
+            },
+          },
+          "400": {
+            description:
+              "Invalid stored-token PoE2 character snapshot capture request",
+          },
+          "401": {
+            description: "Snapshot capture is unauthorized by Calandra or GGG",
+          },
+          "404": {
+            description:
+              "No linked encrypted GGG OAuth token exists for the account",
+          },
+          "503": {
+            description: "Stored-token snapshot capture is not configured",
+          },
+        },
+      },
+    },
     "/snapshots/capture/poe2-character": {
       post: {
         operationId: "capturePoe2CharacterSnapshot",
@@ -1350,6 +1399,15 @@ export const openApiDocument = {
           snapshotId: { type: "string", minLength: 1 },
         },
       },
+      Poe2StoredTokenSnapshotCaptureRequest: {
+        type: "object",
+        required: ["account"],
+        properties: {
+          account: { type: "string", minLength: 1 },
+          capturedAt: { type: "string", format: "date-time" },
+          snapshotId: { type: "string", minLength: 1 },
+        },
+      },
       GggOAuthTokenExchangeRequest: {
         type: "object",
         required: ["account", "code", "codeVerifier", "redirectUri"],
@@ -1790,6 +1848,9 @@ export type AccountSnapshotWriteResponse = z.infer<
 >;
 export type Poe2CharacterSnapshotCaptureRequest = z.infer<
   typeof poe2CharacterSnapshotCaptureRequestSchema
+>;
+export type Poe2StoredTokenSnapshotCaptureRequest = z.infer<
+  typeof poe2StoredTokenSnapshotCaptureRequestSchema
 >;
 export type GggOAuthTokenExchangeRequest = z.infer<
   typeof gggOAuthTokenExchangeRequestSchema

@@ -21,6 +21,7 @@ import {
   gggOAuthTokenExchangeRequestSchema,
   gggOAuthTokenExchangeResponseSchema,
   poe2CharacterSnapshotCaptureRequestSchema,
+  poe2StoredTokenSnapshotCaptureRequestSchema,
   priceCheckRequestSchema,
   priceCheckResponseSchema,
   upgradeAdvisorRequestSchema,
@@ -736,6 +737,30 @@ describe("account snapshot contract", () => {
     expect(
       openApiDocument.components.schemas.GggOAuthTokenExchangeResponse,
     ).toBeDefined();
+  });
+  it("models stored-token official PoE2 character snapshot capture requests", () => {
+    const request = poe2StoredTokenSnapshotCaptureRequestSchema.parse({
+      account: "example",
+      capturedAt: "2026-06-21T10:00:00.000Z",
+      snapshotId: "snapshot-2026-06-21T10-00-00Z",
+    });
+
+    expect(request).toEqual({
+      account: "example",
+      capturedAt: "2026-06-21T10:00:00.000Z",
+      snapshotId: "snapshot-2026-06-21T10-00-00Z",
+    });
+    expect(
+      openApiDocument.paths["/snapshots/capture/poe2-stored-token"]?.post
+        ?.operationId,
+    ).toBe("capturePoe2StoredTokenSnapshot");
+    expect(
+      openApiDocument.components.schemas.Poe2StoredTokenSnapshotCaptureRequest,
+    ).toBeDefined();
+    expect(
+      openApiDocument.components.schemas.Poe2StoredTokenSnapshotCaptureRequest
+        .properties,
+    ).not.toHaveProperty("accessToken");
   });
 
   it("models persisted account snapshot list responses", () => {

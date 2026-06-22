@@ -1,4 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  encryptGggOAuthTokenSet,
+  type GggOAuthTokenSet,
+} from "@calandra/ggg-api";
 import { api } from "../src/index";
 
 const datasetSources = [
@@ -1551,6 +1555,348 @@ describe("api routes", () => {
       error: "GGG OAuth token exchange is not configured",
     });
   });
+  it("captures an official PoE2 character snapshot using a stored encrypted GGG token", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-21T10:00:00.000Z"));
+    const encryptionKey = base64Key(7);
+    const storedTokenObject = await storedGggTokenObject({
+      account: "example",
+      key: encryptionKey,
+      tokenSet: {
+        accessToken: "ggg-access-token",
+        refreshToken: "ggg-refresh-token",
+        tokenType: "bearer",
+        expiresAt: "2026-06-21T11:00:00.000Z",
+        scope: ["account:characters"],
+        username: "CalandraAccount",
+      },
+    });
+    const requestedKeys: string[] = [];
+    const storedObjects: Array<{
+      key: string;
+      value: string;
+      options: unknown;
+    }> = [];
+    const fetch = vi.fn(async (url: string, init?: RequestInit) => {
+      const headers = new Headers(init?.headers);
+      expect(headers.get("authorization")).toBe("Bearer ggg-access-token");
+      expect(headers.get("user-agent")).toBe(
+        "calandra/0.1.0 (+https://calandra.pages.dev; maintainer@calandra.dev)",
+      );
+
+      if (url === "https://api.pathofexile.com/character/poe2") {
+        return jsonResponse({ characters: [{ name: "CalandraTest" }] });
+      }
+
+      if (url === "https://api.pathofexile.com/character/poe2/CalandraTest") {
+        return jsonResponse({
+          character: {
+            id: "character-1",
+            name: "CalandraTest",
+            class: "Deadeye",
+            level: 73,
+            league: "Dawn of the Hunt",
+            equipment: [
+              {
+                inventoryId: "gloves",
+                typeLine: "Duskthread Grips",
+                rarity: "rare",
+                id: "item-1",
+              },
+            ],
+          },
+        });
+      }
+
+      throw new Error(`Unexpected GGG API URL: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetch);
+
+    const response = await api.request(
+      "/snapshots/capture/poe2-stored-token",
+      {
+        method: "POST",
+        headers: {
+          authorization: "Bearer snapshot-write-token",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          account: "example",
+          capturedAt: "2026-06-21T10:00:00.000Z",
+          snapshotId: "snapshot-2026-06-21T10-00-00Z",
+        }),
+      },
+      {
+        APP_URL: "https://calandra.pages.dev",
+        GGG_USER_AGENT:
+          "calandra/0.1.0 (+https://calandra.pages.dev; maintainer@calandra.dev)",
+        GGG_TOKEN_ENCRYPTION_KEY: encryptionKey,
+        GGG_TOKEN_R2_PREFIX: "oauth/ggg",
+        SNAPSHOT_R2_PREFIX: "snapshots",
+        SNAPSHOT_WRITE_TOKEN: "snapshot-write-token",
+        SNAPSHOT_BUCKET: {
+          async get(key: string) {
+            requestedKeys.push(key);
+
+            return key === "oauth/ggg/example/token.json"
+              ? {
+                  async text() {
+                    return storedTokenObject;
+                  },
+                }
+              : null;
+          },
+          async put(key: string, value: string, options: unknown) {
+            storedObjects.push({ key, value, options });
+          },
+        },
+      },
+    );
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toEqual({
+      source: "snapshot-store",
+      objectKey: "snapshots/example/snapshot-2026-06-21T10-00-00Z.json",
+      snapshot: {
+        id: "snapshot-2026-06-21T10-00-00Z",
+        account: "example",
+        capturedAt: "2026-06-21T10:00:00.000Z",
+        source: "official-poe2-character",
+        capabilities: { characters: true, stashes: false },
+        characters: [
+          {
+            id: "character-1",
+            name: "CalandraTest",
+            className: "Deadeye",
+            level: 73,
+            league: "Dawn of the Hunt",
+            equipment: [
+              {
+                slot: "gloves",
+                name: "Duskthread Grips",
+                itemId: "item-1",
+                rarity: "rare",
+              },
+            ],
+          },
+        ],
+      },
+    });
+    expect(requestedKeys).toEqual(["oauth/ggg/example/token.json"]);
+    expect(storedObjects).toEqual([
+      {
+        key: "snapshots/example/snapshot-2026-06-21T10-00-00Z.json",
+        value: JSON.stringify({
+          id: "snapshot-2026-06-21T10-00-00Z",
+          account: "example",
+          capturedAt: "2026-06-21T10:00:00.000Z",
+          source: "official-poe2-character",
+          capabilities: { characters: true, stashes: false },
+          characters: [
+            {
+              id: "character-1",
+              name: "CalandraTest",
+              className: "Deadeye",
+              level: 73,
+              league: "Dawn of the Hunt",
+              equipment: [
+                {
+                  slot: "gloves",
+                  name: "Duskthread Grips",
+                  itemId: "item-1",
+                  rarity: "rare",
+                },
+              ],
+            },
+          ],
+        }),
+        options: {
+          httpMetadata: { contentType: "application/json; charset=utf-8" },
+        },
+      },
+    ]);
+    expect(JSON.stringify(storedObjects)).not.toContain("ggg-access-token");
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("refreshes an expired stored GGG token before capturing a PoE2 character snapshot", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-21T10:00:00.000Z"));
+    const encryptionKey = base64Key(7);
+    const storedTokenObject = await storedGggTokenObject({
+      account: "example",
+      key: encryptionKey,
+      tokenSet: {
+        accessToken: "expired-access-token",
+        refreshToken: "ggg-refresh-token",
+        tokenType: "bearer",
+        expiresAt: "2026-06-21T09:59:00.000Z",
+        scope: ["account:characters"],
+      },
+    });
+    const storedObjects: Array<{
+      key: string;
+      value: string;
+      options: unknown;
+    }> = [];
+    const fetch = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === "https://www.pathofexile.com/oauth/token") {
+        expect(init?.method).toBe("POST");
+        const params = new URLSearchParams(String(init?.body));
+        expect(Object.fromEntries(params)).toEqual({
+          client_id: "calandra-client-id",
+          grant_type: "refresh_token",
+          refresh_token: "ggg-refresh-token",
+          scope: "account:characters",
+        });
+
+        return jsonResponse({
+          access_token: "refreshed-access-token",
+          refresh_token: "refreshed-refresh-token",
+          token_type: "bearer",
+          expires_in: 3600,
+          scope: "account:characters",
+        });
+      }
+
+      expect(new Headers(init?.headers).get("authorization")).toBe(
+        "Bearer refreshed-access-token",
+      );
+
+      if (url === "https://api.pathofexile.com/character/poe2") {
+        return jsonResponse({ characters: [{ name: "CalandraTest" }] });
+      }
+
+      if (url === "https://api.pathofexile.com/character/poe2/CalandraTest") {
+        return jsonResponse({
+          character: {
+            id: "character-1",
+            name: "CalandraTest",
+            class: "Deadeye",
+            level: 74,
+            league: "Dawn of the Hunt",
+            equipment: [],
+          },
+        });
+      }
+
+      throw new Error(`Unexpected GGG API URL: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetch);
+
+    const response = await api.request(
+      "/snapshots/capture/poe2-stored-token",
+      {
+        method: "POST",
+        headers: {
+          authorization: "Bearer snapshot-write-token",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ account: "example" }),
+      },
+      {
+        APP_URL: "https://calandra.pages.dev",
+        GGG_OAUTH_CLIENT_ID: "calandra-client-id",
+        GGG_USER_AGENT:
+          "calandra/0.1.0 (+https://calandra.pages.dev; maintainer@calandra.dev)",
+        GGG_TOKEN_ENCRYPTION_KEY: encryptionKey,
+        GGG_TOKEN_R2_PREFIX: "oauth/ggg",
+        SNAPSHOT_R2_PREFIX: "snapshots",
+        SNAPSHOT_WRITE_TOKEN: "snapshot-write-token",
+        SNAPSHOT_BUCKET: {
+          async get(key: string) {
+            return key === "oauth/ggg/example/token.json"
+              ? {
+                  async text() {
+                    return storedTokenObject;
+                  },
+                }
+              : null;
+          },
+          async put(key: string, value: string, options: unknown) {
+            storedObjects.push({ key, value, options });
+          },
+        },
+      },
+    );
+
+    expect(response.status).toBe(201);
+    expect(storedObjects.map((object) => object.key)).toEqual([
+      "oauth/ggg/example/token.json",
+      "snapshots/example/snapshot-2026-06-21T10-00-00-000Z.json",
+    ]);
+    expect(storedObjects[0]?.value).not.toContain("refreshed-access-token");
+    expect(storedObjects[0]?.value).not.toContain("refreshed-refresh-token");
+    expect(storedObjects[0]?.value).toContain("encryptedTokenSet");
+  });
+
+  it("rejects stored-token snapshot capture without snapshot write authorization", async () => {
+    const response = await api.request(
+      "/snapshots/capture/poe2-stored-token",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ account: "example" }),
+      },
+      {
+        APP_URL: "https://calandra.pages.dev",
+        SNAPSHOT_WRITE_TOKEN: "snapshot-write-token",
+      },
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      error: "snapshot write is unauthorized",
+    });
+  });
+
+  it("returns 404 when no stored GGG token exists for snapshot capture", async () => {
+    const response = await api.request(
+      "/snapshots/capture/poe2-stored-token",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ account: "example" }),
+      },
+      {
+        APP_URL: "https://calandra.pages.dev",
+        GGG_USER_AGENT:
+          "calandra/0.1.0 (+https://calandra.pages.dev; maintainer@calandra.dev)",
+        GGG_TOKEN_ENCRYPTION_KEY: base64Key(7),
+        SNAPSHOT_BUCKET: {
+          async get() {
+            return null;
+          },
+          async put() {
+            throw new Error("capture must stop before writing snapshots");
+          },
+        },
+      },
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({
+      error: "GGG OAuth token is not linked",
+      account: "example",
+    });
+  });
+
+  it("rejects malformed stored-token snapshot capture payloads", async () => {
+    const response = await api.request(
+      "/snapshots/capture/poe2-stored-token",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ account: "" }),
+      },
+      { APP_URL: "https://calandra.pages.dev" },
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "invalid stored-token PoE2 snapshot capture request",
+    });
+  });
   it("rejects official PoE2 character snapshot capture without GGG configuration", async () => {
     const response = await api.request(
       "/snapshots/capture/poe2-character",
@@ -2117,4 +2463,41 @@ function base64Key(seed: number) {
   );
 
   return btoa(String.fromCharCode(...bytes));
+}
+async function storedGggTokenObject({
+  account,
+  key,
+  tokenSet,
+}: {
+  account: string;
+  key: string;
+  tokenSet: GggOAuthTokenSet;
+}) {
+  const encryptedTokenSet = await encryptGggOAuthTokenSet(tokenSet, {
+    key: parseBase64Key(key),
+  });
+
+  return JSON.stringify({
+    account,
+    provider: "ggg",
+    updatedAt: "2026-06-21T09:00:00.000Z",
+    token: {
+      expiresAt: tokenSet.expiresAt,
+      scope: [...tokenSet.scope],
+      ...(tokenSet.username ? { username: tokenSet.username } : {}),
+      ...(tokenSet.sub ? { sub: tokenSet.sub } : {}),
+    },
+    encryptedTokenSet,
+  });
+}
+
+function parseBase64Key(value: string) {
+  const base64 = value.trim().replaceAll("-", "+").replaceAll("_", "/");
+  const padded = base64.padEnd(
+    base64.length + ((4 - (base64.length % 4)) % 4),
+    "=",
+  );
+  const binary = atob(padded);
+
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 }

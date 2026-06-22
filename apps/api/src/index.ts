@@ -24,6 +24,7 @@ import {
   gggOAuthTokenExchangeRequestSchema,
   gggOAuthTokenExchangeResponseSchema,
   poe2CharacterSnapshotCaptureRequestSchema,
+  poe2StoredTokenSnapshotCaptureRequestSchema,
   priceCheckRequestSchema,
   priceCheckResponseSchema,
   upgradeAdvisorRequestSchema,
@@ -43,10 +44,14 @@ import {
   GggOAuthTokenEncryptionError,
   capturePoe2CharacterSnapshot,
   createGggApiClient,
+  decryptGggOAuthTokenSet,
   encryptGggOAuthTokenSet,
   exchangeGggOAuthAuthorizationCode,
   gggOAuthScopes,
+  refreshGggOAuthToken,
+  type EncryptedGggOAuthTokenSet,
   type GggOAuthScope,
+  type GggOAuthTokenSet,
 } from "@calandra/ggg-api";
 import { Hono, type Context } from "hono";
 
@@ -432,6 +437,194 @@ api.post("/auth/ggg/exchange", async (context) => {
     if (error instanceof GggApiHttpError) {
       return context.json(
         { error: "GGG OAuth token exchange failed", status: error.status },
+        502,
+      );
+    }
+
+    throw error;
+  }
+});
+api.post("/snapshots/capture/poe2-stored-token", async (context) => {
+  if (!isSnapshotWriteAuthorized(context)) {
+    return context.json({ error: "snapshot write is unauthorized" }, 401);
+  }
+
+  const rawBody = await readJsonBody(context);
+  const parsed = poe2StoredTokenSnapshotCaptureRequestSchema.safeParse(rawBody);
+
+  if (!parsed.success) {
+    return context.json(
+      { error: "invalid stored-token PoE2 snapshot capture request" },
+      400,
+    );
+  }
+
+  const snapshotBucket = context.env.SNAPSHOT_BUCKET;
+
+  if (
+    !context.env.GGG_USER_AGENT ||
+    !context.env.GGG_TOKEN_ENCRYPTION_KEY ||
+    !snapshotBucket?.get ||
+    !snapshotBucket.put
+  ) {
+    return context.json(
+      { error: "stored-token PoE2 snapshot capture is not configured" },
+      503,
+    );
+  }
+
+  let encryptionKey: Uint8Array;
+
+  try {
+    encryptionKey = parseGggTokenEncryptionKey(
+      context.env.GGG_TOKEN_ENCRYPTION_KEY,
+    );
+  } catch {
+    return context.json(
+      { error: "stored-token PoE2 snapshot capture is not configured" },
+      503,
+    );
+  }
+
+  const tokenObjectKey = getGggOAuthTokenObjectKey(
+    context,
+    parsed.data.account,
+  );
+  const tokenObject = await snapshotBucket.get(tokenObjectKey);
+
+  if (!tokenObject) {
+    return context.json(
+      { error: "GGG OAuth token is not linked", account: parsed.data.account },
+      404,
+    );
+  }
+
+  const storedToken = parseStoredGggOAuthTokenObject(
+    await tokenObject.text(),
+    parsed.data.account,
+  );
+
+  if (!storedToken) {
+    return context.json(
+      { error: "stored GGG OAuth token failed validation" },
+      502,
+    );
+  }
+
+  try {
+    let tokenSet = await decryptGggOAuthTokenSet(
+      storedToken.encryptedTokenSet,
+      {
+        key: encryptionKey,
+      },
+    );
+
+    if (isGggOAuthTokenExpired(tokenSet, new Date())) {
+      if (!tokenSet.refreshToken || !context.env.GGG_OAUTH_CLIENT_ID) {
+        return context.json(
+          { error: "GGG OAuth token cannot be refreshed" },
+          401,
+        );
+      }
+
+      const refreshScopes = parseGggOAuthScopes(tokenSet.scope);
+
+      if (!refreshScopes.ok) {
+        return context.json(
+          { error: "stored GGG OAuth token failed validation" },
+          502,
+        );
+      }
+
+      tokenSet = await refreshGggOAuthToken({
+        clientId: context.env.GGG_OAUTH_CLIENT_ID,
+        ...(context.env.GGG_OAUTH_CLIENT_SECRET
+          ? { clientSecret: context.env.GGG_OAUTH_CLIENT_SECRET }
+          : {}),
+        refreshToken: tokenSet.refreshToken,
+        ...(refreshScopes.scopes ? { scopes: refreshScopes.scopes } : {}),
+        fetch: (url, init) => fetch(url, init),
+        now: new Date(),
+        ...(context.env.GGG_OAUTH_TOKEN_URL
+          ? { tokenUrl: context.env.GGG_OAUTH_TOKEN_URL }
+          : {}),
+      });
+      await snapshotBucket.put(
+        tokenObjectKey,
+        JSON.stringify({
+          account: parsed.data.account,
+          provider: "ggg",
+          updatedAt: new Date().toISOString(),
+          token: buildStoredGggOAuthTokenMetadata(tokenSet),
+          encryptedTokenSet: await encryptGggOAuthTokenSet(tokenSet, {
+            key: encryptionKey,
+          }),
+        }),
+        { httpMetadata: { contentType: "application/json; charset=utf-8" } },
+      );
+    }
+
+    const client = createGggApiClient({
+      accessToken: tokenSet.accessToken,
+      userAgent: context.env.GGG_USER_AGENT,
+      grantedScopes: tokenSet.scope,
+      fetch: (url, init) => fetch(url, init),
+      ...(context.env.GGG_API_BASE_URL
+        ? { baseUrl: context.env.GGG_API_BASE_URL }
+        : {}),
+    });
+    const snapshot = await capturePoe2CharacterSnapshot({
+      account: parsed.data.account,
+      client,
+      ...(parsed.data.capturedAt ? { capturedAt: parsed.data.capturedAt } : {}),
+      ...(parsed.data.snapshotId ? { id: parsed.data.snapshotId } : {}),
+    });
+    const stored = await writeStoredAccountSnapshot(context, snapshot);
+
+    if (!stored.ok) {
+      return context.json(stored.body, stored.status);
+    }
+
+    return context.json(
+      accountSnapshotWriteResponseSchema.parse({
+        source: "snapshot-store",
+        objectKey: stored.objectKey,
+        snapshot,
+      }),
+      201,
+    );
+  } catch (error) {
+    if (error instanceof GggApiScopeError) {
+      return context.json(
+        { error: "GGG OAuth token is missing required scope" },
+        401,
+      );
+    }
+
+    if (
+      error instanceof GggApiHttpError &&
+      (error.status === 401 || error.status === 403)
+    ) {
+      return context.json(
+        { error: "GGG OAuth token was rejected", status: error.status },
+        401,
+      );
+    }
+
+    if (error instanceof GggOAuthTokenEncryptionError) {
+      return context.json(
+        { error: "stored GGG OAuth token failed validation" },
+        502,
+      );
+    }
+
+    if (error instanceof GggApiConfigurationError) {
+      return context.json({ error: error.message }, 400);
+    }
+
+    if (error instanceof GggApiHttpError) {
+      return context.json(
+        { error: "GGG API request failed", status: error.status },
         502,
       );
     }
@@ -956,6 +1149,40 @@ function buildStoredGggOAuthTokenMetadata(tokenSet: {
     ...(tokenSet.username ? { username: tokenSet.username } : {}),
     ...(tokenSet.sub ? { sub: tokenSet.sub } : {}),
   };
+}
+function parseStoredGggOAuthTokenObject(raw: string, account: string) {
+  let value: unknown;
+
+  try {
+    value = JSON.parse(raw.replace(/^\uFEFF/, ""));
+  } catch {
+    return undefined;
+  }
+
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  if (
+    value.account !== account ||
+    value.provider !== "ggg" ||
+    !isRecord(value.encryptedTokenSet)
+  ) {
+    return undefined;
+  }
+
+  return {
+    encryptedTokenSet:
+      value.encryptedTokenSet as unknown as EncryptedGggOAuthTokenSet,
+  };
+}
+
+function isGggOAuthTokenExpired(tokenSet: GggOAuthTokenSet, now: Date) {
+  return Date.parse(tokenSet.expiresAt) <= now.valueOf();
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function getSnapshotAccountPrefix(
