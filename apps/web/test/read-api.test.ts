@@ -193,6 +193,12 @@ describe("dashboard read API client", () => {
             character: "CalandraTest",
             className: "Deadeye",
             level: 92,
+            rank: 42,
+            mainSkill: "Lightning Arrow",
+            passiveTreeUrl:
+              "https://poe.ninja/poe2/builds/dawn/character/example/CalandraTest/passive-tree",
+            passiveSkillIds: ["keystone-1", "notable-2"],
+            updatedAt: "2026-06-22T00:00:00.000Z",
           },
         ],
       }),
@@ -201,16 +207,20 @@ describe("dashboard read API client", () => {
     const builds = await getDashboardLadderBuilds(
       "https://calandra-api.piogreeff.workers.dev",
       fetchImplementation,
+      { className: "Deadeye", skill: "Lightning", limit: 10 },
     );
 
     expect(fetchImplementation).toHaveBeenCalledWith(
-      "https://calandra-api.piogreeff.workers.dev/builds/ladder?league=Dawn+of+the+Hunt&patch=0.2.0",
+      "https://calandra-api.piogreeff.workers.dev/builds/ladder?league=Dawn+of+the+Hunt&patch=0.2.0&className=Deadeye&skill=Lightning&limit=10",
     );
     expect(builds.source).toBe("api");
     expect(builds.builds[0]).toMatchObject({
       character: "CalandraTest",
       className: "Deadeye",
       level: 92,
+      rank: 42,
+      mainSkill: "Lightning Arrow",
+      passiveSkillIds: ["keystone-1", "notable-2"],
     });
   });
 

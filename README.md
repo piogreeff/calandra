@@ -22,7 +22,7 @@ An AI-powered, open-source companion for **Path of Exile 2** — it mirrors your
 
 Hybrid by necessity: anything that reads the live game (overlay, hotkey, clipboard, log watching, build-file writes) runs in a local **Tauri 2** desktop agent; everything else (data, AI, sync, snapshots, MCP) is a **Cloudflare Workers** backend. One typed API contract serves all clients. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
-The Worker serves the current contract at `/openapi.json`; during temporary-domain development that is `https://calandra-api.piogreeff.workers.dev/openapi.json`. Published dataset metadata is available at `/datasets/manifest?league=<league>&patch=<patch>` after the Worker validates the artifact checksum and counts.
+The Worker serves the current contract at `/openapi.json`; during temporary-domain development that is `https://calandra-api.piogreeff.workers.dev/openapi.json`. Published dataset metadata is available at `/datasets/manifest?league=<league>&patch=<patch>` after the Worker validates the artifact checksum and counts. Ladder browsing is served from `/builds/ladder?league=<league>&patch=<patch>&className=<class>&skill=<skill>&limit=<n>`.
 
 The MCP server can be launched over stdio for local agent hosts:
 

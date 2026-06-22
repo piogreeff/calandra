@@ -15,7 +15,7 @@ describe("maintainer ingestion source policy", () => {
       executionContext: "maintainer",
       sources: [
         { kind: "game-data", host: "poe2db.tw", url: "https://poe2db.tw/us/" },
-        { kind: "economy", host: "poe.ninja", url: "https://poe.ninja/poe2" },
+        { kind: "ladder", host: "poe.ninja", url: "https://poe.ninja/poe2" },
       ],
     });
   });
@@ -50,7 +50,7 @@ describe("maintainer ingestion source policy", () => {
   it("exposes the default source allowlist for scheduled maintainer jobs", () => {
     expect(getMaintainerIngestionSources()).toEqual([
       { kind: "game-data", host: "poe2db.tw", url: "https://poe2db.tw/" },
-      { kind: "economy", host: "poe.ninja", url: "https://poe.ninja/poe2" },
+      { kind: "ladder", host: "poe.ninja", url: "https://poe.ninja/poe2" },
     ]);
   });
 });

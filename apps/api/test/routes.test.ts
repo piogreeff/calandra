@@ -182,6 +182,14 @@ describe("api routes", () => {
           character: "CalandraTest",
           className: "Deadeye",
           level: 92,
+          rank: 42,
+          mainSkill: "Lightning Arrow",
+          profileUrl:
+            "https://poe.ninja/poe2/builds/dawn/character/example/CalandraTest",
+          passiveTreeUrl:
+            "https://poe.ninja/poe2/builds/dawn/character/example/CalandraTest/passive-tree",
+          passiveSkillIds: ["keystone-1", "notable-2"],
+          updatedAt: "2026-06-22T00:00:00.000Z",
         },
       ],
     }),
@@ -486,7 +494,69 @@ describe("api routes", () => {
             character: "CalandraTest",
             className: "Deadeye",
             level: 92,
+            rank: 42,
+            mainSkill: "Lightning Arrow",
+            profileUrl:
+              "https://poe.ninja/poe2/builds/dawn/character/example/CalandraTest",
+            passiveTreeUrl:
+              "https://poe.ninja/poe2/builds/dawn/character/example/CalandraTest/passive-tree",
+            passiveSkillIds: ["keystone-1", "notable-2"],
+            updatedAt: "2026-06-22T00:00:00.000Z",
           },
+        ],
+      },
+    );
+  });
+
+  it("filters ladder builds by class, skill, and limit", async () => {
+    const env = {
+      APP_URL: "https://calandra.pages.dev",
+      DATASET_ARTIFACT_JSON: JSON.stringify({
+        league: "Dawn of the Hunt",
+        patch: "0.2.0",
+        generatedAt: "2026-06-21T00:00:00.000Z",
+        source: "published-artifact",
+        sources: datasetSources,
+        items: [],
+        uniques: [],
+        mods: [],
+        gems: [],
+        economy: [],
+        ladderBuilds: [
+          {
+            id: "deadeye-1",
+            account: "example",
+            character: "CalandraTest",
+            className: "Deadeye",
+            level: 92,
+            rank: 42,
+            mainSkill: "Lightning Arrow",
+          },
+          {
+            id: "monk-1",
+            account: "example",
+            character: "CalandraMonk",
+            className: "Monk",
+            level: 88,
+            rank: 44,
+            mainSkill: "Tempest Bell",
+          },
+        ],
+      }),
+    };
+
+    await expectJson(
+      "/builds/ladder?league=Dawn%20of%20the%20Hunt&patch=0.2.0&className=Deadeye&skill=lightning&limit=1",
+      env,
+      {
+        league: "Dawn of the Hunt",
+        patch: "0.2.0",
+        builds: [
+          expect.objectContaining({
+            id: "deadeye-1",
+            className: "Deadeye",
+            mainSkill: "Lightning Arrow",
+          }),
         ],
       },
     );

@@ -78,6 +78,12 @@ export type DashboardLadderBuilds = {
   builds: LadderBuild[];
 };
 
+export type DashboardLadderBuildFilters = {
+  className?: string;
+  skill?: string;
+  limit?: number;
+};
+
 type DashboardSnapshotReadOptions = {
   snapshotReadToken?: string;
 };
@@ -157,6 +163,12 @@ const fallbackLadderBuilds: LadderBuild[] = [
     character: "ResurrectGodAura",
     className: "Martial Artist",
     level: 95,
+    rank: 18,
+    mainSkill: "Twister",
+    passiveTreeUrl:
+      "https://poe.ninja/poe2/builds/runesofaldur/character/heygyus-0416/ResurrectGodAura/passive-tree",
+    passiveSkillIds: ["aura-wheel", "spirit-path", "reservation"],
+    updatedAt: "2026-06-21T13:15:00.000Z",
   },
 ];
 
@@ -399,9 +411,13 @@ export async function getDashboardSearch(
 export async function getDashboardLadderBuilds(
   apiBaseUrl = defaultApiBaseUrl,
   fetchImplementation: typeof fetch = fetch,
+  filters: DashboardLadderBuildFilters = {},
 ): Promise<DashboardLadderBuilds> {
   try {
     const query = new URLSearchParams(dashboardDatasetVersion);
+    if (filters.className) query.set("className", filters.className);
+    if (filters.skill) query.set("skill", filters.skill);
+    if (filters.limit) query.set("limit", String(filters.limit));
     const collection = await fetchJson(
       fetchImplementation,
       `${apiBaseUrl}/builds/ladder?${query.toString()}`,

@@ -74,7 +74,7 @@ describe("maintainer dataset artifact builder", () => {
     });
     expect(artifact.sources).toEqual([
       expect.objectContaining({ kind: "game-data", name: "poe2db.tw" }),
-      expect.objectContaining({ kind: "economy", name: "poe.ninja" }),
+      expect.objectContaining({ kind: "ladder", name: "poe.ninja" }),
       expect.objectContaining({
         kind: "image",
         name: "Grinding Gear Games CDN",

@@ -124,6 +124,12 @@ export const ladderBuildSchema = z.object({
   character: z.string().min(1),
   className: z.string().min(1),
   level: z.number().int().positive(),
+  rank: z.number().int().positive().optional(),
+  mainSkill: z.string().min(1).optional(),
+  profileUrl: z.string().url().optional(),
+  passiveTreeUrl: z.string().url().optional(),
+  passiveSkillIds: z.array(z.string().min(1)).optional(),
+  updatedAt: z.string().datetime().optional(),
 });
 
 export const ladderBuildCollectionSchema = z.object({
@@ -678,7 +684,27 @@ export const openApiDocument = {
       get: {
         operationId: "listLadderBuilds",
         summary: "List patch-versioned ladder build snapshots",
-        parameters: versionedQueryParameters,
+        parameters: [
+          ...versionedQueryParameters,
+          {
+            name: "className",
+            in: "query",
+            schema: { type: "string" },
+            required: false,
+          },
+          {
+            name: "skill",
+            in: "query",
+            schema: { type: "string" },
+            required: false,
+          },
+          {
+            name: "limit",
+            in: "query",
+            schema: { type: "integer", minimum: 1, maximum: 100 },
+            required: false,
+          },
+        ],
         responses: {
           "200": {
             description: "Ladder build collection",
@@ -1383,6 +1409,15 @@ export const openApiDocument = {
           character: { type: "string", minLength: 1 },
           className: { type: "string", minLength: 1 },
           level: { type: "integer", minimum: 1 },
+          rank: { type: "integer", minimum: 1 },
+          mainSkill: { type: "string", minLength: 1 },
+          profileUrl: { type: "string", format: "uri" },
+          passiveTreeUrl: { type: "string", format: "uri" },
+          passiveSkillIds: {
+            type: "array",
+            items: { type: "string", minLength: 1 },
+          },
+          updatedAt: { type: "string", format: "date-time" },
         },
       },
       LadderBuildCollection: {

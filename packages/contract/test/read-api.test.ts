@@ -262,10 +262,45 @@ describe("phase 1 read API contract", () => {
             character: "CalandraTest",
             className: "Deadeye",
             level: 92,
+            rank: 42,
+            mainSkill: "Lightning Arrow",
+            profileUrl:
+              "https://poe.ninja/poe2/builds/dawn/character/example/CalandraTest",
+            passiveTreeUrl:
+              "https://poe.ninja/poe2/builds/dawn/character/example/CalandraTest/passive-tree",
+            passiveSkillIds: ["keystone-1", "notable-2"],
+            updatedAt: "2026-06-22T00:00:00.000Z",
           },
         ],
       }).builds,
     ).toHaveLength(1);
+    expect(
+      ladderBuildCollectionSchema.parse({
+        league: "Dawn of the Hunt",
+        patch: "0.2.0",
+        builds: [
+          {
+            id: "deadeye-1",
+            account: "example",
+            character: "CalandraTest",
+            className: "Deadeye",
+            level: 92,
+            rank: 42,
+            mainSkill: "Lightning Arrow",
+            profileUrl:
+              "https://poe.ninja/poe2/builds/dawn/character/example/CalandraTest",
+            passiveTreeUrl:
+              "https://poe.ninja/poe2/builds/dawn/character/example/CalandraTest/passive-tree",
+            passiveSkillIds: ["keystone-1", "notable-2"],
+            updatedAt: "2026-06-22T00:00:00.000Z",
+          },
+        ],
+      }).builds[0],
+    ).toMatchObject({
+      rank: 42,
+      mainSkill: "Lightning Arrow",
+      passiveSkillIds: ["keystone-1", "notable-2"],
+    });
   });
 
   it("models grouped dataset search results for the patch-versioned item database", () => {
@@ -320,6 +355,27 @@ describe("phase 1 read API contract", () => {
       "searchDataset",
     );
     expect(openApiDocument.paths["/builds/ladder"]).toBeDefined();
+    expect(
+      openApiDocument.paths["/builds/ladder"]?.get?.parameters,
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "className", in: "query" }),
+        expect.objectContaining({ name: "skill", in: "query" }),
+        expect.objectContaining({ name: "limit", in: "query" }),
+      ]),
+    );
+    expect(
+      openApiDocument.components.schemas.LadderBuild.properties.mainSkill,
+    ).toEqual({ type: "string", minLength: 1 });
+    expect(
+      openApiDocument.components.schemas.LadderBuild.properties.passiveTreeUrl,
+    ).toEqual({ type: "string", format: "uri" });
+    expect(
+      openApiDocument.components.schemas.LadderBuild.properties.passiveSkillIds,
+    ).toEqual({
+      type: "array",
+      items: { type: "string", minLength: 1 },
+    });
     expect(openApiDocument.paths["/datasets/manifest"]).toBeDefined();
     expect(openApiDocument.components.schemas.ModStat).toBeDefined();
     expect(openApiDocument.components.schemas.Mod.properties.stats).toEqual({

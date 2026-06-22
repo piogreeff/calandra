@@ -101,6 +101,12 @@ describe("home dashboard", () => {
     expect(html).toContain("Ladder builds");
     expect(html).toContain("CalandraTest");
     expect(html).toContain("Level 92 Deadeye");
+    expect(html).toContain("#42");
+    expect(html).toContain("Lightning Arrow");
+    expect(html).toContain("Open passive tree");
+    expect(html).toContain(
+      "https://poe.ninja/poe2/builds/dawn/character/example/CalandraTest/passive-tree",
+    );
     expect(html).toContain("example");
     expect(html).toContain("Desktop shell");
     expect(html).toContain("Checking desktop shell");
@@ -197,6 +203,11 @@ function mockDashboardFetch() {
             character: "CalandraTest",
             className: "Deadeye",
             level: 92,
+            rank: 42,
+            mainSkill: "Lightning Arrow",
+            passiveTreeUrl:
+              "https://poe.ninja/poe2/builds/dawn/character/example/CalandraTest/passive-tree",
+            passiveSkillIds: ["keystone-1", "notable-2"],
           },
         ],
       });

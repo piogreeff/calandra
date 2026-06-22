@@ -629,12 +629,38 @@ export default async function Home({
                             </h3>
                           </div>
                           <span className="shrink-0 rounded-md bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
-                            Level {build.level}
+                            {build.rank
+                              ? `#${build.rank}`
+                              : `Level ${build.level}`}
                           </span>
                         </div>
                         <p className="mt-2 text-sm text-base-content/65">
                           Level {build.level} {build.className}
                         </p>
+                        {build.mainSkill ? (
+                          <p className="mt-1 text-sm font-medium text-base-content">
+                            {build.mainSkill}
+                          </p>
+                        ) : null}
+                        {build.passiveSkillIds?.length ? (
+                          <p className="mt-1 text-xs text-base-content/55">
+                            {build.passiveSkillIds.length} passive nodes tracked
+                          </p>
+                        ) : null}
+                        {build.passiveTreeUrl ? (
+                          <a
+                            href={build.passiveTreeUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="btn btn-outline btn-xs mt-3 w-full"
+                          >
+                            Open passive tree
+                            <ExternalLink
+                              className="size-3"
+                              aria-hidden="true"
+                            />
+                          </a>
+                        ) : null}
                       </article>
                     ))}
                   </div>

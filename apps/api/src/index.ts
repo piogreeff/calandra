@@ -1202,7 +1202,11 @@ api.get("/builds/ladder", async (context) => {
   return context.json(
     ladderBuildCollectionSchema.parse({
       ...responseVersion,
-      builds: artifact?.ladderBuilds ?? [],
+      builds: filterLadderBuilds(artifact?.ladderBuilds ?? [], {
+        className: context.req.query("className"),
+        skill: context.req.query("skill"),
+        limit: context.req.query("limit"),
+      }),
     }),
   );
 });
@@ -1908,6 +1912,37 @@ function matchesGem(gem: DatasetArtifact["gems"][number], query: string) {
   return [gem.id, gem.name, gem.kind, ...(gem.tags ?? [])].some((value) =>
     normalizeSearchValue(value).includes(query),
   );
+}
+
+function filterLadderBuilds(
+  builds: DatasetArtifact["ladderBuilds"],
+  filters: {
+    className: string | undefined;
+    skill: string | undefined;
+    limit: string | undefined;
+  },
+) {
+  const className = filters.className
+    ? normalizeSearchValue(filters.className)
+    : "";
+  const skill = filters.skill ? normalizeSearchValue(filters.skill) : "";
+  const limit = Math.min(
+    Math.max(Number.parseInt(filters.limit ?? "50", 10) || 50, 1),
+    100,
+  );
+
+  return builds
+    .filter((build) =>
+      className
+        ? normalizeSearchValue(build.className).includes(className)
+        : true,
+    )
+    .filter((build) =>
+      skill && build.mainSkill
+        ? normalizeSearchValue(build.mainSkill).includes(skill)
+        : !skill,
+    )
+    .slice(0, limit);
 }
 
 async function sha256Hex(value: string) {

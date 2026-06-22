@@ -4,7 +4,7 @@ export type MaintainerIngestionExecutionContext =
   | "self-host";
 
 export type MaintainerIngestionSource = {
-  kind: "game-data" | "economy";
+  kind: "game-data" | "ladder";
   host: "poe2db.tw" | "poe.ninja";
   url: string;
 };
@@ -16,7 +16,7 @@ export type MaintainerIngestionRequest = {
 
 const allowedSources = [
   { kind: "game-data", host: "poe2db.tw", url: "https://poe2db.tw/" },
-  { kind: "economy", host: "poe.ninja", url: "https://poe.ninja/poe2" },
+  { kind: "ladder", host: "poe.ninja", url: "https://poe.ninja/poe2" },
 ] as const satisfies readonly MaintainerIngestionSource[];
 
 const bannedSourceHosts = new Set(["mobalytics.gg", "maxroll.gg"]);
