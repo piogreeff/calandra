@@ -15,9 +15,9 @@ describe("Calandra UI theme tokens", () => {
     expect(availableThemeNames[0]).toBe(calandraThemeName);
   });
 
-  it("exports the dark gold Calandra palette and rarity colors", () => {
-    expect(calandraThemeTokens["--color-base-100"]).toBe("#0d0b08");
-    expect(calandraThemeTokens["--color-primary"]).toBe("#c9a227");
+  it("exports the graphite cyan Calandra palette and rarity colors", () => {
+    expect(calandraThemeTokens["--color-base-100"]).toBe("#0b0d10");
+    expect(calandraThemeTokens["--color-primary"]).toBe("#38bdf8");
     expect(rarityTokens["--rarity-unique"]).toBe("#af6025");
     expect(rarityTokens["--rarity-currency"]).toBe("#aa9e82");
   });
