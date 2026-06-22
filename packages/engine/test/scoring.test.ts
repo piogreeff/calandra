@@ -214,4 +214,41 @@ describe("deterministic item scoring", () => {
     ]);
     expect(ranked[0]?.estimatedCostChaos).toBeUndefined();
   });
+
+  it("does not recommend equal or worse gear as upgrades", () => {
+    const ranked = rankLoadoutUpgrades({
+      equipped: [
+        {
+          slot: "gloves",
+          name: "Current Gloves",
+          stats: { life: 60, fireResistance: 20 },
+        },
+      ],
+      candidates: [
+        {
+          slot: "gloves",
+          name: "Same Gloves",
+          stats: { life: 60, fireResistance: 20 },
+          estimatedCostChaos: 5,
+        },
+        {
+          slot: "gloves",
+          name: "Worse Gloves",
+          stats: { life: 40 },
+          estimatedCostChaos: 3,
+        },
+        {
+          slot: "gloves",
+          name: "Better Gloves",
+          stats: { life: 80, fireResistance: 20 },
+          estimatedCostChaos: 10,
+        },
+      ],
+      weights,
+    });
+
+    expect(ranked.map((candidate) => candidate.candidateName)).toEqual([
+      "Better Gloves",
+    ]);
+  });
 });

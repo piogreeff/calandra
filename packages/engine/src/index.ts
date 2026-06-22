@@ -247,16 +247,16 @@ export function rankLoadoutUpgrades(
         return [];
       }
 
-      return [
-        compareUpgradeCandidate({
-          current,
-          candidate,
-          weights: input.weights,
-          ...(candidate.estimatedCostChaos !== undefined
-            ? { estimatedCostChaos: candidate.estimatedCostChaos }
-            : {}),
-        }),
-      ];
+      const comparison = compareUpgradeCandidate({
+        current,
+        candidate,
+        weights: input.weights,
+        ...(candidate.estimatedCostChaos !== undefined
+          ? { estimatedCostChaos: candidate.estimatedCostChaos }
+          : {}),
+      });
+
+      return comparison.scoreDelta > 0 ? [comparison] : [];
     }),
   );
 }
