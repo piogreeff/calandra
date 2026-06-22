@@ -25,7 +25,10 @@ import type {
 } from "@calandra/contract";
 import { defaultTheme } from "../lib/theme";
 import { DatasetSearchPanel } from "../components/DatasetSearchPanel";
-import { DesktopPathsPanel } from "../components/DesktopPathsPanel";
+import {
+  DesktopPathsPanel,
+  type AdvisorBuildExport,
+} from "../components/DesktopPathsPanel";
 import { GggOAuthLinkPanel } from "../components/GggOAuthLinkPanel";
 import { ThemeSelector } from "../components/ThemeSelector";
 import {
@@ -289,6 +292,10 @@ export default async function Home({
     hasExplicitSnapshotSelection
       ? "Selected account snapshot"
       : "Latest account snapshot",
+  );
+  const advisorBuildExport = createAdvisorBuildExport(
+    visualLoadoutPreview,
+    snapshotAdvisor.response.upgrades,
   );
 
   return (
@@ -1027,7 +1034,7 @@ export default async function Home({
                 />
               </Panel>
 
-              <DesktopPathsPanel />
+              <DesktopPathsPanel advisorBuildExport={advisorBuildExport} />
 
               <Panel
                 title="About Calandra"
@@ -1287,6 +1294,25 @@ function createLadderBuildLoadoutPreview(
         ladderBuild.passiveTreeUrl ??
         fallbackVisualLoadoutPreview.passiveTree.referenceUrl,
     },
+  };
+}
+
+function createAdvisorBuildExport(
+  loadout: VisualLoadoutPreview,
+  upgrades: AdvisorBuildExport["upgrades"],
+): AdvisorBuildExport {
+  return {
+    name: loadout.character.name,
+    className: loadout.character.className,
+    level: loadout.character.level,
+    league: loadout.character.league,
+    patch: dashboardDatasetVersion.patch,
+    passiveSkillIds: loadout.passiveTree.nodeIds,
+    equipment: loadout.equipment.map((item) => ({
+      slot: item.slot,
+      name: item.name,
+    })),
+    upgrades,
   };
 }
 

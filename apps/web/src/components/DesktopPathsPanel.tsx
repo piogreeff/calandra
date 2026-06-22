@@ -38,6 +38,24 @@ import {
 import { dashboardDatasetVersion, defaultApiBaseUrl } from "../lib/read-api";
 import type { ParsedClientLogLine } from "@calandra/parser";
 
+export type AdvisorBuildExport = {
+  name: string;
+  className: string;
+  level: number;
+  league: string;
+  patch: string;
+  mainSkill?: string;
+  passiveSkillIds: string[];
+  equipment: Array<{ slot: string; name: string }>;
+  upgrades: Array<{
+    slot: string;
+    currentName: string;
+    candidateName: string;
+    scoreDelta: number;
+    estimatedCostChaos?: number | undefined;
+  }>;
+};
+
 type DesktopPathsPanelState =
   | { status: "loading" }
   | { status: "ready"; bridge: DesktopPoe2PathState }
@@ -84,6 +102,7 @@ type ClientLogWatchState =
   | { status: "error"; message: string };
 
 export function DesktopPathsPanel({
+  advisorBuildExport = fallbackAdvisorBuildExport,
   loadPaths = getDesktopPoe2Paths,
   captureClipboardItem = captureDesktopClipboardItem,
   priceClipboardItem = priceDesktopClipboardItem,
@@ -96,6 +115,7 @@ export function DesktopPathsPanel({
   clientLogPollIntervalMs = defaultClientLogPollIntervalMs,
   now = defaultNow,
 }: {
+  advisorBuildExport?: AdvisorBuildExport;
   loadPaths?: () => Promise<DesktopPoe2PathState>;
   captureClipboardItem?: (
     request: DesktopClipboardItemCaptureRequest,
@@ -291,6 +311,7 @@ export function DesktopPathsPanel({
         createAdvisorBuildExportRequest({
           buildPlannerDirectory: paths.buildPlannerDirectory,
           capturedAt: now().toISOString(),
+          exportBuild: advisorBuildExport,
         }),
       );
 
@@ -591,19 +612,70 @@ export function createOverlayModeRequest({
 export function createAdvisorBuildExportRequest({
   buildPlannerDirectory,
   capturedAt,
+  exportBuild,
 }: {
   buildPlannerDirectory: string;
   capturedAt: string;
+  exportBuild: AdvisorBuildExport;
 }): DesktopBuildFileWriteRequest {
   return {
     buildPlannerDirectory,
-    fileName: "Calandra Advisor Export",
-    content:
-      "[build]\nname=Calandra Advisor Export\nsource=calandra\nnotes=Generated from the deterministic advisor preview.\n",
+    fileName: normalizeBuildExportFileName(exportBuild.name),
+    content: createBuildPlannerExportContent(exportBuild),
     actionId: `advisor-export-${capturedAt.replace(/[:.]/g, "-")}`,
     userInitiated: true,
   };
 }
+
+function createBuildPlannerExportContent(exportBuild: AdvisorBuildExport) {
+  return [
+    "# Calandra BuildPlanner export",
+    `name=${exportBuild.name}`,
+    `class=${exportBuild.className}`,
+    `level=${exportBuild.level}`,
+    `league=${exportBuild.league}`,
+    `patch=${exportBuild.patch}`,
+    `mainSkill=${exportBuild.mainSkill ?? ""}`,
+    "",
+    "[passives]",
+    ...exportBuild.passiveSkillIds,
+    "",
+    "[equipment]",
+    ...exportBuild.equipment.map((item) => `${item.slot}=${item.name}`),
+    "",
+    "[upgrades]",
+    ...exportBuild.upgrades.map(formatBuildPlannerUpgrade),
+    "",
+  ].join("\n");
+}
+
+function formatBuildPlannerUpgrade(
+  upgrade: AdvisorBuildExport["upgrades"][number],
+) {
+  const cost =
+    upgrade.estimatedCostChaos === undefined
+      ? "unpriced"
+      : `${upgrade.estimatedCostChaos} chaos`;
+
+  return `${upgrade.slot}=${upgrade.candidateName} over ${upgrade.currentName} (+${upgrade.scoreDelta}, ${cost})`;
+}
+
+function normalizeBuildExportFileName(value: string) {
+  const normalized = value.trim().replace(/[\\/:]/g, "-");
+
+  return normalized || "Calandra Advisor Export";
+}
+
+const fallbackAdvisorBuildExport: AdvisorBuildExport = {
+  name: "Calandra Advisor Export",
+  className: "Unknown",
+  level: 0,
+  league: dashboardDatasetVersion.league,
+  patch: dashboardDatasetVersion.patch,
+  passiveSkillIds: [],
+  equipment: [],
+  upgrades: [],
+};
 
 export function defaultLocalBackupDirectory(gameDirectory: string): string {
   const trimmed = gameDirectory.replace(/[\\/]+$/, "");

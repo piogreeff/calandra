@@ -95,13 +95,31 @@ describe("DesktopPathsPanel helpers", () => {
         buildPlannerDirectory:
           "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2\\BuildPlanner",
         capturedAt: "2026-06-21T19:05:00.000Z",
+        exportBuild: {
+          name: "RealMonkBefore",
+          className: "Monk",
+          level: 43,
+          league: "Dawn of the Hunt",
+          patch: "0.2.0",
+          passiveSkillIds: ["passive-before"],
+          equipment: [{ slot: "Gloves", name: "Threadbare Gloves" }],
+          upgrades: [
+            {
+              slot: "Gloves",
+              currentName: "Threadbare Gloves",
+              candidateName: "Early Gloves",
+              scoreDelta: 22,
+              estimatedCostChaos: 6,
+            },
+          ],
+        },
       }),
     ).toEqual({
       buildPlannerDirectory:
         "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2\\BuildPlanner",
-      fileName: "Calandra Advisor Export",
+      fileName: "RealMonkBefore",
       content:
-        "[build]\nname=Calandra Advisor Export\nsource=calandra\nnotes=Generated from the deterministic advisor preview.\n",
+        "# Calandra BuildPlanner export\nname=RealMonkBefore\nclass=Monk\nlevel=43\nleague=Dawn of the Hunt\npatch=0.2.0\nmainSkill=\n\n[passives]\npassive-before\n\n[equipment]\nGloves=Threadbare Gloves\n\n[upgrades]\nGloves=Early Gloves over Threadbare Gloves (+22, 6 chaos)\n",
       actionId: "advisor-export-2026-06-21T19-05-00-000Z",
       userInitiated: true,
     });
