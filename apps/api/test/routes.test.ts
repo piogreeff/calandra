@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   encryptGggOAuthTokenSet,
@@ -38,6 +39,35 @@ const r2Artifact = JSON.stringify({
 
 const r2ArtifactSha256 =
   "33272bd5d8c37deda60f5681e28372a400d207636abdacfbd1e07f2f359bfff8";
+
+const uniqueCoverageArtifact = JSON.stringify({
+  league: "Dawn of the Hunt",
+  patch: "0.2.0",
+  generatedAt: "2026-06-21T00:00:00.000Z",
+  source: "published-artifact",
+  sources: datasetSources,
+  items: [],
+  uniques: Array.from({ length: 20 }, (_, index) => ({
+    id: `unique-${index + 1}`,
+    name: `Unique ${index + 1}`,
+    category: "amulet",
+    rarity: "unique",
+    iconUrl:
+      index < 19
+        ? `https://web.poecdn.com/image/unique-${index + 1}.png`
+        : "http://web.poecdn.com/image/unresolved-unique.png",
+    iconAttribution:
+      "Game art and item data are property of Grinding Gear Games.",
+  })),
+  mods: [],
+  gems: [],
+  economy: [],
+  ladderBuilds: [],
+});
+
+const uniqueCoverageArtifactSha256 = createHash("sha256")
+  .update(uniqueCoverageArtifact)
+  .digest("hex");
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -728,6 +758,113 @@ describe("api routes", () => {
         economy: 0,
         ladderBuilds: 0,
       },
+    });
+  });
+
+  it("serves an R2 dataset manifest when unique icon coverage meets the gate", async () => {
+    const response = await api.request(
+      "/datasets/manifest?league=Dawn%20of%20the%20Hunt&patch=0.2.0",
+      undefined,
+      {
+        APP_URL: "https://calandra.pages.dev",
+        DATASET_R2_PREFIX: "datasets",
+        DATA_BUCKET: {
+          async get(key: string) {
+            return {
+              async text() {
+                return key.endsWith(".manifest.json")
+                  ? JSON.stringify({
+                      league: "Dawn of the Hunt",
+                      patch: "0.2.0",
+                      generatedAt: "2026-06-21T00:00:00.000Z",
+                      artifactKey: "datasets/Dawn of the Hunt/0.2.0.json",
+                      sha256: uniqueCoverageArtifactSha256,
+                      sources: datasetSources,
+                      qualityGates: {
+                        uniqueImageCoverage: {
+                          resolved: 19,
+                          expected: 20,
+                          ratio: 0.95,
+                          minimum: 0.95,
+                        },
+                      },
+                      counts: {
+                        items: 0,
+                        uniques: 20,
+                        mods: 0,
+                        gems: 0,
+                        economy: 0,
+                        ladderBuilds: 0,
+                      },
+                    })
+                  : uniqueCoverageArtifact;
+              },
+            };
+          },
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      qualityGates: {
+        uniqueImageCoverage: {
+          resolved: 19,
+          expected: 20,
+          ratio: 0.95,
+          minimum: 0.95,
+        },
+      },
+    });
+  });
+
+  it("rejects an R2 manifest that overstates unique HTTPS image coverage", async () => {
+    const response = await api.request(
+      "/datasets/manifest?league=Dawn%20of%20the%20Hunt&patch=0.2.0",
+      undefined,
+      {
+        APP_URL: "https://calandra.pages.dev",
+        DATASET_R2_PREFIX: "datasets",
+        DATA_BUCKET: {
+          async get(key: string) {
+            return {
+              async text() {
+                return key.endsWith(".manifest.json")
+                  ? JSON.stringify({
+                      league: "Dawn of the Hunt",
+                      patch: "0.2.0",
+                      generatedAt: "2026-06-21T00:00:00.000Z",
+                      artifactKey: "datasets/Dawn of the Hunt/0.2.0.json",
+                      sha256: uniqueCoverageArtifactSha256,
+                      sources: datasetSources,
+                      qualityGates: {
+                        uniqueImageCoverage: {
+                          resolved: 20,
+                          expected: 20,
+                          ratio: 1,
+                          minimum: 0.95,
+                        },
+                      },
+                      counts: {
+                        items: 0,
+                        uniques: 20,
+                        mods: 0,
+                        gems: 0,
+                        economy: 0,
+                        ladderBuilds: 0,
+                      },
+                    })
+                  : uniqueCoverageArtifact;
+              },
+            };
+          },
+        },
+      },
+    );
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toEqual({
+      error: "dataset artifact failed manifest validation",
     });
   });
 

@@ -1695,9 +1695,10 @@ function validateUniqueImageCoverageGate(
 
   const ratio =
     coverage.expected === 0 ? 1 : coverage.resolved / coverage.expected;
+  const resolved = artifact.uniques.filter(hasResolvedUniqueImage).length;
 
   if (
-    coverage.resolved !== artifact.uniques.length ||
+    coverage.resolved !== resolved ||
     coverage.ratio !== ratio ||
     coverage.ratio < coverage.minimum
   ) {
@@ -1705,6 +1706,10 @@ function validateUniqueImageCoverageGate(
       "Dataset manifest unique image coverage mismatch",
     );
   }
+}
+
+function hasResolvedUniqueImage(unique: DatasetArtifact["uniques"][number]) {
+  return unique.iconUrl.startsWith("https://");
 }
 
 function findPriceMatch(
