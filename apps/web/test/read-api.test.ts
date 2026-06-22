@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  completeDashboardGggOAuthLink,
   getDashboardDataset,
   getDashboardGggOAuthStatus,
   getDashboardSearch,
   getDashboardSnapshotDiff,
   getDashboardSnapshots,
+  startDashboardGggOAuthLink,
 } from "../src/lib/read-api";
 
 const datasetSources = [
@@ -222,6 +224,86 @@ describe("dashboard read API client", () => {
     });
   });
 
+  it("starts browser-safe GGG OAuth with a public API request", async () => {
+    const fetchImplementation = vi.fn(
+      async (input: RequestInfo | URL, init) => {
+        expect(String(input)).toBe(
+          "https://calandra-api.piogreeff.workers.dev/auth/ggg/start",
+        );
+        expect(init).toMatchObject({
+          method: "POST",
+          headers: { "content-type": "application/json" },
+        });
+        expect(JSON.parse(String(init?.body))).toEqual({
+          account: "example",
+        });
+
+        return Response.json({
+          source: "ggg-oauth-start",
+          account: "example",
+          authorizationUrl:
+            "https://www.pathofexile.com/oauth/authorize?client_id=calandra",
+          state: "oauth-state",
+          expiresAt: "2026-06-21T10:10:00.000Z",
+          redirectUri: "https://calandra.pages.dev/auth/ggg/callback",
+          requiredScopes: ["account:characters"],
+        });
+      },
+    );
+
+    const started = await startDashboardGggOAuthLink(
+      "example",
+      "https://calandra-api.piogreeff.workers.dev",
+      fetchImplementation,
+    );
+
+    expect(started.authorizationUrl).toContain(
+      "https://www.pathofexile.com/oauth/authorize",
+    );
+    expect(started.state).toBe("oauth-state");
+    expect(JSON.stringify(started)).not.toContain("codeVerifier");
+  });
+
+  it("completes browser-safe GGG OAuth with state and code only", async () => {
+    const fetchImplementation = vi.fn(
+      async (input: RequestInfo | URL, init) => {
+        expect(String(input)).toBe(
+          "https://calandra-api.piogreeff.workers.dev/auth/ggg/complete",
+        );
+        expect(init).toMatchObject({
+          method: "POST",
+          headers: { "content-type": "application/json" },
+        });
+        expect(JSON.parse(String(init?.body))).toEqual({
+          state: "oauth-state",
+          code: "authorization-code",
+        });
+
+        return Response.json({
+          source: "ggg-oauth-token-store",
+          account: "CalandraAccount",
+          objectKey: "oauth/ggg/CalandraAccount/token.json",
+          token: {
+            tokenType: "encrypted",
+            expiresAt: "2026-06-21T11:00:00.000Z",
+            scope: ["account:characters"],
+            username: "CalandraAccount",
+          },
+        });
+      },
+    );
+
+    const completed = await completeDashboardGggOAuthLink(
+      { state: "oauth-state", code: "authorization-code" },
+      "https://calandra-api.piogreeff.workers.dev",
+      fetchImplementation,
+    );
+
+    expect(completed.account).toBe("CalandraAccount");
+    expect(completed.token.scope).toEqual(["account:characters"]);
+    expect(JSON.stringify(completed)).not.toContain("access_token");
+  });
+
   it("returns empty fallback search results for blank or unavailable searches", async () => {
     const blank = await getDashboardSearch(
       "   ",
@@ -288,49 +370,51 @@ describe("dashboard read API client", () => {
   });
 
   it("loads the latest account snapshot diff through the typed API", async () => {
-    const fetchImplementation = vi.fn(async (input: RequestInfo | URL, init) => {
-      const url = String(input);
+    const fetchImplementation = vi.fn(
+      async (input: RequestInfo | URL, init) => {
+        const url = String(input);
 
-      expect(url).toBe(
-        "https://calandra-api.piogreeff.workers.dev/snapshots/example/diff?beforeSnapshotId=snapshot-before&afterSnapshotId=snapshot-after",
-      );
-      expect(init).toBeUndefined();
+        expect(url).toBe(
+          "https://calandra-api.piogreeff.workers.dev/snapshots/example/diff?beforeSnapshotId=snapshot-before&afterSnapshotId=snapshot-after",
+        );
+        expect(init).toBeUndefined();
 
-      return Response.json({
-        beforeSnapshotId: "snapshot-before",
-        afterSnapshotId: "snapshot-after",
-        beforeCapturedAt: "2026-06-21T09:00:00.000Z",
-        afterCapturedAt: "2026-06-21T10:00:00.000Z",
-        characterChanges: [
-          {
-            id: "char-1",
-            name: "Monkette",
-            type: "changed",
-            beforeLevel: 43,
-            afterLevel: 45,
-            levelDelta: 2,
-            equipmentChanges: [
-              {
-                type: "changed",
-                slot: "Gloves",
-                beforeName: "Frayed Mail Mitts",
-                afterName: "Duskthread Grips",
-              },
-            ],
-          },
-        ],
-        stashChanges: [
-          {
-            id: "stash-1",
-            name: "Currency Tab",
-            type: "changed",
-            beforeItemCount: 1,
-            afterItemCount: 2,
-            itemCountDelta: 1,
-          },
-        ],
-      });
-    });
+        return Response.json({
+          beforeSnapshotId: "snapshot-before",
+          afterSnapshotId: "snapshot-after",
+          beforeCapturedAt: "2026-06-21T09:00:00.000Z",
+          afterCapturedAt: "2026-06-21T10:00:00.000Z",
+          characterChanges: [
+            {
+              id: "char-1",
+              name: "Monkette",
+              type: "changed",
+              beforeLevel: 43,
+              afterLevel: 45,
+              levelDelta: 2,
+              equipmentChanges: [
+                {
+                  type: "changed",
+                  slot: "Gloves",
+                  beforeName: "Frayed Mail Mitts",
+                  afterName: "Duskthread Grips",
+                },
+              ],
+            },
+          ],
+          stashChanges: [
+            {
+              id: "stash-1",
+              name: "Currency Tab",
+              type: "changed",
+              beforeItemCount: 1,
+              afterItemCount: 2,
+              itemCountDelta: 1,
+            },
+          ],
+        });
+      },
+    );
 
     const diff = await getDashboardSnapshotDiff(
       "example",

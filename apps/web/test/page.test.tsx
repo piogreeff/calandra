@@ -43,6 +43,8 @@ describe("home dashboard", () => {
     expect(html).toContain("Snapshot restore");
     expect(html).toContain("GGG account link");
     expect(html).toContain("Ready to link");
+    expect(html).toContain("Link GGG account");
+    expect(html).toContain('name="account"');
     expect(html).toContain("account:characters");
     expect(html).toContain("/auth/ggg/callback");
     expect(html).toContain("snapshot-2026-06-21T10-00-00Z");

@@ -5,7 +5,11 @@ import {
   datasetManifestSchema,
   datasetSearchResponseSchema,
   economyCollectionSchema,
+  gggOAuthCompleteRequestSchema,
+  gggOAuthStartRequestSchema,
+  gggOAuthStartResponseSchema,
   gggOAuthStatusResponseSchema,
+  gggOAuthTokenExchangeResponseSchema,
   itemCollectionSchema,
   uniqueCollectionSchema,
   type AccountSnapshotDiff,
@@ -13,7 +17,10 @@ import {
   type DatasetManifest,
   type DatasetSearchResponse,
   type EconomyPrice,
+  type GggOAuthCompleteRequest,
+  type GggOAuthStartResponse,
   type GggOAuthStatusResponse,
+  type GggOAuthTokenExchangeResponse,
   type Item,
   type UniqueItem,
 } from "@calandra/contract";
@@ -241,6 +248,44 @@ export async function getDashboardGggOAuthStatus(
   } catch {
     return fallbackGggOAuthStatus();
   }
+}
+
+export async function startDashboardGggOAuthLink(
+  account: string,
+  apiBaseUrl = defaultApiBaseUrl,
+  fetchImplementation: typeof fetch = fetch,
+): Promise<GggOAuthStartResponse> {
+  const request = gggOAuthStartRequestSchema.parse({ account });
+
+  return fetchJson(
+    fetchImplementation,
+    `${apiBaseUrl}/auth/ggg/start`,
+    gggOAuthStartResponseSchema.parse,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(request),
+    },
+  );
+}
+
+export async function completeDashboardGggOAuthLink(
+  request: GggOAuthCompleteRequest,
+  apiBaseUrl = defaultApiBaseUrl,
+  fetchImplementation: typeof fetch = fetch,
+): Promise<GggOAuthTokenExchangeResponse> {
+  const parsedRequest = gggOAuthCompleteRequestSchema.parse(request);
+
+  return fetchJson(
+    fetchImplementation,
+    `${apiBaseUrl}/auth/ggg/complete`,
+    gggOAuthTokenExchangeResponseSchema.parse,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(parsedRequest),
+    },
+  );
 }
 
 export async function getDashboardSearch(

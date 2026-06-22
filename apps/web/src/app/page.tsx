@@ -18,6 +18,7 @@ import type { UpgradeAdvisorResponse } from "@calandra/contract";
 import { defaultTheme } from "../lib/theme";
 import { DatasetSearchPanel } from "../components/DatasetSearchPanel";
 import { DesktopPathsPanel } from "../components/DesktopPathsPanel";
+import { GggOAuthLinkPanel } from "../components/GggOAuthLinkPanel";
 import { ThemeSelector } from "../components/ThemeSelector";
 import {
   dashboardDatasetVersion,
@@ -95,9 +96,6 @@ export default async function Home() {
     dataset.source === "api" ? "Published R2 artifact" : "Demo fallback";
   const snapshotSource =
     snapshotList.source === "api" ? "Snapshot store" : "Awaiting first sync";
-  const gggOAuthState = gggOAuthStatus.configured
-    ? "Ready to link"
-    : "Hosted setup pending";
   const totalDatasetRecords = Object.values(dataset.manifest.counts).reduce(
     (sum, count) => sum + count,
     0,
@@ -527,52 +525,10 @@ export default async function Home() {
                 title="GGG account link"
                 icon={<KeyRound className="size-4" aria-hidden="true" />}
               >
-                <div className="mb-3 rounded-md border border-base-300/70 bg-base-100/45 p-3">
-                  <p className="text-xs uppercase text-base-content/55">
-                    Hosted OAuth
-                  </p>
-                  <p
-                    className={`mt-1 text-sm font-semibold ${
-                      gggOAuthStatus.configured
-                        ? "text-success"
-                        : "text-warning"
-                    }`}
-                  >
-                    {gggOAuthState}
-                  </p>
-                </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center justify-between gap-3 rounded-md bg-base-100/45 p-2">
-                    <span className="text-base-content/60">Account link</span>
-                    <span className="font-medium text-base-content">
-                      {formatBooleanReady(
-                        gggOAuthStatus.features.accountLinking,
-                      )}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3 rounded-md bg-base-100/45 p-2">
-                    <span className="text-base-content/60">
-                      Snapshot capture
-                    </span>
-                    <span className="font-medium text-base-content">
-                      {formatBooleanReady(
-                        gggOAuthStatus.features.snapshotCapture,
-                      )}
-                    </span>
-                  </div>
-                </div>
-                <p className="mt-3 break-all rounded-md border border-base-300/70 bg-base-100/45 p-3 text-xs text-base-content/70">
-                  {gggOAuthStatus.redirectUri.replace(
-                    "https://calandra.pages.dev",
-                    "",
-                  )}
-                </p>
-                <p className="mt-3 rounded-md border border-base-300/70 bg-base-100/45 p-3 text-xs text-base-content/70">
-                  {gggOAuthStatus.requiredScopes.join(", ")}
-                </p>
-                <p className="mt-3 rounded-md border border-warning/35 bg-warning/10 p-3 text-sm text-warning">
-                  Stash OAuth: pending GGG support
-                </p>
+                <GggOAuthLinkPanel
+                  status={gggOAuthStatus}
+                  apiBaseUrl={defaultApiBaseUrl}
+                />
               </Panel>
 
               <DesktopPathsPanel />
@@ -590,10 +546,6 @@ function formatSnapshotTimestamp(value: string | undefined) {
   }
 
   return value.replace("T", " ").replace(".000Z", "Z");
-}
-
-function formatBooleanReady(value: boolean) {
-  return value ? "Ready" : "Pending";
 }
 
 function formatBytes(value: number | undefined) {
