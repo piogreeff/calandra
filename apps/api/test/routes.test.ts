@@ -16,6 +16,14 @@ const datasetSources = [
   },
 ] as const;
 
+const imageSource = {
+  kind: "image",
+  name: "Grinding Gear Games CDN",
+  url: "https://web.poecdn.com/",
+  attribution:
+    "Item art is property of Grinding Gear Games and is cached for attribution-preserving display.",
+} as const;
+
 const r2Artifact = JSON.stringify({
   league: "Dawn of the Hunt",
   patch: "0.2.0",
@@ -40,31 +48,33 @@ const r2Artifact = JSON.stringify({
 const r2ArtifactSha256 =
   "33272bd5d8c37deda60f5681e28372a400d207636abdacfbd1e07f2f359bfff8";
 
+const uniqueCoverageUniques = Array.from({ length: 20 }, (_, index) => ({
+  id: `unique-${index + 1}`,
+  name: `Unique ${index + 1}`,
+  category: "amulet",
+  rarity: "unique",
+  iconUrl:
+    index < 19
+      ? `https://calandra-assets.example/images/Dawn%20of%20the%20Hunt/0.2.0/uniques/unique-${index + 1}.png`
+      : "http://web.poecdn.com/image/unresolved-unique.png",
+  ...(index < 19
+    ? {
+        iconSourceUrl: `https://web.poecdn.com/image/unique-${index + 1}.png`,
+        iconCacheKey: `images/Dawn of the Hunt/0.2.0/uniques/unique-${index + 1}.png`,
+      }
+    : {}),
+  iconAttribution:
+    "Game art and item data are property of Grinding Gear Games.",
+}));
+
 const uniqueCoverageArtifact = JSON.stringify({
   league: "Dawn of the Hunt",
   patch: "0.2.0",
   generatedAt: "2026-06-21T00:00:00.000Z",
   source: "published-artifact",
-  sources: datasetSources,
+  sources: [...datasetSources, imageSource],
   items: [],
-  uniques: Array.from({ length: 20 }, (_, index) => ({
-    id: `unique-${index + 1}`,
-    name: `Unique ${index + 1}`,
-    category: "amulet",
-    rarity: "unique",
-    iconUrl:
-      index < 19
-        ? `https://calandra-assets.example/images/Dawn%20of%20the%20Hunt/0.2.0/uniques/unique-${index + 1}.png`
-        : "http://web.poecdn.com/image/unresolved-unique.png",
-    ...(index < 19
-      ? {
-          iconSourceUrl: `https://web.poecdn.com/image/unique-${index + 1}.png`,
-          iconCacheKey: `images/Dawn of the Hunt/0.2.0/uniques/unique-${index + 1}.png`,
-        }
-      : {}),
-    iconAttribution:
-      "Game art and item data are property of Grinding Gear Games.",
-  })),
+  uniques: uniqueCoverageUniques,
   mods: [],
   gems: [],
   economy: [],
@@ -73,6 +83,24 @@ const uniqueCoverageArtifact = JSON.stringify({
 
 const uniqueCoverageArtifactSha256 = createHash("sha256")
   .update(uniqueCoverageArtifact)
+  .digest("hex");
+
+const uniqueCoverageArtifactWithoutImageSource = JSON.stringify({
+  league: "Dawn of the Hunt",
+  patch: "0.2.0",
+  generatedAt: "2026-06-21T00:00:00.000Z",
+  source: "published-artifact",
+  sources: datasetSources,
+  items: [],
+  uniques: uniqueCoverageUniques,
+  mods: [],
+  gems: [],
+  economy: [],
+  ladderBuilds: [],
+});
+
+const uniqueCoverageArtifactWithoutImageSourceSha256 = createHash("sha256")
+  .update(uniqueCoverageArtifactWithoutImageSource)
   .digest("hex");
 
 afterEach(() => {
@@ -875,7 +903,7 @@ describe("api routes", () => {
                       generatedAt: "2026-06-21T00:00:00.000Z",
                       artifactKey: "datasets/Dawn of the Hunt/0.2.0.json",
                       sha256: uniqueCoverageArtifactSha256,
-                      sources: datasetSources,
+                      sources: [...datasetSources, imageSource],
                       qualityGates: {
                         uniqueImageCoverage: {
                           resolved: 19,
@@ -911,6 +939,56 @@ describe("api routes", () => {
           minimum: 0.95,
         },
       },
+    });
+  });
+
+  it("rejects cached R2 item icons without image source attribution", async () => {
+    const response = await api.request(
+      "/datasets/manifest?league=Dawn%20of%20the%20Hunt&patch=0.2.0",
+      undefined,
+      {
+        APP_URL: "https://calandra.pages.dev",
+        DATASET_R2_PREFIX: "datasets",
+        DATA_BUCKET: {
+          async get(key: string) {
+            return {
+              async text() {
+                return key.endsWith(".manifest.json")
+                  ? JSON.stringify({
+                      league: "Dawn of the Hunt",
+                      patch: "0.2.0",
+                      generatedAt: "2026-06-21T00:00:00.000Z",
+                      artifactKey: "datasets/Dawn of the Hunt/0.2.0.json",
+                      sha256: uniqueCoverageArtifactWithoutImageSourceSha256,
+                      sources: datasetSources,
+                      qualityGates: {
+                        uniqueImageCoverage: {
+                          resolved: 19,
+                          expected: 20,
+                          ratio: 0.95,
+                          minimum: 0.95,
+                        },
+                      },
+                      counts: {
+                        items: 0,
+                        uniques: 20,
+                        mods: 0,
+                        gems: 0,
+                        economy: 0,
+                        ladderBuilds: 0,
+                      },
+                    })
+                  : uniqueCoverageArtifactWithoutImageSource;
+              },
+            };
+          },
+        },
+      },
+    );
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toEqual({
+      error: "dataset artifact failed manifest validation",
     });
   });
 

@@ -21,6 +21,14 @@ const datasetSources = [
   },
 ] as const;
 
+const imageSource = {
+  kind: "image",
+  name: "Grinding Gear Games CDN",
+  url: "https://web.poecdn.com/",
+  attribution:
+    "Item art is property of Grinding Gear Games and is cached for attribution-preserving display.",
+} as const;
+
 describe("dataset artifact import", () => {
   it("loads a published artifact without scraper configuration", async () => {
     const directory = await mkdtemp(join(tmpdir(), "calandra-dataset-"));
@@ -177,7 +185,7 @@ describe("dataset artifact import", () => {
         patch: "0.2.0",
         generatedAt: "2026-06-21T00:00:00.000Z",
         source: "published-artifact",
-        sources: datasetSources,
+        sources: [...datasetSources, imageSource],
         items: [],
         uniques: makeUniques(19),
         mods: [],
@@ -215,7 +223,7 @@ describe("dataset artifact import", () => {
         patch: "0.2.0",
         generatedAt: "2026-06-21T00:00:00.000Z",
         source: "published-artifact",
-        sources: datasetSources,
+        sources: [...datasetSources, imageSource],
         items: [],
         uniques: makeUniques(18),
         mods: [],
@@ -248,7 +256,7 @@ describe("dataset artifact import", () => {
         patch: "0.2.0",
         generatedAt: "2026-06-21T00:00:00.000Z",
         source: "published-artifact",
-        sources: datasetSources,
+        sources: [...datasetSources, imageSource],
         items: [],
         uniques: [
           ...makeUniques(18),
@@ -278,6 +286,64 @@ describe("dataset artifact import", () => {
         minimumUniqueImageCoverage: 0.95,
       }),
     ).rejects.toThrow("Unique image coverage 90.00% is below required 95.00%");
+  });
+
+  it("rejects cached unique icons without image source attribution", async () => {
+    const directory = await mkdtemp(
+      join(tmpdir(), "calandra-dataset-image-source-"),
+    );
+    const artifactPath = join(directory, "artifact.json");
+
+    await writeFile(
+      artifactPath,
+      JSON.stringify({
+        league: "Dawn of the Hunt",
+        patch: "0.2.0",
+        generatedAt: "2026-06-21T00:00:00.000Z",
+        source: "published-artifact",
+        sources: datasetSources,
+        items: [],
+        uniques: makeUniques(1),
+        mods: [],
+        gems: [],
+        economy: [],
+        ladderBuilds: [],
+      }),
+      "utf8",
+    );
+
+    await expect(importDatasetArtifact({ artifactPath })).rejects.toThrow(
+      "Cached item images require image source attribution.",
+    );
+  });
+
+  it("accepts cached unique icons when image source attribution is present", async () => {
+    const directory = await mkdtemp(
+      join(tmpdir(), "calandra-dataset-image-source-ok-"),
+    );
+    const artifactPath = join(directory, "artifact.json");
+
+    await writeFile(
+      artifactPath,
+      JSON.stringify({
+        league: "Dawn of the Hunt",
+        patch: "0.2.0",
+        generatedAt: "2026-06-21T00:00:00.000Z",
+        source: "published-artifact",
+        sources: [...datasetSources, imageSource],
+        items: [],
+        uniques: makeUniques(1),
+        mods: [],
+        gems: [],
+        economy: [],
+        ladderBuilds: [],
+      }),
+      "utf8",
+    );
+
+    const result = await importDatasetArtifact({ artifactPath });
+
+    expect(result.artifact.sources).toContainEqual(imageSource);
   });
 
   it("publishes an artifact into the same object layout the API reads from R2", async () => {
@@ -473,7 +539,7 @@ describe("dataset artifact import", () => {
         patch: "0.2.0",
         generatedAt: "2026-06-21T00:00:00.000Z",
         source: "published-artifact",
-        sources: datasetSources,
+        sources: [...datasetSources, imageSource],
         items: [],
         uniques: makeUniques(19),
         mods: [],
@@ -568,7 +634,7 @@ describe("dataset artifact import", () => {
       patch: "0.2.0",
       generatedAt: "2026-06-21T00:00:00.000Z",
       source: "published-artifact",
-      sources: datasetSources,
+      sources: [...datasetSources, imageSource],
       items: [],
       uniques: [
         ...makeUniques(18),
@@ -598,7 +664,7 @@ describe("dataset artifact import", () => {
         generatedAt: artifact.generatedAt,
         artifactKey: "datasets/Dawn of the Hunt/0.2.0.json",
         sha256: createHash("sha256").update(artifactRaw).digest("hex"),
-        sources: datasetSources,
+        sources: [...datasetSources, imageSource],
         counts: {
           items: 0,
           uniques: 19,

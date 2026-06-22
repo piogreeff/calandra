@@ -1782,6 +1782,8 @@ async function validateDatasetManifest({
     );
   }
 
+  validateCachedImageAttribution(artifact);
+
   validateUniqueImageCoverageGate(
     artifact,
     manifest.qualityGates?.uniqueImageCoverage,
@@ -1823,6 +1825,21 @@ function getDatasetCounts(artifact: DatasetArtifact) {
     economy: artifact.economy.length,
     ladderBuilds: artifact.ladderBuilds.length,
   };
+}
+
+function validateCachedImageAttribution(artifact: DatasetArtifact) {
+  const hasCachedImages = [...artifact.items, ...artifact.uniques].some(
+    (item) => Boolean(item.iconCacheKey),
+  );
+
+  if (
+    hasCachedImages &&
+    !artifact.sources.some((source) => source.kind === "image")
+  ) {
+    throw new DatasetManifestValidationError(
+      "Dataset cached image attribution missing",
+    );
+  }
 }
 
 function validateUniqueImageCoverageGate(

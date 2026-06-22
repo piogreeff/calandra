@@ -104,6 +104,7 @@ export async function importDatasetArtifact(
   const artifact = datasetArtifactSchema.parse(
     JSON.parse(raw.replace(/^\uFEFF/, "")),
   );
+  assertCachedImageAttribution(artifact);
   const counts = getDatasetCounts(artifact);
   const uniqueImageCoverage = getUniqueImageCoverage(artifact, validOptions);
   const manifest = validOptions.manifestPath
@@ -357,6 +358,19 @@ function getDatasetCounts(artifact: DatasetArtifact) {
     economy: artifact.economy.length,
     ladderBuilds: artifact.ladderBuilds.length,
   };
+}
+
+function assertCachedImageAttribution(artifact: DatasetArtifact) {
+  const hasCachedImages = [...artifact.items, ...artifact.uniques].some(
+    (item) => Boolean(item.iconCacheKey),
+  );
+
+  if (
+    hasCachedImages &&
+    !artifact.sources.some((source) => source.kind === "image")
+  ) {
+    throw new Error("Cached item images require image source attribution.");
+  }
 }
 
 function getUniqueImageCoverage(
