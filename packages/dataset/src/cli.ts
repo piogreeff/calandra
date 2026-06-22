@@ -8,12 +8,28 @@ import {
   publishDatasetArtifact,
   publishDatasetArtifactToR2,
 } from "./import";
-import { cacheDatasetIcons, readDatasetArtifact } from "./icon-cache";
+import {
+  cacheDatasetIcons,
+  publishIconCacheToR2,
+  readDatasetArtifact,
+} from "./icon-cache";
 import { formatDatasetCliResult } from "./output";
 
 const options = parseDatasetCliArgs(process.argv.slice(2));
 
-if ("mode" in options && options.mode === "cache-icons") {
+if ("mode" in options && options.mode === "publish-icon-cache") {
+  const result = await publishIconCacheToR2({
+    executionContext: options.executionContext,
+    iconCacheDirectory: options.iconCacheDirectory,
+    manifestPath: options.manifestPath,
+    r2Bucket: options.r2Bucket,
+    ...(options.wranglerCommand
+      ? { wranglerCommand: options.wranglerCommand }
+      : {}),
+  });
+
+  console.log(JSON.stringify(result, null, 2));
+} else if ("mode" in options && options.mode === "cache-icons") {
   const result = await cacheDatasetIcons({
     artifact: await readDatasetArtifact(options.artifactPath),
     outputDirectory: options.iconCacheDirectory,

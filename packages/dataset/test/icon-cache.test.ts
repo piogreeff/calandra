@@ -1,9 +1,9 @@
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { DatasetArtifact } from "@calandra/contract";
 import { describe, expect, it } from "vitest";
-import { cacheDatasetIcons } from "../src/icon-cache";
+import { cacheDatasetIcons, publishIconCacheToR2 } from "../src/icon-cache";
 
 const artifact: DatasetArtifact = {
   league: "Dawn of the Hunt",
@@ -107,5 +107,95 @@ describe("maintainer icon cache", () => {
         },
       }),
     ).rejects.toThrow("Icon caching is maintainer-only");
+  });
+
+  it("uploads cached icon files and the attribution manifest to R2", async () => {
+    const outputDirectory = await mkdtemp(join(tmpdir(), "calandra-icons-r2-"));
+    const iconPath = join(
+      outputDirectory,
+      "images",
+      "Dawn of the Hunt",
+      "0.2.0",
+      "uniques",
+      "choir-of-the-storm.png",
+    );
+    const manifestPath = join(outputDirectory, "icon-cache.manifest.json");
+    const commands: Array<{ command: string; args: string[] }> = [];
+
+    await mkdir(
+      join(outputDirectory, "images", "Dawn of the Hunt", "0.2.0", "uniques"),
+      { recursive: true },
+    );
+    await writeFile(iconPath, Buffer.from([1, 2, 3]));
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        league: "Dawn of the Hunt",
+        patch: "0.2.0",
+        source: "maintainer-icon-cache",
+        sources: artifact.sources.filter((source) => source.kind === "image"),
+        count: 1,
+        icons: [
+          {
+            itemId: "choir-of-the-storm",
+            itemName: "Choir of the Storm",
+            cacheKey:
+              "images/Dawn of the Hunt/0.2.0/uniques/choir-of-the-storm.png",
+            sourceUrl: "https://web.poecdn.com/image/choir.png",
+            attribution:
+              "Game art and item data are property of Grinding Gear Games.",
+            contentType: "image/png",
+            bytes: 3,
+          },
+        ],
+      }),
+      "utf8",
+    );
+
+    const result = await publishIconCacheToR2({
+      executionContext: "maintainer",
+      iconCacheDirectory: outputDirectory,
+      manifestPath,
+      r2Bucket: "calandra-data",
+      wranglerCommand: "wrangler",
+      runCommand: async (command, args) => {
+        commands.push({ command, args });
+      },
+    });
+
+    expect(result.uploadedObjects).toEqual([
+      "calandra-data/images/Dawn of the Hunt/0.2.0/uniques/choir-of-the-storm.png",
+      "calandra-data/images/Dawn of the Hunt/0.2.0/icon-cache.manifest.json",
+    ]);
+    expect(commands).toEqual([
+      {
+        command: "wrangler",
+        args: [
+          "r2",
+          "object",
+          "put",
+          "calandra-data/images/Dawn of the Hunt/0.2.0/uniques/choir-of-the-storm.png",
+          "--file",
+          iconPath,
+          "--content-type",
+          "image/png",
+          "--remote",
+        ],
+      },
+      {
+        command: "wrangler",
+        args: [
+          "r2",
+          "object",
+          "put",
+          "calandra-data/images/Dawn of the Hunt/0.2.0/icon-cache.manifest.json",
+          "--file",
+          manifestPath,
+          "--content-type",
+          "application/json",
+          "--remote",
+        ],
+      },
+    ]);
   });
 });

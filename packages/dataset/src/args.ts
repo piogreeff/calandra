@@ -24,10 +24,20 @@ export type MaintainerIconCacheCliOptions = {
   executionContext: "maintainer" | "client" | "self-host";
 };
 
+export type MaintainerIconCachePublishCliOptions = {
+  mode: "publish-icon-cache";
+  iconCacheDirectory: string;
+  manifestPath: string;
+  r2Bucket: string;
+  executionContext: "maintainer" | "client" | "self-host";
+  wranglerCommand?: string;
+};
+
 export type DatasetCliOptions =
   | DatasetArtifactCliOptions
   | MaintainerArtifactBuildCliOptions
-  | MaintainerIconCacheCliOptions;
+  | MaintainerIconCacheCliOptions
+  | MaintainerIconCachePublishCliOptions;
 
 export function parseDatasetCliArgs(args: string[]): DatasetCliOptions {
   const scrapeFlag = args.find(
@@ -88,6 +98,35 @@ export function parseDatasetCliArgs(args: string[]): DatasetCliOptions {
       artifactPath,
       iconCacheDirectory,
       executionContext,
+    };
+  }
+
+  if (args.includes("--publish-icon-cache")) {
+    const iconCacheDirectory = getFlagValue(args, "--icon-cache-dir");
+    const manifestPath = getFlagValue(args, "--icon-cache-manifest");
+    const r2Bucket = getFlagValue(args, "--r2-bucket");
+    const executionContext = getFlagValue(args, "--execution-context");
+    const wranglerCommand = getFlagValue(args, "--wrangler-command");
+
+    if (!iconCacheDirectory || !manifestPath || !r2Bucket || !executionContext) {
+      throw new Error(
+        "Usage: pnpm dataset:import -- --publish-icon-cache --icon-cache-dir <dir> --icon-cache-manifest <path> --r2-bucket <bucket> --execution-context maintainer",
+      );
+    }
+
+    if (!isDatasetExecutionContext(executionContext)) {
+      throw new Error(
+        "--execution-context must be maintainer, client, or self-host",
+      );
+    }
+
+    return {
+      mode: "publish-icon-cache",
+      iconCacheDirectory,
+      manifestPath,
+      r2Bucket,
+      executionContext,
+      ...(wranglerCommand ? { wranglerCommand } : {}),
     };
   }
 

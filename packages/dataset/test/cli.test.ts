@@ -76,6 +76,31 @@ describe("dataset CLI args", () => {
     });
   });
 
+  it("parses maintainer icon cache publish options", () => {
+    expect(
+      parseDatasetCliArgs([
+        "--publish-icon-cache",
+        "--icon-cache-dir",
+        "dist/icons",
+        "--icon-cache-manifest",
+        "dist/icons/icon-cache.manifest.json",
+        "--r2-bucket",
+        "calandra-data",
+        "--execution-context",
+        "maintainer",
+        "--wrangler-command",
+        "wrangler",
+      ]),
+    ).toEqual({
+      mode: "publish-icon-cache",
+      iconCacheDirectory: "dist/icons",
+      manifestPath: "dist/icons/icon-cache.manifest.json",
+      r2Bucket: "calandra-data",
+      executionContext: "maintainer",
+      wranglerCommand: "wrangler",
+    });
+  });
+
   it("rejects scraper-like flags", () => {
     expect(() =>
       parseDatasetCliArgs([
