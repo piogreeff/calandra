@@ -237,7 +237,7 @@ describe("Calandra MCP tools", () => {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          "x-calandra-snapshot-read-token": "read-token",
+          authorization: "Bearer read-token",
         },
         body: JSON.stringify({
           weights: { life: 1, movementSpeed: 2 },
@@ -697,11 +697,16 @@ describe("Calandra MCP tools", () => {
 
     const result = await server.callTool("list_snapshots", {
       account: "example",
+      snapshotReadToken: "read-token",
     });
 
     expect(fetch).toHaveBeenCalledWith(
       "https://calandra-api.workers.dev/snapshots/example",
-      undefined,
+      {
+        headers: {
+          authorization: "Bearer read-token",
+        },
+      },
     );
     expect(parseToolJson(result)).toEqual({
       source: "snapshot-store",
@@ -751,11 +756,16 @@ describe("Calandra MCP tools", () => {
     const result = await server.callTool("get_snapshot", {
       account: "example",
       snapshotId: "snapshot-2026-06-21T10-00-00Z",
+      snapshotReadToken: "read-token",
     });
 
     expect(fetch).toHaveBeenCalledWith(
       "https://calandra-api.workers.dev/snapshots/example/snapshot-2026-06-21T10-00-00Z",
-      undefined,
+      {
+        headers: {
+          authorization: "Bearer read-token",
+        },
+      },
     );
     expect(parseToolJson(result)).toEqual(snapshot);
   });

@@ -82,8 +82,13 @@ const priceItemInputSchema = economyInputSchema.extend({
   item: z.string().min(1),
 });
 
+const snapshotReadTokenInput = {
+  snapshotReadToken: z.string().min(1).optional(),
+};
+
 const listSnapshotsInputSchema = z.object({
   account: z.string().min(1),
+  ...snapshotReadTokenInput,
 });
 
 const getSnapshotInputSchema = listSnapshotsInputSchema.extend({
@@ -235,6 +240,7 @@ export function listCalandraMcpTools(): CalandraMcpTool[] {
         type: "object",
         properties: {
           account: { type: "string", minLength: 1 },
+          snapshotReadToken: { type: "string", minLength: 1 },
         },
         required: ["account"],
       },
@@ -248,6 +254,7 @@ export function listCalandraMcpTools(): CalandraMcpTool[] {
         properties: {
           account: { type: "string", minLength: 1 },
           snapshotId: { type: "string", minLength: 1 },
+          snapshotReadToken: { type: "string", minLength: 1 },
         },
         required: ["account", "snapshotId"],
       },
@@ -454,12 +461,10 @@ async function recommendSnapshotUpgrade(
   const parsed = snapshotUpgradeInputSchema.parse(input);
   const { account, snapshotId, league, patch, snapshotReadToken, ...request } =
     parsed;
-  const headers: Record<string, string> = {
+  const headers = {
     "content-type": "application/json",
+    ...snapshotReadAuthorizationHeader(snapshotReadToken),
   };
-  if (snapshotReadToken) {
-    headers["x-calandra-snapshot-read-token"] = snapshotReadToken;
-  }
 
   return upgradeAdvisorResponseSchema.parse(
     await fetchJson(
@@ -558,6 +563,7 @@ async function listSnapshots(
     await fetchJson(
       fetchImplementation,
       `${apiBaseUrl}/snapshots/${encodeURIComponent(parsed.account)}`,
+      snapshotReadRequestInit(parsed.snapshotReadToken),
     ),
   );
 }
@@ -573,6 +579,7 @@ async function getSnapshot(
     await fetchJson(
       fetchImplementation,
       `${apiBaseUrl}/snapshots/${encodeURIComponent(parsed.account)}/${encodeURIComponent(parsed.snapshotId)}`,
+      snapshotReadRequestInit(parsed.snapshotReadToken),
     ),
   );
 }
@@ -658,6 +665,18 @@ function datasetSearchQuery(input: {
   });
 
   return params.toString();
+}
+
+function snapshotReadRequestInit(snapshotReadToken: string | undefined) {
+  const headers = snapshotReadAuthorizationHeader(snapshotReadToken);
+
+  return Object.keys(headers).length > 0 ? { headers } : undefined;
+}
+
+function snapshotReadAuthorizationHeader(snapshotReadToken: string | undefined) {
+  return snapshotReadToken
+    ? { authorization: `Bearer ${snapshotReadToken}` }
+    : {};
 }
 
 function normalizeBaseUrl(apiBaseUrl: string) {
