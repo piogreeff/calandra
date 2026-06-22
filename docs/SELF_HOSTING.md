@@ -36,6 +36,8 @@ pnpm dev                    # run the backend + web locally
 
 Until a permanent domain is purchased, the default hosted URLs use Cloudflare temporary domains: `https://calandra.pages.dev` for the app and `https://calandra-api.piogreeff.workers.dev` for the API. Replace those in `.env` once the real domain is available.
 
+For the hosted temporary-domain deployment, run `pnpm hosted:oauth:check` to confirm whether the Worker secrets and public `/auth/ggg/status` response are ready for the browser GGG account-link flow.
+
 To expose Calandra to a local MCP-capable agent, point the stdio server at your API and register this command with the host:
 
 ```bash

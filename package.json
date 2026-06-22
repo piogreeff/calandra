@@ -24,6 +24,7 @@
     "build": "pnpm -r build",
     "dataset:import": "pnpm --filter @calandra/dataset run import",
     "dataset:publish": "pnpm --filter @calandra/dataset run publish:r2",
+    "hosted:oauth:check": "tsx scripts/check-hosted-oauth.ts",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test && vitest run scripts",
