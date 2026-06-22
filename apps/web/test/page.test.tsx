@@ -47,6 +47,40 @@ describe("home dashboard", () => {
     expect(html).toContain("snapshots/RealAccount/");
   });
 
+  it("ignores search params during static export builds", async () => {
+    const fetchImplementation = mockDashboardFetch();
+    const originalNextOutput = process.env["NEXT_OUTPUT"];
+    process.env["NEXT_OUTPUT"] = "export";
+    vi.stubGlobal("fetch", fetchImplementation);
+
+    try {
+      const html = renderToStaticMarkup(
+        await Home({
+          searchParams: {
+            then() {
+              throw new Error("search params should not be read");
+            },
+          } as unknown as Promise<{ account: string }>,
+        }),
+      );
+
+      const requestedUrls = fetchImplementation.mock.calls.map(([input]) =>
+        String(input),
+      );
+
+      expect(requestedUrls).toContain(
+        "https://calandra-api.piogreeff.workers.dev/snapshots/example",
+      );
+      expect(html).toContain("Loadout workbench");
+    } finally {
+      if (originalNextOutput === undefined) {
+        delete process.env["NEXT_OUTPUT"];
+      } else {
+        process.env["NEXT_OUTPUT"] = originalNextOutput;
+      }
+    }
+  });
+
   it("restores the selected account snapshot from query params", async () => {
     const fetchImplementation = mockDashboardFetch();
     vi.stubGlobal("fetch", fetchImplementation);

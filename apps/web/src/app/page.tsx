@@ -192,7 +192,9 @@ export default async function Home({
 }: {
   searchParams?: Promise<HomeSearchParams>;
 }) {
-  const resolvedSearchParams = await searchParams;
+  const resolvedSearchParams = isStaticExportBuild()
+    ? undefined
+    : await searchParams;
   const selectedAccount = resolveSelectedAccount(resolvedSearchParams);
   const ladderBuildFilters = resolveLadderBuildFilters(resolvedSearchParams);
   const snapshotReadToken = process.env["SNAPSHOT_READ_TOKEN"]?.trim();
@@ -1073,6 +1075,10 @@ export default async function Home({
       </div>
     </main>
   );
+}
+
+function isStaticExportBuild() {
+  return process.env["NEXT_OUTPUT"] === "export";
 }
 
 function CharacterBuildPreviewPanel({
