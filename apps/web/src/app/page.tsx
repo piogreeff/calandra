@@ -47,6 +47,7 @@ import {
   getDashboardSnapshotDiff,
   getDashboardSnapshots,
   type DashboardLadderBuildFilters,
+  type DashboardLadderBuilds,
   type DashboardDatasetVisualSummary,
 } from "../lib/read-api";
 
@@ -54,6 +55,7 @@ const navItems = [
   { label: "Overview", icon: Gauge, href: "#overview", current: true },
   { label: "Character", icon: Swords, href: "#character" },
   { label: "Gear", icon: ShieldCheck, href: "#gear" },
+  { label: "Builds", icon: Trophy, href: "#builds" },
   { label: "Crafting", icon: Hammer, href: "#crafting" },
   { label: "Economy", icon: Activity, href: "#economy" },
   { label: "Snapshots", icon: History, href: "#snapshots" },
@@ -383,6 +385,13 @@ export default async function Home({
 
             <div className="min-w-0 space-y-4">
               <DatasetVisualCatalogPanel visualSummary={datasetVisualSummary} />
+
+              <LadderBuildBrowserPanel
+                account={selectedAccount}
+                filters={ladderBuildFilters}
+                builds={ladderBuilds}
+                selectedBuild={ladderBuildDetail.build ?? null}
+              />
 
               <section
                 className="grid grid-cols-[minmax(0,1fr)] gap-4 md:grid-cols-3"
@@ -808,172 +817,6 @@ export default async function Home({
               </Panel>
 
               <Panel
-                title="Ladder builds"
-                icon={<Trophy className="size-4" aria-hidden="true" />}
-              >
-                <form
-                  action="/"
-                  className="mb-3 grid grid-cols-[minmax(0,1fr)] gap-2 rounded-md border border-base-300/70 bg-base-100/45 p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
-                >
-                  <input type="hidden" name="account" value={selectedAccount} />
-                  <label className="min-w-0">
-                    <span className="mb-1 block text-xs font-medium uppercase text-base-content/55">
-                      Ladder filters
-                    </span>
-                    <input
-                      className="input input-sm w-full"
-                      name="className"
-                      placeholder="Class"
-                      defaultValue={ladderBuildFilters.className ?? ""}
-                    />
-                  </label>
-                  <label className="min-w-0">
-                    <span className="mb-1 block text-xs font-medium uppercase text-base-content/55">
-                      Skill
-                    </span>
-                    <input
-                      className="input input-sm w-full"
-                      name="skill"
-                      placeholder="Main skill"
-                      defaultValue={ladderBuildFilters.skill ?? ""}
-                    />
-                  </label>
-                  <button className="btn btn-primary btn-sm self-end">
-                    Filter
-                  </button>
-                </form>
-                <div className="mb-3 rounded-md border border-base-300/70 bg-base-100/45 p-3 text-xs font-medium text-base-content/65">
-                  {ladderBuilds.source === "api"
-                    ? "Published ladder artifact"
-                    : "Demo ladder fallback"}
-                </div>
-                {ladderBuilds.builds.length > 0 ? (
-                  <div className="space-y-3">
-                    {ladderBuilds.builds.slice(0, 4).map((build) => {
-                      const buildDetail =
-                        ladderBuildDetail.build?.id === build.id
-                          ? ladderBuildDetail.build
-                          : build;
-                      const passiveHighlights = [
-                        ...(buildDetail.passiveTree?.keystones ?? []).map(
-                          (name) => ({ kind: "Keystone", name }),
-                        ),
-                        ...(buildDetail.passiveTree?.notables ?? []).map(
-                          (name) => ({ kind: "Notable", name }),
-                        ),
-                      ].slice(0, 4);
-
-                      return (
-                        <article
-                          key={build.id}
-                          className={`rounded-md border bg-base-100/45 p-3 ${
-                            buildDetail.id === ladderBuildDetail.build?.id
-                              ? "border-primary/60"
-                              : "border-base-300/70"
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="truncate text-xs uppercase text-base-content/55">
-                                {build.account}
-                              </p>
-                              <h3 className="truncate text-sm font-semibold text-base-content">
-                                {build.character}
-                              </h3>
-                            </div>
-                            <span className="shrink-0 rounded-md bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
-                              {build.rank
-                                ? `#${build.rank}`
-                                : `Level ${build.level}`}
-                            </span>
-                          </div>
-                          <p className="mt-2 text-sm text-base-content/65">
-                            Level {build.level} {build.className}
-                          </p>
-                          {build.mainSkill ? (
-                            <p className="mt-1 text-sm font-medium text-base-content">
-                              {build.mainSkill}
-                            </p>
-                          ) : null}
-                          {buildDetail.passiveSkillIds?.length ? (
-                            <p className="mt-1 text-xs text-base-content/55">
-                              {buildDetail.passiveSkillIds.length} passive nodes
-                              tracked
-                            </p>
-                          ) : null}
-                          {buildDetail.passiveTree ? (
-                            <div className="mt-3 border-t border-base-300/60 pt-3">
-                              <p className="text-xs font-medium uppercase text-base-content/55">
-                                Passive highlights
-                              </p>
-                              {passiveHighlights.length > 0 ? (
-                                <div className="mt-2 flex flex-wrap gap-2">
-                                  {passiveHighlights.map((passive) => (
-                                    <span
-                                      key={`${passive.kind}-${passive.name}`}
-                                      className="rounded-md border border-primary/25 bg-primary/10 px-2 py-1 text-xs font-medium text-primary"
-                                    >
-                                      {passive.name}
-                                    </span>
-                                  ))}
-                                </div>
-                              ) : null}
-                              {buildDetail.passiveTree.summary ? (
-                                <p className="mt-2 text-xs leading-5 text-base-content/65">
-                                  {buildDetail.passiveTree.summary}
-                                </p>
-                              ) : null}
-                            </div>
-                          ) : null}
-                          {buildDetail.equipment?.length ? (
-                            <p className="mt-1 text-xs text-base-content/55">
-                              {buildDetail.equipment.length} gear{" "}
-                              {buildDetail.equipment.length === 1
-                                ? "item"
-                                : "items"}{" "}
-                              tracked
-                            </p>
-                          ) : null}
-                          {build.passiveTreeUrl ? (
-                            <a
-                              href={build.passiveTreeUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="btn btn-outline btn-xs mt-3 w-full"
-                            >
-                              Open passive tree
-                              <ExternalLink
-                                className="size-3"
-                                aria-hidden="true"
-                              />
-                            </a>
-                          ) : null}
-                          <a
-                            href={buildLadderBuildHref(
-                              selectedAccount,
-                              ladderBuildFilters,
-                              build.id,
-                            )}
-                            className="btn btn-primary btn-xs mt-2 w-full"
-                          >
-                            Inspect build
-                            <ChevronRight
-                              className="size-3"
-                              aria-hidden="true"
-                            />
-                          </a>
-                        </article>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="rounded-md border border-base-300/70 bg-base-100/45 p-3 text-sm text-base-content/70">
-                    No ladder builds in this published dataset yet.
-                  </p>
-                )}
-              </Panel>
-
-              <Panel
                 title="Dataset manifest"
                 icon={<Database className="size-4" aria-hidden="true" />}
               >
@@ -1333,6 +1176,284 @@ function CharacterBuildPreviewPanel({
   );
 }
 
+function LadderBuildBrowserPanel({
+  account,
+  filters,
+  builds,
+  selectedBuild,
+}: {
+  account: string;
+  filters: DashboardLadderBuildFilters;
+  builds: DashboardLadderBuilds;
+  selectedBuild: LadderBuild | null;
+}) {
+  const activeBuild = selectedBuild ?? builds.builds[0] ?? null;
+  const activePassiveTree = activeBuild?.passiveTree;
+  const activePassiveIds = activeBuild?.passiveSkillIds ?? [];
+  const activeEquipment = activeBuild?.equipment
+    ? toVisualEquipment(activeBuild.equipment, "Ladder gear item")
+    : [];
+  const passiveHighlights = getPassiveHighlights(activeBuild);
+  const passiveReferenceUrl =
+    activePassiveTree?.url ?? activeBuild?.passiveTreeUrl;
+
+  return (
+    <Panel
+      id="builds"
+      title="Build and passive browser"
+      icon={<Trophy className="size-4" aria-hidden="true" />}
+    >
+      <div className="mb-4 grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto]">
+        <form
+          action="/"
+          className="grid grid-cols-[minmax(0,1fr)] gap-2 rounded-md border border-base-300/70 bg-base-100/45 p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+        >
+          <input type="hidden" name="account" value={account} />
+          <label className="min-w-0">
+            <span className="mb-1 block text-xs font-medium uppercase text-base-content/55">
+              Ladder filters
+            </span>
+            <input
+              className="input input-sm w-full"
+              name="className"
+              placeholder="Class"
+              defaultValue={filters.className ?? ""}
+            />
+          </label>
+          <label className="min-w-0">
+            <span className="mb-1 block text-xs font-medium uppercase text-base-content/55">
+              Skill
+            </span>
+            <input
+              className="input input-sm w-full"
+              name="skill"
+              placeholder="Main skill"
+              defaultValue={filters.skill ?? ""}
+            />
+          </label>
+          <button className="btn btn-primary btn-sm self-end">Filter</button>
+        </form>
+
+        <div className="grid grid-cols-3 gap-2 rounded-md border border-base-300/70 bg-base-100/45 p-3 text-sm">
+          <MetricTile label="Builds" value={`${builds.builds.length}`} />
+          <MetricTile
+            label="Selected"
+            value={
+              activeBuild ? `#${activeBuild.rank ?? activeBuild.level}` : "-"
+            }
+          />
+          <MetricTile
+            label="Passives"
+            value={`${activePassiveTree?.allocatedCount ?? activePassiveIds.length}`}
+          />
+        </div>
+      </div>
+
+      <div className="mb-4 rounded-md border border-info/30 bg-info/10 p-3 text-xs font-medium text-info">
+        {builds.source === "api"
+          ? "Published ladder artifact"
+          : "Demo ladder fallback"}{" "}
+        - Ladder builds available: {builds.builds.length}
+        {activeBuild ? ` - selected ${activeBuild.character}` : ""}
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[18rem_minmax(0,1fr)]">
+        <div className="space-y-3">
+          {builds.builds.length > 0 ? (
+            builds.builds.slice(0, 8).map((build) => (
+              <article
+                key={build.id}
+                className={`rounded-md border bg-base-100/45 p-3 ${
+                  build.id === activeBuild?.id
+                    ? "border-primary/60"
+                    : "border-base-300/70"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-xs uppercase text-base-content/55">
+                      {build.account}
+                    </p>
+                    <h3 className="truncate text-sm font-semibold text-base-content">
+                      {build.character}
+                    </h3>
+                  </div>
+                  <span className="shrink-0 rounded-md bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
+                    {build.rank ? `#${build.rank}` : `L${build.level}`}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm text-base-content/65">
+                  Level {build.level} {build.className}
+                </p>
+                {build.mainSkill ? (
+                  <p className="mt-1 truncate text-sm font-medium text-base-content">
+                    {build.mainSkill}
+                  </p>
+                ) : null}
+                <a
+                  href={buildLadderBuildHref(account, filters, build.id)}
+                  className="btn btn-primary btn-xs mt-3 w-full"
+                >
+                  Inspect build
+                  <ChevronRight className="size-3" aria-hidden="true" />
+                </a>
+              </article>
+            ))
+          ) : (
+            <p className="rounded-md border border-dashed border-base-300/70 bg-base-100/45 p-3 text-sm text-base-content/70">
+              No ladder builds in this published dataset yet.
+            </p>
+          )}
+        </div>
+
+        {activeBuild ? (
+          <div className="min-w-0 space-y-4">
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_16rem]">
+              <div className="min-w-0 rounded-md border border-base-300/70 bg-base-100/45 p-4">
+                <p className="text-xs font-medium uppercase text-base-content/55">
+                  Level {activeBuild.level} {activeBuild.className}
+                </p>
+                <h3 className="mt-1 truncate text-2xl font-semibold text-base-content">
+                  {activeBuild.character}
+                </h3>
+                <p className="mt-2 text-sm text-base-content/65">
+                  {activeBuild.mainSkill ?? "Main skill unavailable"}
+                </p>
+                <p className="mt-2 text-xs text-base-content/55">
+                  {activeEquipment.length} gear{" "}
+                  {activeEquipment.length === 1 ? "item" : "items"} tracked
+                </p>
+                {activeBuild.profileUrl ? (
+                  <a
+                    href={activeBuild.profileUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn btn-outline btn-sm mt-4"
+                  >
+                    Open profile
+                    <ExternalLink className="size-4" aria-hidden="true" />
+                  </a>
+                ) : null}
+              </div>
+
+              <div className="rounded-md border border-base-300/70 bg-base-100/45 p-4">
+                <div className="flex items-center gap-2">
+                  <Network className="size-4 text-primary" aria-hidden="true" />
+                  <h3 className="text-sm font-semibold text-base-content">
+                    Passive allocation preview
+                  </h3>
+                </div>
+                <p className="mt-3 text-3xl font-semibold text-base-content">
+                  {activePassiveTree?.allocatedCount ?? activePassiveIds.length}
+                </p>
+                <p className="mt-1 text-xs uppercase text-base-content/55">
+                  passive nodes tracked
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-3 lg:grid-cols-2">
+              <section className="rounded-md border border-base-300/70 bg-base-100/45 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-semibold text-base-content">
+                    Passive highlights
+                  </h3>
+                  {activePassiveTree?.ascendancy ? (
+                    <span className="rounded-md bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
+                      {activePassiveTree.ascendancy}
+                    </span>
+                  ) : null}
+                </div>
+                {passiveHighlights.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {passiveHighlights.map((passive) => (
+                      <span
+                        key={`${passive.kind}-${passive.name}`}
+                        className="rounded-md border border-primary/25 bg-primary/10 px-2 py-1 text-xs font-medium text-primary"
+                      >
+                        {passive.name}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="rounded-md border border-dashed border-base-300/70 p-3 text-sm text-base-content/65">
+                    No passive highlights in this build record yet.
+                  </p>
+                )}
+                {activePassiveTree?.summary ? (
+                  <p className="mt-3 text-sm leading-6 text-base-content/65">
+                    {activePassiveTree.summary}
+                  </p>
+                ) : null}
+                {activePassiveIds.length > 0 ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {activePassiveIds.slice(0, 8).map((nodeId) => (
+                      <span
+                        key={nodeId}
+                        className="rounded-md border border-base-300/70 bg-base-200/70 px-2 py-1 text-xs text-base-content/65"
+                      >
+                        {nodeId}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+                {passiveReferenceUrl ? (
+                  <a
+                    href={passiveReferenceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn btn-outline btn-sm mt-4"
+                  >
+                    Open passive tree
+                    <ExternalLink className="size-4" aria-hidden="true" />
+                  </a>
+                ) : null}
+              </section>
+
+              <section className="rounded-md border border-base-300/70 bg-base-100/45 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-semibold text-base-content">
+                    Build gear
+                  </h3>
+                  <span className="rounded-md border border-base-300/70 bg-base-200/70 px-2 py-1 text-xs text-base-content/65">
+                    {activeEquipment.length} items
+                  </span>
+                </div>
+                {activeEquipment.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                    {activeEquipment.slice(0, 6).map((item) => (
+                      <div
+                        key={`${item.slot}-${item.name}`}
+                        className="min-w-0"
+                      >
+                        <EquipmentThumb item={item} />
+                        <p className="mt-1 truncate text-xs font-medium text-base-content">
+                          {item.name}
+                        </p>
+                        <p className="truncate text-xs text-base-content/55">
+                          {item.slot}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="rounded-md border border-dashed border-base-300/70 p-3 text-sm text-base-content/65">
+                    No gear captured in this build record yet.
+                  </p>
+                )}
+              </section>
+            </div>
+          </div>
+        ) : (
+          <p className="rounded-md border border-dashed border-base-300/70 bg-base-100/45 p-4 text-sm text-base-content/70">
+            No selected build to inspect.
+          </p>
+        )}
+      </div>
+    </Panel>
+  );
+}
+
 function DatasetVisualCatalogPanel({
   visualSummary,
 }: {
@@ -1552,6 +1673,19 @@ function createAdvisorBuildExport(
 
 function hasVisualBuildGear(ladderBuild: LadderBuild) {
   return Boolean(ladderBuild.equipment?.some((item) => item.iconUrl));
+}
+
+function getPassiveHighlights(ladderBuild: LadderBuild | null) {
+  return [
+    ...(ladderBuild?.passiveTree?.keystones ?? []).map((name) => ({
+      kind: "Keystone",
+      name,
+    })),
+    ...(ladderBuild?.passiveTree?.notables ?? []).map((name) => ({
+      kind: "Notable",
+      name,
+    })),
+  ].slice(0, 8);
 }
 
 function toVisualEquipment(

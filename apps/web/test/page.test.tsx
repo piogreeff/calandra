@@ -163,6 +163,9 @@ describe("home dashboard", () => {
     );
     expect(html).toContain("Resonance");
     expect(html).toContain("Inspect build");
+    expect(html).toContain("Build and passive browser");
+    expect(html).toContain("Passive allocation preview");
+    expect(html).toContain("Build gear");
     expect(html).toContain(
       "?account=RealAccount&amp;className=Deadeye&amp;skill=Lightning&amp;buildId=stormweaver-2",
     );
@@ -265,7 +268,10 @@ describe("home dashboard", () => {
     expect(html).toContain("Duskthread Grips");
     expect(html).toContain("Currency Tab");
     expect(html).toContain("+7 items");
+    expect(html).toContain("Build and passive browser");
     expect(html).toContain("Ladder builds");
+    expect(html).toContain("Passive allocation preview");
+    expect(html).toContain("Build gear");
     expect(html).toContain("CalandraTest");
     expect(html).toContain("Level 92 Deadeye");
     expect(html).toContain("#42");
