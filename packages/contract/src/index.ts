@@ -536,6 +536,33 @@ export const datasetManifestSchema = z.object({
   counts: datasetCountsSchema,
 });
 
+export const datasetVisualItemSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  category: z.string().min(1),
+  rarity: raritySchema,
+  iconUrl: z.string().url(),
+  iconAttribution: z.string().min(1),
+});
+
+export const datasetVisualCategorySchema = z.object({
+  category: z.string().min(1),
+  totalItems: z.number().int().nonnegative(),
+  totalUniques: z.number().int().nonnegative(),
+  iconCount: z.number().int().nonnegative(),
+  featured: z.array(datasetVisualItemSchema),
+});
+
+export const datasetVisualSummarySchema = z.object({
+  source: z.literal("published-dataset"),
+  ...versionedCollectionFields,
+  totalItems: z.number().int().nonnegative(),
+  totalUniques: z.number().int().nonnegative(),
+  totalVisualItems: z.number().int().nonnegative(),
+  uniqueImageCoverage: uniqueImageCoverageSchema.optional(),
+  categories: z.array(datasetVisualCategorySchema),
+});
+
 const versionedQueryParameters = [
   {
     name: "league",
@@ -859,6 +886,28 @@ export const openApiDocument = {
           },
           "404": {
             description: "Dataset manifest not found for league and patch",
+          },
+        },
+      },
+    },
+    "/datasets/visual-summary": {
+      get: {
+        operationId: "getDatasetVisualSummary",
+        summary: "Get image-backed dataset category summaries",
+        parameters: versionedQueryParameters,
+        responses: {
+          "200": {
+            description: "Visual dataset summary grouped by item category",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/DatasetVisualSummary",
+                },
+              },
+            },
+          },
+          "404": {
+            description: "Dataset artifact not found for league and patch",
           },
         },
       },
@@ -2404,6 +2453,75 @@ export const openApiDocument = {
           counts: { $ref: "#/components/schemas/DatasetCounts" },
         },
       },
+      DatasetVisualItem: {
+        type: "object",
+        required: [
+          "id",
+          "name",
+          "category",
+          "rarity",
+          "iconUrl",
+          "iconAttribution",
+        ],
+        properties: {
+          id: { type: "string", minLength: 1 },
+          name: { type: "string", minLength: 1 },
+          category: { type: "string", minLength: 1 },
+          rarity: {
+            type: "string",
+            enum: ["normal", "magic", "rare", "unique", "gem", "currency"],
+          },
+          iconUrl: { type: "string", format: "uri" },
+          iconAttribution: { type: "string", minLength: 1 },
+        },
+      },
+      DatasetVisualCategory: {
+        type: "object",
+        required: [
+          "category",
+          "totalItems",
+          "totalUniques",
+          "iconCount",
+          "featured",
+        ],
+        properties: {
+          category: { type: "string", minLength: 1 },
+          totalItems: { type: "integer", minimum: 0 },
+          totalUniques: { type: "integer", minimum: 0 },
+          iconCount: { type: "integer", minimum: 0 },
+          featured: {
+            type: "array",
+            items: { $ref: "#/components/schemas/DatasetVisualItem" },
+          },
+        },
+      },
+      DatasetVisualSummary: {
+        type: "object",
+        required: [
+          "source",
+          "league",
+          "patch",
+          "totalItems",
+          "totalUniques",
+          "totalVisualItems",
+          "categories",
+        ],
+        properties: {
+          source: { type: "string", enum: ["published-dataset"] },
+          league: { type: "string", minLength: 1 },
+          patch: { type: "string", minLength: 1 },
+          totalItems: { type: "integer", minimum: 0 },
+          totalUniques: { type: "integer", minimum: 0 },
+          totalVisualItems: { type: "integer", minimum: 0 },
+          uniqueImageCoverage: {
+            $ref: "#/components/schemas/UniqueImageCoverage",
+          },
+          categories: {
+            type: "array",
+            items: { $ref: "#/components/schemas/DatasetVisualCategory" },
+          },
+        },
+      },
     },
   },
 } as const;
@@ -2530,3 +2648,8 @@ export type DatasetCounts = z.infer<typeof datasetCountsSchema>;
 export type UniqueImageCoverage = z.infer<typeof uniqueImageCoverageSchema>;
 export type DatasetQualityGates = z.infer<typeof datasetQualityGatesSchema>;
 export type DatasetManifest = z.infer<typeof datasetManifestSchema>;
+export type DatasetVisualItem = z.infer<typeof datasetVisualItemSchema>;
+export type DatasetVisualCategory = z.infer<
+  typeof datasetVisualCategorySchema
+>;
+export type DatasetVisualSummary = z.infer<typeof datasetVisualSummarySchema>;

@@ -3,6 +3,7 @@ import {
   completeDashboardGggOAuthLink,
   getDashboardCraftingEstimate,
   getDashboardDataset,
+  getDashboardDatasetVisualSummary,
   getDashboardGggOAuthStatus,
   getDashboardLadderBuild,
   getDashboardLadderBuilds,
@@ -123,6 +124,71 @@ describe("dashboard read API client", () => {
     expect(dataset.items.length).toBeGreaterThan(0);
     expect(dataset.prices.length).toBeGreaterThan(0);
     expect(dataset.manifest.artifactKey).toBe("fallback/demo-dataset.json");
+  });
+
+  it("loads a visual dataset summary from the typed API", async () => {
+    const fetchImplementation = vi.fn(async () =>
+      Response.json({
+        source: "published-dataset",
+        league: "Dawn of the Hunt",
+        patch: "0.2.0",
+        totalItems: 4,
+        totalUniques: 2,
+        totalVisualItems: 3,
+        uniqueImageCoverage: {
+          resolved: 19,
+          expected: 20,
+          ratio: 0.95,
+          minimum: 0.95,
+        },
+        categories: [
+          {
+            category: "amulet",
+            totalItems: 1,
+            totalUniques: 2,
+            iconCount: 2,
+            featured: [
+              {
+                id: "choir-of-the-storm",
+                name: "Choir of the Storm",
+                category: "amulet",
+                rarity: "unique",
+                iconUrl:
+                  "https://calandra-assets.example/images/Dawn%20of%20the%20Hunt/0.2.0/uniques/choir-of-the-storm.png",
+                iconAttribution:
+                  "Game art and item data are property of Grinding Gear Games.",
+              },
+            ],
+          },
+        ],
+      }),
+    );
+
+    const summary = await getDashboardDatasetVisualSummary(
+      "https://calandra-api.piogreeff.workers.dev",
+      fetchImplementation,
+    );
+
+    expect(fetchImplementation).toHaveBeenCalledWith(
+      "https://calandra-api.piogreeff.workers.dev/datasets/visual-summary?league=Dawn+of+the+Hunt&patch=0.2.0",
+    );
+    expect(summary.source).toBe("api");
+    expect(summary.response.totalVisualItems).toBe(3);
+    expect(summary.response.categories[0]?.featured[0]?.name).toBe(
+      "Choir of the Storm",
+    );
+  });
+
+  it("falls back to a visual summary from demo dataset rows when the API is unavailable", async () => {
+    const summary = await getDashboardDatasetVisualSummary(
+      "https://calandra-api.piogreeff.workers.dev",
+      vi.fn(async () => new Response(null, { status: 503 })),
+    );
+
+    expect(summary.source).toBe("fallback");
+    expect(summary.response.source).toBe("published-dataset");
+    expect(summary.response.totalVisualItems).toBeGreaterThan(0);
+    expect(summary.response.categories[0]?.featured.length).toBeGreaterThan(0);
   });
 
   it("loads a dataset-backed crafting estimate from the typed API", async () => {

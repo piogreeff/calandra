@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  datasetVisualSummarySchema,
   itemCollectionSchema,
   itemSchema,
   openApiDocument,
@@ -69,5 +70,50 @@ describe("item contract", () => {
       ])
     );
     expect(openApiDocument.components?.schemas?.Item).toBeDefined();
+  });
+
+  it("models a patch-versioned visual dataset summary for dashboard galleries", () => {
+    const parsed = datasetVisualSummarySchema.parse({
+      source: "published-dataset",
+      league: "Dawn of the Hunt",
+      patch: "0.2.0",
+      totalItems: 8,
+      totalUniques: 2,
+      totalVisualItems: 3,
+      uniqueImageCoverage: {
+        resolved: 19,
+        expected: 20,
+        ratio: 0.95,
+        minimum: 0.95,
+      },
+      categories: [
+        {
+          category: "amulet",
+          totalItems: 1,
+          totalUniques: 2,
+          iconCount: 2,
+          featured: [
+            {
+              id: "choir-of-the-storm",
+              name: "Choir of the Storm",
+              category: "amulet",
+              rarity: "unique",
+              iconUrl:
+                "https://calandra-assets.example/images/Dawn%20of%20the%20Hunt/0.2.0/uniques/choir-of-the-storm.png",
+              iconAttribution:
+                "Game art and item data are property of Grinding Gear Games.",
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(parsed.categories[0]?.featured[0]?.name).toBe(
+      "Choir of the Storm",
+    );
+    expect(openApiDocument.paths["/datasets/visual-summary"]).toBeDefined();
+    expect(
+      openApiDocument.components?.schemas?.DatasetVisualSummary,
+    ).toBeDefined();
   });
 });

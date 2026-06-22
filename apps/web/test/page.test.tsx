@@ -191,6 +191,14 @@ describe("home dashboard", () => {
       "https://calandra.pages.dev/demo-unique-placeholder.png",
     );
     expect(html).toContain("Published R2 artifact");
+    expect(html).toContain("Visual item catalog");
+    expect(html).toContain("3 image-backed records");
+    expect(html).toContain("Amulet");
+    expect(html).toContain("Choir of the Storm");
+    expect(html).toContain('alt="Choir of the Storm icon"');
+    expect(html).toContain(
+      "https://calandra-assets.example/images/Dawn%20of%20the%20Hunt/0.2.0/uniques/choir-of-the-storm.png",
+    );
     expect(html).toContain("Dataset manifest");
     expect(html).toContain("9aaa78cdba51");
     expect(html).toContain("Unique images");
@@ -558,6 +566,71 @@ function mockDashboardFetch() {
           economy: 1,
           ladderBuilds: 0,
         },
+      });
+    }
+
+    if (url.includes("/datasets/visual-summary?")) {
+      return Response.json({
+        source: "published-dataset",
+        league: "Dawn of the Hunt",
+        patch: "0.2.0",
+        totalItems: 4,
+        totalUniques: 2,
+        totalVisualItems: 3,
+        uniqueImageCoverage: {
+          resolved: 19,
+          expected: 20,
+          ratio: 0.95,
+          minimum: 0.95,
+        },
+        categories: [
+          {
+            category: "amulet",
+            totalItems: 1,
+            totalUniques: 2,
+            iconCount: 2,
+            featured: [
+              {
+                id: "choir-of-the-storm",
+                name: "Choir of the Storm",
+                category: "amulet",
+                rarity: "unique",
+                iconUrl:
+                  "https://calandra-assets.example/images/Dawn%20of%20the%20Hunt/0.2.0/uniques/choir-of-the-storm.png",
+                iconAttribution:
+                  "Game art and item data are property of Grinding Gear Games.",
+              },
+              {
+                id: "astramentis",
+                name: "Astramentis",
+                category: "amulet",
+                rarity: "unique",
+                iconUrl:
+                  "https://calandra-assets.example/images/Dawn%20of%20the%20Hunt/0.2.0/uniques/astramentis.png",
+                iconAttribution:
+                  "Game art and item data are property of Grinding Gear Games.",
+              },
+            ],
+          },
+          {
+            category: "wand",
+            totalItems: 3,
+            totalUniques: 0,
+            iconCount: 1,
+            featured: [
+              {
+                id: "advanced-siphoning-wand",
+                name: "Advanced Siphoning Wand",
+                category: "wand",
+                rarity: "magic",
+                iconUrl:
+                  "https://calandra-assets.example/images/Dawn%20of%20the%20Hunt/0.2.0/items/advanced-siphoning-wand.png",
+                iconAttribution:
+                  "Game art and item data are property of Grinding Gear Games.",
+              },
+            ],
+          },
+        ],
       });
     }
 

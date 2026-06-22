@@ -6,6 +6,7 @@ import {
   datasetManifestSchema,
   datasetCraftingEstimateRequestSchema,
   datasetCraftingEstimateResponseSchema,
+  datasetVisualSummarySchema,
   datasetSearchResponseSchema,
   economyCollectionSchema,
   gggOAuthCompleteRequestSchema,
@@ -27,6 +28,7 @@ import {
   type DatasetManifest,
   type DatasetCraftingEstimateResponse,
   type DatasetSearchResponse,
+  type DatasetVisualSummary,
   type EconomyPrice,
   type GggOAuthCompleteRequest,
   type GggOAuthStartResponse,
@@ -53,6 +55,11 @@ export type DashboardDataset = {
   items: Array<Item | UniqueItem>;
   prices: EconomyPrice[];
   manifest: DatasetManifest;
+};
+
+export type DashboardDatasetVisualSummary = {
+  source: "api" | "fallback";
+  response: DatasetVisualSummary;
 };
 
 export type DashboardSnapshots = {
@@ -438,6 +445,27 @@ export async function getDashboardDataset(
   }
 }
 
+export async function getDashboardDatasetVisualSummary(
+  apiBaseUrl = defaultApiBaseUrl,
+  fetchImplementation: typeof fetch = fetch,
+): Promise<DashboardDatasetVisualSummary> {
+  try {
+    const query = new URLSearchParams(dashboardDatasetVersion);
+    const response = await fetchJson(
+      fetchImplementation,
+      `${apiBaseUrl}/datasets/visual-summary?${query.toString()}`,
+      datasetVisualSummarySchema.parse,
+    );
+
+    return { source: "api", response };
+  } catch {
+    return {
+      source: "fallback",
+      response: createDatasetVisualSummary(fallbackDataset.items),
+    };
+  }
+}
+
 export async function getDashboardSnapshots(
   account: string,
   apiBaseUrl = defaultApiBaseUrl,
@@ -797,6 +825,77 @@ function fallbackSearchResults(query: string): DashboardSearchResults {
     mods: [],
     gems: [],
   };
+}
+
+function createDatasetVisualSummary(
+  items: Array<Item | UniqueItem>,
+): DatasetVisualSummary {
+  const categories = new Map<
+    string,
+    DatasetVisualSummary["categories"][number]
+  >();
+
+  for (const item of items) {
+    const category = categories.get(item.category) ?? {
+      category: item.category,
+      totalItems: 0,
+      totalUniques: 0,
+      iconCount: 0,
+      featured: [],
+    };
+
+    if (isUniqueItem(item)) {
+      category.totalUniques += 1;
+    } else {
+      category.totalItems += 1;
+    }
+
+    if (hasDashboardVisualItem(item)) {
+      category.iconCount += 1;
+      category.featured.push({
+        id: item.id,
+        name: item.name,
+        category: item.category,
+        rarity: item.rarity,
+        iconUrl: item.iconUrl,
+        iconAttribution: item.iconAttribution,
+      });
+    }
+
+    categories.set(item.category, category);
+  }
+
+  return {
+    source: "published-dataset",
+    ...dashboardDatasetVersion,
+    totalItems: items.filter((item) => !isUniqueItem(item)).length,
+    totalUniques: items.filter(isUniqueItem).length,
+    totalVisualItems: items.filter(hasDashboardVisualItem).length,
+    categories: [...categories.values()].sort(compareDatasetVisualCategory),
+  };
+}
+
+function hasDashboardVisualItem(
+  item: Item | UniqueItem,
+): item is (Item | UniqueItem) & {
+  iconUrl: string;
+  iconAttribution: string;
+} {
+  return Boolean(item.iconUrl && item.iconAttribution);
+}
+
+function compareDatasetVisualCategory(
+  left: DatasetVisualSummary["categories"][number],
+  right: DatasetVisualSummary["categories"][number],
+) {
+  return (
+    right.iconCount - left.iconCount ||
+    right.totalUniques - left.totalUniques ||
+    right.totalItems +
+      right.totalUniques -
+      (left.totalItems + left.totalUniques) ||
+    left.category.localeCompare(right.category)
+  );
 }
 
 function getSnapshotReadRequestInit({

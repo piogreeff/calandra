@@ -36,6 +36,7 @@ import {
   defaultApiBaseUrl,
   getDashboardCraftingEstimate,
   getDashboardDataset,
+  getDashboardDatasetVisualSummary,
   getDashboardGggOAuthStatus,
   getDashboardLadderBuild,
   getDashboardLadderBuilds,
@@ -46,6 +47,7 @@ import {
   getDashboardSnapshotDiff,
   getDashboardSnapshots,
   type DashboardLadderBuildFilters,
+  type DashboardDatasetVisualSummary,
 } from "../lib/read-api";
 
 const navItems = [
@@ -197,6 +199,7 @@ export default async function Home({
   const snapshotReadOptions = snapshotReadToken ? { snapshotReadToken } : {};
   const [
     dataset,
+    datasetVisualSummary,
     gggOAuthStatus,
     snapshotList,
     ladderBuilds,
@@ -204,6 +207,7 @@ export default async function Home({
     priceCheck,
   ] = await Promise.all([
     getDashboardDataset(),
+    getDashboardDatasetVisualSummary(),
     getDashboardGggOAuthStatus(),
     getDashboardSnapshots(
       selectedAccount,
@@ -953,6 +957,8 @@ export default async function Home({
                 )}
               </Panel>
 
+              <DatasetVisualCatalogPanel visualSummary={datasetVisualSummary} />
+
               <Panel
                 title="Dataset manifest"
                 icon={<Database className="size-4" aria-hidden="true" />}
@@ -1212,6 +1218,72 @@ function CharacterBuildPreviewPanel({
             </a>
           </div>
         </div>
+      </div>
+    </Panel>
+  );
+}
+
+function DatasetVisualCatalogPanel({
+  visualSummary,
+}: {
+  visualSummary: DashboardDatasetVisualSummary;
+}) {
+  const categories = visualSummary.response.categories.slice(0, 4);
+
+  return (
+    <Panel
+      title="Visual item catalog"
+      icon={<ImageIcon className="size-4" aria-hidden="true" />}
+    >
+      <div className="mb-3 rounded-md border border-info/30 bg-info/10 p-3 text-xs font-medium text-info">
+        {visualSummary.source === "api" ? "Published R2 artifact" : "Demo fallback"} -{" "}
+        {visualSummary.response.totalVisualItems} image-backed records
+      </div>
+      <div className="space-y-3">
+        {categories.map((category) => (
+          <section
+            key={category.category}
+            className="rounded-md border border-base-300/70 bg-base-100/45 p-3"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-base-content">
+                  {formatStatLabel(category.category)}
+                </h3>
+                <p className="mt-1 text-xs text-base-content/55">
+                  {category.totalItems} bases - {category.totalUniques} uniques
+                </p>
+              </div>
+              <span className="rounded-md bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
+                {category.iconCount} icons
+              </span>
+            </div>
+            {category.featured.length > 0 ? (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {category.featured.slice(0, 4).map((item) => (
+                  <div key={item.id} className="min-w-0">
+                    <div className="aspect-square rounded-md border border-base-300/70 bg-base-300/35 p-2">
+                      <img
+                        src={item.iconUrl}
+                        alt={`${item.name} icon`}
+                        title={item.iconAttribution}
+                        loading="lazy"
+                        className="h-full w-full object-contain"
+                      />
+                    </div>
+                    <p className="mt-1 truncate text-xs font-medium text-base-content">
+                      {item.name}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-3 rounded-md border border-dashed border-base-300/70 p-3 text-xs text-base-content/60">
+                No image-backed records in this category yet.
+              </p>
+            )}
+          </section>
+        ))}
       </div>
     </Panel>
   );

@@ -13,6 +13,7 @@ import {
   datasetCraftingEstimateResponseSchema,
   datasetArtifactSchema,
   datasetManifestSchema,
+  datasetVisualSummarySchema,
   datasetSearchResponseSchema,
   type DatasetArtifact,
   type DatasetManifest,
@@ -1400,6 +1401,34 @@ api.get("/datasets/manifest", async (context) => {
   return context.json(datasetManifestSchema.parse(manifest));
 });
 
+api.get("/datasets/visual-summary", async (context) => {
+  const version = getVersionedQuery(context);
+  if (!version.ok) return context.json(version.body, 400);
+  const artifact = await getMatchingArtifact(context, version);
+
+  if (!artifact) {
+    return context.json(
+      {
+        error: "dataset artifact not found",
+        league: version.league,
+        patch: version.patch,
+      },
+      404,
+    );
+  }
+
+  const manifest = await getMatchingDatasetManifest(context, version);
+
+  return context.json(
+    datasetVisualSummarySchema.parse(
+      toDatasetVisualSummary(
+        artifact,
+        manifest?.qualityGates?.uniqueImageCoverage,
+      ),
+    ),
+  );
+});
+
 async function getMatchingArtifact(
   context: Context<{ Bindings: Bindings }>,
   version: { league: string; patch: string },
@@ -1999,6 +2028,131 @@ function getDatasetCounts(artifact: DatasetArtifact) {
     economy: artifact.economy.length,
     ladderBuilds: artifact.ladderBuilds.length,
   };
+}
+
+function toDatasetVisualSummary(
+  artifact: DatasetArtifact,
+  uniqueImageCoverage: UniqueImageCoverage | undefined,
+) {
+  const categories = new Map<
+    string,
+    {
+      category: string;
+      totalItems: number;
+      totalUniques: number;
+      iconCount: number;
+      featured: ReturnType<typeof toDatasetVisualItem>[];
+    }
+  >();
+
+  for (const item of artifact.items) {
+    addDatasetVisualCategoryItem(categories, item, "item");
+  }
+
+  for (const unique of artifact.uniques) {
+    addDatasetVisualCategoryItem(categories, unique, "unique");
+  }
+
+  return {
+    source: "published-dataset",
+    league: artifact.league,
+    patch: artifact.patch,
+    totalItems: artifact.items.length,
+    totalUniques: artifact.uniques.length,
+    totalVisualItems: [...artifact.items, ...artifact.uniques].filter(
+      hasDashboardVisualItem,
+    ).length,
+    ...(uniqueImageCoverage ? { uniqueImageCoverage } : {}),
+    categories: [...categories.values()].sort(compareDatasetVisualCategory),
+  };
+}
+
+function addDatasetVisualCategoryItem(
+  categories: Map<
+    string,
+    {
+      category: string;
+      totalItems: number;
+      totalUniques: number;
+      iconCount: number;
+      featured: ReturnType<typeof toDatasetVisualItem>[];
+    }
+  >,
+  item: DatasetArtifact["items"][number] | DatasetArtifact["uniques"][number],
+  kind: "item" | "unique",
+) {
+  const category = categories.get(item.category) ?? {
+    category: item.category,
+    totalItems: 0,
+    totalUniques: 0,
+    iconCount: 0,
+    featured: [],
+  };
+
+  if (kind === "unique") {
+    category.totalUniques += 1;
+  } else {
+    category.totalItems += 1;
+  }
+
+  if (hasDashboardVisualItem(item)) {
+    category.iconCount += 1;
+    if (category.featured.length < 4) {
+      category.featured.push(toDatasetVisualItem(item));
+    }
+  }
+
+  categories.set(item.category, category);
+}
+
+function hasDashboardVisualItem(
+  item: DatasetArtifact["items"][number] | DatasetArtifact["uniques"][number],
+): item is (
+  | DatasetArtifact["items"][number]
+  | DatasetArtifact["uniques"][number]
+) & { iconUrl: string; iconAttribution: string } {
+  return Boolean(item.iconUrl && item.iconAttribution);
+}
+
+function toDatasetVisualItem(
+  item: DatasetArtifact["items"][number] | DatasetArtifact["uniques"][number],
+) {
+  if (!hasDashboardVisualItem(item)) {
+    throw new Error("visual item requires image metadata");
+  }
+
+  return {
+    id: item.id,
+    name: item.name,
+    category: item.category,
+    rarity: item.rarity,
+    iconUrl: item.iconUrl,
+    iconAttribution: item.iconAttribution,
+  };
+}
+
+function compareDatasetVisualCategory(
+  left: {
+    category: string;
+    totalItems: number;
+    totalUniques: number;
+    iconCount: number;
+  },
+  right: {
+    category: string;
+    totalItems: number;
+    totalUniques: number;
+    iconCount: number;
+  },
+) {
+  return (
+    right.iconCount - left.iconCount ||
+    right.totalUniques - left.totalUniques ||
+    right.totalItems +
+      right.totalUniques -
+      (left.totalItems + left.totalUniques) ||
+    left.category.localeCompare(right.category)
+  );
 }
 
 function validateCachedImageAttribution(artifact: DatasetArtifact) {

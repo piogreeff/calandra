@@ -548,6 +548,47 @@ describe("api routes", () => {
     );
   });
 
+  it("serves a visual dataset summary from the configured artifact", async () => {
+    await expectJson(
+      "/datasets/visual-summary?league=Dawn%20of%20the%20Hunt&patch=0.2.0",
+      datasetEnv,
+      {
+        source: "published-dataset",
+        league: "Dawn of the Hunt",
+        patch: "0.2.0",
+        totalItems: 1,
+        totalUniques: 1,
+        totalVisualItems: 1,
+        categories: [
+          {
+            category: "amulet",
+            totalItems: 0,
+            totalUniques: 1,
+            iconCount: 1,
+            featured: [
+              {
+                id: "choir-of-the-storm",
+                name: "Choir of the Storm",
+                category: "amulet",
+                rarity: "unique",
+                iconUrl: "https://web.poecdn.com/image/example.png",
+                iconAttribution:
+                  "Game art and item data are property of Grinding Gear Games.",
+              },
+            ],
+          },
+          {
+            category: "body-armour",
+            totalItems: 1,
+            totalUniques: 0,
+            iconCount: 0,
+            featured: [],
+          },
+        ],
+      },
+    );
+  });
+
   it("returns one ladder build detail with equipment and passive tree data", async () => {
     await expectJson(
       "/builds/ladder/deadeye-1?league=Dawn%20of%20the%20Hunt&patch=0.2.0",
