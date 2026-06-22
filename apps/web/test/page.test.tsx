@@ -34,6 +34,9 @@ describe("home dashboard", () => {
     expect(requestedUrls).toContain(
       "https://calandra-api.piogreeff.workers.dev/snapshots/RealAccount/snapshot-2026-06-21T10-00-00Z",
     );
+    expect(requestedUrls).toContain(
+      "https://calandra-api.piogreeff.workers.dev/advisor/snapshots/RealAccount/snapshot-2026-06-21T10-00-00Z?league=Dawn+of+the+Hunt&patch=0.2.0",
+    );
     expect(requestedUrls.some((url) => url.includes("/snapshots/example"))).toBe(
       false,
     );
@@ -65,8 +68,9 @@ describe("home dashboard", () => {
       "https://poe.ninja/poe2/builds/runesofaldur/character/heygyus-0416/ResurrectGodAura/passive-tree",
     );
     expect(html).toContain("Duskthread Grips");
-    expect(html).toContain("+43.4");
-    expect(html).toContain("14.47 / chaos");
+    expect(html).toContain("Snapshot advisor");
+    expect(html).toContain("+60.0");
+    expect(html).toContain("5.00 / chaos");
     expect(html).toContain("No LLM values");
     expect(html).toContain("calandra-api.piogreeff.workers.dev");
     expect(html).toContain("calandra.pages.dev");
@@ -319,6 +323,26 @@ function mockDashboardFetch() {
       });
     }
 
+    if (url.includes("/advisor/snapshots/RealAccount/snapshot-2026-06-21T10-00-00Z?")) {
+      return Response.json({
+        source: "deterministic-engine",
+        upgrades: [
+          {
+            slot: "Gloves",
+            currentName: "Current Gloves",
+            candidateName: "Heavy Gloves",
+            currentScore: 40,
+            candidateScore: 100,
+            scoreDelta: 60,
+            estimatedCostChaos: 12,
+            valuePerChaos: 5,
+            currentMissingStats: ["fireResistance"],
+            candidateMissingStats: [],
+          },
+        ],
+      });
+    }
+
     if (url.includes("/snapshots/RealAccount/snapshot-2026-06-21T10-00-00Z")) {
       return Response.json({
         id: "snapshot-2026-06-21T10-00-00Z",
@@ -433,6 +457,26 @@ function mockDashboardFetch() {
             name: "Currency Tab",
             league: "Dawn of the Hunt",
             items: [{ slot: "stash", name: "Exalted Orb" }],
+          },
+        ],
+      });
+    }
+
+    if (url.includes("/advisor/snapshots/example/snapshot-2026-06-21T10-00-00Z?")) {
+      return Response.json({
+        source: "deterministic-engine",
+        upgrades: [
+          {
+            slot: "Gloves",
+            currentName: "Frayed Mail Mitts",
+            candidateName: "Duskthread Grips",
+            currentScore: 40,
+            candidateScore: 100,
+            scoreDelta: 60,
+            estimatedCostChaos: 12,
+            valuePerChaos: 5,
+            currentMissingStats: ["fireResistance"],
+            candidateMissingStats: [],
           },
         ],
       });

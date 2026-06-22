@@ -5,6 +5,7 @@ import {
   getDashboardGggOAuthStatus,
   getDashboardLadderBuild,
   getDashboardLadderBuilds,
+  getDashboardSnapshotAdvisor,
   getDashboardSearch,
   getDashboardLatestSnapshot,
   getDashboardSnapshotDiff,
@@ -283,6 +284,74 @@ describe("dashboard read API client", () => {
 
     expect(build.source).toBe("fallback");
     expect(build.build?.character).toBe("ResurrectGodAura");
+  });
+
+  it("loads deterministic snapshot upgrade rankings from the typed API", async () => {
+    const fetchImplementation = vi.fn(
+      async (input: RequestInfo | URL, init) => {
+        expect(String(input)).toBe(
+          "https://calandra-api.piogreeff.workers.dev/advisor/snapshots/example/snapshot-2026-06-21T10-00-00Z?league=Dawn+of+the+Hunt&patch=0.2.0",
+        );
+        expect(init).toMatchObject({
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: "Bearer snapshot-read-token",
+          },
+        });
+        expect(JSON.parse(String(init?.body))).toEqual({
+          weights: { life: 1, fireResistance: 0.5, movementSpeed: 0.75 },
+          maxBudgetChaos: 20,
+        });
+
+        return Response.json({
+          source: "deterministic-engine",
+          upgrades: [
+            {
+              slot: "Gloves",
+              currentName: "Frayed Mail Mitts",
+              candidateName: "Duskthread Grips",
+              currentScore: 40,
+              candidateScore: 100,
+              scoreDelta: 60,
+              estimatedCostChaos: 12,
+              valuePerChaos: 5,
+              currentMissingStats: ["fireResistance"],
+              candidateMissingStats: [],
+            },
+          ],
+        });
+      },
+    );
+
+    const advisor = await getDashboardSnapshotAdvisor(
+      "example",
+      "snapshot-2026-06-21T10-00-00Z",
+      "https://calandra-api.piogreeff.workers.dev",
+      fetchImplementation,
+      { snapshotReadToken: "snapshot-read-token" },
+    );
+
+    expect(advisor.source).toBe("api");
+    expect(advisor.response.upgrades[0]).toMatchObject({
+      candidateName: "Duskthread Grips",
+      scoreDelta: 60,
+      valuePerChaos: 5,
+    });
+  });
+
+  it("falls back to demo advisor rankings when snapshot advisor data is unavailable", async () => {
+    const advisor = await getDashboardSnapshotAdvisor(
+      "example",
+      "snapshot-2026-06-21T10-00-00Z",
+      "https://calandra-api.piogreeff.workers.dev",
+      vi.fn(async () => new Response(null, { status: 503 })),
+    );
+
+    expect(advisor.source).toBe("fallback");
+    expect(advisor.response.upgrades[0]?.candidateName).toBe(
+      "Duskthread Grips",
+    );
   });
 
   it("loads safe GGG OAuth status for account linking", async () => {

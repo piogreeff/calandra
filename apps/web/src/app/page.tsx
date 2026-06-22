@@ -20,7 +20,6 @@ import {
 } from "lucide-react";
 import type {
   AccountSnapshot,
-  UpgradeAdvisorResponse,
 } from "@calandra/contract";
 import { defaultTheme } from "../lib/theme";
 import { DatasetSearchPanel } from "../components/DatasetSearchPanel";
@@ -35,6 +34,7 @@ import {
   getDashboardLadderBuild,
   getDashboardLadderBuilds,
   getDashboardLatestSnapshot,
+  getDashboardSnapshotAdvisor,
   getDashboardSnapshotDiff,
   getDashboardSnapshots,
 } from "../lib/read-api";
@@ -48,48 +48,6 @@ const navItems = [
   { label: "Snapshots", icon: History },
   { label: "Settings", icon: Settings },
 ];
-
-const advisorPreview = {
-  source: "deterministic-engine",
-  upgrades: [
-    {
-      slot: "Gloves",
-      currentName: "Frayed Mail Mitts",
-      candidateName: "Duskthread Grips",
-      currentScore: 58.2,
-      candidateScore: 101.6,
-      scoreDelta: 43.4,
-      estimatedCostChaos: 3,
-      valuePerChaos: 14.4667,
-      currentMissingStats: ["fire_resistance", "attack_speed"],
-      candidateMissingStats: [],
-    },
-    {
-      slot: "Amulet",
-      currentName: "Amber Talisman",
-      candidateName: "Stormbind Charm",
-      currentScore: 76.8,
-      candidateScore: 98,
-      scoreDelta: 21.2,
-      estimatedCostChaos: 8,
-      valuePerChaos: 2.65,
-      currentMissingStats: ["lightning_damage"],
-      candidateMissingStats: ["life"],
-    },
-    {
-      slot: "Boots",
-      currentName: "Threadbare Shoes",
-      candidateName: "Wanderstep Boots",
-      currentScore: 64,
-      candidateScore: 79.5,
-      scoreDelta: 15.5,
-      estimatedCostChaos: 5,
-      valuePerChaos: 3.1,
-      currentMissingStats: ["movement_speed"],
-      candidateMissingStats: [],
-    },
-  ],
-} satisfies UpgradeAdvisorResponse;
 
 const gggDisclaimer =
   "Unofficial fan tool. Calandra is not affiliated with, endorsed by, or associated with Grinding Gear Games. Path of Exile 2 and related content are the property of Grinding Gear Games.";
@@ -232,7 +190,9 @@ export default async function Home({
       ),
       getDashboardLadderBuilds(),
     ]);
-  const [snapshotDiff, latestSnapshotDetail, ladderBuildDetail] =
+  const latestSnapshot =
+    snapshotList.snapshots[snapshotList.snapshots.length - 1];
+  const [snapshotDiff, latestSnapshotDetail, ladderBuildDetail, snapshotAdvisor] =
     await Promise.all([
       getDashboardSnapshotDiff(
         snapshotList.account,
@@ -249,6 +209,13 @@ export default async function Home({
         snapshotReadOptions,
       ),
       getDashboardLadderBuild(ladderBuilds.builds[0]?.id),
+      getDashboardSnapshotAdvisor(
+        snapshotList.account,
+        latestSnapshot?.snapshotId,
+        defaultApiBaseUrl,
+        fetch,
+        snapshotReadOptions,
+      ),
     ]);
   const endpointLabel = new URL(defaultApiBaseUrl).hostname;
   const datasetSource =
@@ -262,8 +229,6 @@ export default async function Home({
   const uniqueImageCoverage =
     dataset.manifest.qualityGates?.uniqueImageCoverage;
   const shortChecksum = dataset.manifest.sha256.slice(0, 12);
-  const latestSnapshot =
-    snapshotList.snapshots[snapshotList.snapshots.length - 1];
   const latestDiff = snapshotDiff.diff;
   const visualLoadoutPreview = createVisualLoadoutPreview(
     latestSnapshotDetail.snapshot,
@@ -441,10 +406,12 @@ export default async function Home({
                 icon={<Bot className="size-4" aria-hidden="true" />}
               >
                 <div className="mb-3 rounded-md border border-success/30 bg-success/10 p-3 text-xs font-medium text-success">
-                  No LLM values - {advisorPreview.source}
+                  No LLM values - Snapshot advisor -{" "}
+                  {snapshotAdvisor.response.source}
+                  {snapshotAdvisor.source === "fallback" ? " fallback" : ""}
                 </div>
                 <div className="space-y-3">
-                  {advisorPreview.upgrades.map((upgrade, index) => (
+                  {snapshotAdvisor.response.upgrades.map((upgrade, index) => (
                     <article
                       key={`${upgrade.slot}-${upgrade.candidateName}`}
                       className="rounded-md border border-base-300/70 bg-base-100/45 p-3"

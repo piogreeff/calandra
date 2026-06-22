@@ -14,7 +14,9 @@ import {
   itemCollectionSchema,
   ladderBuildCollectionSchema,
   ladderBuildSchema,
+  snapshotUpgradeAdvisorRequestSchema,
   uniqueCollectionSchema,
+  upgradeAdvisorResponseSchema,
   type AccountSnapshot,
   type AccountSnapshotDiff,
   type AccountSnapshotListItem,
@@ -28,6 +30,7 @@ import {
   type Item,
   type LadderBuild,
   type UniqueItem,
+  type UpgradeAdvisorResponse,
 } from "@calandra/contract";
 
 export const defaultApiBaseUrl =
@@ -82,6 +85,11 @@ export type DashboardLadderBuilds = {
 export type DashboardLadderBuild = {
   source: "api" | "fallback";
   build: LadderBuild | null;
+};
+
+export type DashboardSnapshotAdvisor = {
+  source: "api" | "fallback";
+  response: UpgradeAdvisorResponse;
 };
 
 export type DashboardLadderBuildFilters = {
@@ -188,6 +196,53 @@ const fallbackLadderBuilds: LadderBuild[] = [
     updatedAt: "2026-06-21T13:15:00.000Z",
   },
 ];
+
+const dashboardAdvisorRequest = snapshotUpgradeAdvisorRequestSchema.parse({
+  weights: { life: 1, fireResistance: 0.5, movementSpeed: 0.75 },
+  maxBudgetChaos: 20,
+});
+
+const fallbackAdvisorResponse: UpgradeAdvisorResponse = {
+  source: "deterministic-engine",
+  upgrades: [
+    {
+      slot: "Gloves",
+      currentName: "Frayed Mail Mitts",
+      candidateName: "Duskthread Grips",
+      currentScore: 58.2,
+      candidateScore: 101.6,
+      scoreDelta: 43.4,
+      estimatedCostChaos: 3,
+      valuePerChaos: 14.4667,
+      currentMissingStats: ["fireResistance", "attackSpeed"],
+      candidateMissingStats: [],
+    },
+    {
+      slot: "Amulet",
+      currentName: "Amber Talisman",
+      candidateName: "Stormbind Charm",
+      currentScore: 76.8,
+      candidateScore: 98,
+      scoreDelta: 21.2,
+      estimatedCostChaos: 8,
+      valuePerChaos: 2.65,
+      currentMissingStats: ["lightningDamage"],
+      candidateMissingStats: ["life"],
+    },
+    {
+      slot: "Boots",
+      currentName: "Threadbare Shoes",
+      candidateName: "Wanderstep Boots",
+      currentScore: 64,
+      candidateScore: 79.5,
+      scoreDelta: 15.5,
+      estimatedCostChaos: 5,
+      valuePerChaos: 3.1,
+      currentMissingStats: ["movementSpeed"],
+      candidateMissingStats: [],
+    },
+  ],
+};
 
 function fallbackSnapshots(account: string): DashboardSnapshots {
   return {
@@ -477,6 +532,34 @@ export async function getDashboardLadderBuild(
   }
 }
 
+export async function getDashboardSnapshotAdvisor(
+  account: string,
+  snapshotId: string | undefined,
+  apiBaseUrl = defaultApiBaseUrl,
+  fetchImplementation: typeof fetch = fetch,
+  options: DashboardSnapshotReadOptions = {},
+): Promise<DashboardSnapshotAdvisor> {
+  if (!snapshotId) {
+    return { source: "fallback", response: fallbackAdvisorResponse };
+  }
+
+  try {
+    const query = new URLSearchParams(dashboardDatasetVersion);
+    const response = await fetchJson(
+      fetchImplementation,
+      `${apiBaseUrl}/advisor/snapshots/${encodeURIComponent(
+        account,
+      )}/${encodeURIComponent(snapshotId)}?${query.toString()}`,
+      upgradeAdvisorResponseSchema.parse,
+      getSnapshotAdvisorRequestInit(options),
+    );
+
+    return { source: "api", response };
+  } catch {
+    return { source: "fallback", response: fallbackAdvisorResponse };
+  }
+}
+
 export async function getDashboardSnapshotDiff(
   account: string,
   snapshots: AccountSnapshotListItem[],
@@ -550,6 +633,21 @@ function getSnapshotReadRequestInit({
   return token
     ? { headers: { authorization: `Bearer ${token}` } }
     : undefined;
+}
+
+function getSnapshotAdvisorRequestInit({
+  snapshotReadToken,
+}: DashboardSnapshotReadOptions): RequestInit {
+  const token = snapshotReadToken?.trim();
+
+  return {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(dashboardAdvisorRequest),
+  };
 }
 
 function isUniqueItem(item: Item | UniqueItem): item is UniqueItem {
