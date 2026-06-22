@@ -213,6 +213,8 @@ export async function publishDatasetArtifactToR2(
     throw new Error("r2Bucket is required");
   }
 
+  await assertR2UniqueImageCoverageConfigured(options);
+
   const publishDirectory =
     options.publishDirectory ??
     (await mkdtemp(join(tmpdir(), "calandra-dataset-publish-")));
@@ -246,6 +248,25 @@ export async function publishDatasetArtifactToR2(
       (command) => command[command.indexOf("put") + 1] ?? "",
     ),
   };
+}
+
+async function assertR2UniqueImageCoverageConfigured(
+  options: DatasetR2PublishOptions,
+) {
+  if (options.expectedUniqueCount !== undefined) {
+    return;
+  }
+
+  const raw = await readFile(options.artifactPath, "utf8");
+  const artifact = datasetArtifactSchema.parse(
+    JSON.parse(raw.replace(/^\uFEFF/, "")),
+  );
+
+  if (artifact.uniques.length > 0) {
+    throw new Error(
+      "expectedUniqueCount is required before publishing unique item images to R2.",
+    );
+  }
 }
 
 export function getDatasetObjectKey(

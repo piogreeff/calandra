@@ -714,6 +714,46 @@ describe("dataset artifact import", () => {
     ]);
   });
 
+  it("requires unique image coverage metadata before publishing uniques to R2", async () => {
+    const directory = await mkdtemp(
+      join(tmpdir(), "calandra-dataset-r2-coverage-"),
+    );
+    const artifactPath = join(directory, "source.json");
+    const publishDirectory = join(directory, "publish");
+
+    await writeFile(
+      artifactPath,
+      JSON.stringify({
+        league: "Dawn of the Hunt",
+        patch: "0.2.0",
+        generatedAt: "2026-06-21T00:00:00.000Z",
+        source: "published-artifact",
+        sources: datasetSources,
+        items: [],
+        uniques: makeUniques(1),
+        mods: [],
+        gems: [],
+        economy: [],
+        ladderBuilds: [],
+      }),
+      "utf8",
+    );
+
+    await expect(
+      publishDatasetArtifactToR2({
+        artifactPath,
+        publishDirectory,
+        r2Bucket: "calandra-data",
+        wranglerCommand: "wrangler",
+        runCommand: async () => {
+          throw new Error("R2 upload must not run without coverage metadata");
+        },
+      }),
+    ).rejects.toThrow(
+      "expectedUniqueCount is required before publishing unique item images to R2.",
+    );
+  });
+
   it("builds R2 upload commands for the artifact and manifest", () => {
     expect(
       getR2UploadCommands({
