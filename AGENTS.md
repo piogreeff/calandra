@@ -10,6 +10,8 @@ Unofficial fan tool — not affiliated with Grinding Gear Games. Ships no game a
 
 ## Hard constraints (do not violate)
 
+FOLLOW YAGNI PRINCIPLES AND STICK TO ONE-LINER SOLLUTIONS! 
+
 1. Desktop agent must **never** inject into the PoE2 process, read game memory, or automate input beyond a single user-initiated keypress. Read-only overlay + one server action per user action.
 2. **No scrapers in clients or self-host paths.** The maintainer runs scrapers and publishes a dataset; everything else consumes it.
 3. Never scrape Maxroll or Mobalytics (copyrighted). Link out.
