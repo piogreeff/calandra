@@ -120,6 +120,20 @@ type VisualLoadoutPreview = {
   };
 };
 
+const equipmentSlots = [
+  "Weapon",
+  "Offhand",
+  "Helmet",
+  "Body armour",
+  "Gloves",
+  "Boots",
+  "Belt",
+  "Amulet",
+  "Ring 1",
+  "Ring 2",
+  "Charm",
+] as const;
+
 const fallbackVisualLoadoutPreview: VisualLoadoutPreview = {
   character: {
     name: "ResurrectGodAura",
@@ -808,38 +822,63 @@ function CharacterBuildPreviewPanel({
               <ImageIcon className="size-4 text-primary" aria-hidden="true" />
               <h3>Visual equipment</h3>
             </div>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-              {loadout.equipment.map((item) => (
-                <article
-                  key={`${item.slot}-${item.name}`}
-                  className="min-w-0 rounded-md border border-base-300/70 bg-base-100/45 p-3"
-                >
-                  <div className="aspect-square rounded-md border border-base-300/70 bg-base-300/35 p-2">
-                    <img
-                      src={item.iconUrl}
-                      alt={item.name}
-                      loading="lazy"
-                      className="h-full w-full object-contain"
-                    />
-                  </div>
-                  <p className="mt-3 text-xs uppercase text-base-content/55">
-                    {item.slot}
-                  </p>
-                  <h4 className="truncate text-sm font-semibold text-base-content">
-                    {item.name}
-                  </h4>
-                  <p className="mt-1 text-xs capitalize text-primary">
-                    {item.rarity}
-                  </p>
-                  <ul className="mt-2 space-y-1 text-xs leading-5 text-base-content/60">
-                    {item.stats.map((stat) => (
-                      <li key={stat} className="truncate">
-                        {stat}
-                      </li>
-                    ))}
-                  </ul>
-                </article>
-              ))}
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-3">
+              {equipmentSlots.map((slot) => {
+                const item = findEquipmentSlot(loadout.equipment, slot);
+
+                return item ? (
+                  <article
+                    key={slot}
+                    className="min-w-0 rounded-md border border-base-300/70 bg-base-100/45 p-3"
+                  >
+                    <div className="aspect-square rounded-md border border-base-300/70 bg-base-300/35 p-2">
+                      <img
+                        src={item.iconUrl}
+                        alt={item.name}
+                        loading="lazy"
+                        className="h-full w-full object-contain"
+                      />
+                    </div>
+                    <p className="mt-3 text-xs uppercase text-base-content/55">
+                      {slot}
+                    </p>
+                    <p className="mt-1 text-xs font-medium text-success">
+                      {slot} equipped
+                    </p>
+                    <h4 className="truncate text-sm font-semibold text-base-content">
+                      {item.name}
+                    </h4>
+                    <p className="mt-1 text-xs capitalize text-primary">
+                      {item.rarity}
+                    </p>
+                    <ul className="mt-2 space-y-1 text-xs leading-5 text-base-content/60">
+                      {item.stats.map((stat) => (
+                        <li key={stat} className="truncate">
+                          {stat}
+                        </li>
+                      ))}
+                    </ul>
+                  </article>
+                ) : (
+                  <article
+                    key={slot}
+                    className="min-h-36 rounded-md border border-dashed border-base-300/80 bg-base-100/30 p-3"
+                  >
+                    <div className="grid aspect-square place-items-center rounded-md border border-base-300/60 bg-base-300/20">
+                      <ImageIcon
+                        className="size-6 text-base-content/35"
+                        aria-hidden="true"
+                      />
+                    </div>
+                    <p className="mt-3 text-xs uppercase text-base-content/55">
+                      {slot}
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-base-content/65">
+                      {slot} slot empty
+                    </p>
+                  </article>
+                );
+              })}
             </div>
           </section>
         </div>
@@ -953,6 +992,21 @@ function createVisualLoadoutPreview(
       referenceUrl: fallbackVisualLoadoutPreview.passiveTree.referenceUrl,
     },
   };
+}
+
+function findEquipmentSlot(
+  equipment: VisualLoadoutPreview["equipment"],
+  slot: (typeof equipmentSlots)[number],
+) {
+  const normalizedSlot = normalizeEquipmentSlot(slot);
+
+  return equipment.find(
+    (item) => normalizeEquipmentSlot(item.slot) === normalizedSlot,
+  );
+}
+
+function normalizeEquipmentSlot(slot: string) {
+  return slot.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 function resolveSelectedAccount(searchParams: HomeSearchParams | undefined) {

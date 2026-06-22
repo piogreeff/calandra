@@ -49,6 +49,9 @@ describe("home dashboard", () => {
     expect(html).toContain("Deterministic upgrade rankings");
     expect(html).toContain("Character build preview");
     expect(html).toContain("Visual equipment");
+    expect(html).toContain("Weapon slot empty");
+    expect(html).toContain("Helmet slot empty");
+    expect(html).toContain("Gloves equipped");
     expect(html).toContain("Passive tree");
     expect(html).toContain("Level 45 Monk");
     expect(html).toContain("2 passive nodes tracked");
