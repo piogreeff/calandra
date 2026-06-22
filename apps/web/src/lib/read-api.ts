@@ -136,11 +136,22 @@ const fallbackDataset: DashboardDataset = {
   },
 };
 
+const fallbackDemoSnapshotId = "fallback-demo-snapshot";
+const fallbackDemoCapturedAt = "2026-06-21T10:00:00.000Z";
+
 function fallbackSnapshots(account: string): DashboardSnapshots {
   return {
     source: "fallback",
     account,
-    snapshots: [],
+    snapshots: [
+      {
+        account,
+        snapshotId: fallbackDemoSnapshotId,
+        objectKey: `fallback/${account}/${fallbackDemoSnapshotId}.json`,
+        uploadedAt: "2026-06-21T10:01:00.000Z",
+        size: 768,
+      },
+    ],
   };
 }
 
@@ -422,7 +433,52 @@ function fallbackLatestSnapshot(
     source: "fallback",
     reason,
     account,
-    snapshot: null,
+    snapshot: createFallbackAccountSnapshot(account),
+  };
+}
+
+function createFallbackAccountSnapshot(account: string): AccountSnapshot {
+  return {
+    id: fallbackDemoSnapshotId,
+    account,
+    capturedAt: fallbackDemoCapturedAt,
+    source: "manual-import",
+    capabilities: { characters: true, stashes: true },
+    characters: [
+      {
+        id: "char-1",
+        name: "Monkette",
+        className: "Monk",
+        level: 45,
+        league: dashboardDatasetVersion.league,
+        passiveSkillIds: ["passive-1", "passive-2"],
+        equipment: [
+          {
+            slot: "Gloves",
+            name: "Duskthread Grips",
+            rarity: "rare",
+            stats: { life: 65, fireResistance: 18 },
+          },
+          {
+            slot: "Amulet",
+            name: "Calandra Demo Amulet",
+            rarity: "unique",
+            stats: { spirit: 30 },
+          },
+        ],
+      },
+    ],
+    stashes: [
+      {
+        id: "stash-1",
+        name: "Currency Tab",
+        league: dashboardDatasetVersion.league,
+        items: [
+          { slot: "stash", name: "Exalted Orb" },
+          { slot: "stash", name: "Divine Orb" },
+        ],
+      },
+    ],
   };
 }
 

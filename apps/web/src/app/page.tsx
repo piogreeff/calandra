@@ -112,6 +112,7 @@ type VisualLoadoutPreview = {
   passiveTree: {
     allocated: number;
     focus: string;
+    nodeIds: string[];
     source: string;
     referenceUrl: string;
   };
@@ -177,6 +178,14 @@ const fallbackVisualLoadoutPreview: VisualLoadoutPreview = {
   passiveTree: {
     allocated: 95,
     focus: "Aura pathing, spirit reservation, defensive wheel coverage",
+    nodeIds: [
+      "aura-wheel",
+      "spirit-path",
+      "reservation",
+      "evasion-ring",
+      "deflection",
+      "crit-route",
+    ],
     source: "Link-out reference only; not scraped or bundled.",
     referenceUrl: passiveTreeReferenceUrl,
   },
@@ -196,7 +205,7 @@ export default async function Home() {
   const datasetSource =
     dataset.source === "api" ? "Published R2 artifact" : "Demo fallback";
   const snapshotSource =
-    snapshotList.source === "api" ? "Snapshot store" : "Awaiting first sync";
+    snapshotList.source === "api" ? "Snapshot store" : "Demo snapshot";
   const totalDatasetRecords = Object.values(dataset.manifest.counts).reduce(
     (sum, count) => sum + count,
     0,
@@ -762,6 +771,22 @@ function CharacterBuildPreviewPanel({
             <p className="mt-2 text-sm leading-6 text-base-content/65">
               {loadout.passiveTree.focus}
             </p>
+            <div className="mt-3 rounded-md border border-base-300/70 bg-base-200/65 p-3">
+              <p className="text-xs font-medium uppercase text-base-content/55">
+                Passive allocation preview
+              </p>
+              <div className="mt-3 grid grid-cols-3 gap-2" role="list">
+                {loadout.passiveTree.nodeIds.slice(0, 6).map((nodeId) => (
+                  <div
+                    key={nodeId}
+                    className="relative grid min-h-14 place-items-center rounded-md border border-primary/35 bg-primary/10 px-2 text-center text-[0.7rem] font-semibold leading-4 text-primary before:absolute before:left-[-0.6rem] before:top-1/2 before:hidden before:h-px before:w-2 before:bg-primary/45 sm:before:block"
+                    role="listitem"
+                  >
+                    <span className="break-all">{nodeId}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
             <p className="mt-3 rounded-md border border-warning/35 bg-warning/10 p-2 text-xs leading-5 text-warning">
               {loadout.passiveTree.source}
             </p>
@@ -819,6 +844,7 @@ function createVisualLoadoutPreview(
         character.passiveSkillIds && character.passiveSkillIds.length > 0
           ? "Latest account snapshot passive allocation"
           : "No passive allocation data captured yet",
+      nodeIds: character.passiveSkillIds ?? [],
       source: fallbackVisualLoadoutPreview.passiveTree.source,
       referenceUrl: fallbackVisualLoadoutPreview.passiveTree.referenceUrl,
     },

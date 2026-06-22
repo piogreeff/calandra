@@ -413,18 +413,37 @@ describe("dashboard read API client", () => {
     expect(snapshot.snapshot?.characters[0]?.passiveSkillIds).toHaveLength(2);
   });
 
-  it("falls back to empty snapshot restore metadata when the API is unavailable", async () => {
+  it("falls back to demo snapshot restore metadata when the API is unavailable", async () => {
     const snapshots = await getDashboardSnapshots(
       "example",
       "https://calandra-api.piogreeff.workers.dev",
       vi.fn(async () => new Response(null, { status: 503 })),
     );
 
-    expect(snapshots).toEqual({
-      source: "fallback",
-      account: "example",
-      snapshots: [],
-    });
+    expect(snapshots.source).toBe("fallback");
+    expect(snapshots.account).toBe("example");
+    expect(snapshots.snapshots[0]?.snapshotId).toBe("fallback-demo-snapshot");
+    expect(snapshots.snapshots[0]?.objectKey).toBe(
+      "fallback/example/fallback-demo-snapshot.json",
+    );
+  });
+
+  it("falls back to a demo latest snapshot with passive tree data", async () => {
+    const snapshot = await getDashboardLatestSnapshot(
+      "example",
+      [],
+      "https://calandra-api.piogreeff.workers.dev",
+      vi.fn(),
+    );
+
+    expect(snapshot.source).toBe("fallback");
+    expect(snapshot.reason).toBe("no-snapshots");
+    expect(snapshot.snapshot?.source).toBe("manual-import");
+    expect(snapshot.snapshot?.characters[0]?.name).toBe("Monkette");
+    expect(snapshot.snapshot?.characters[0]?.passiveSkillIds).toHaveLength(2);
+    expect(snapshot.snapshot?.characters[0]?.equipment[0]?.name).toBe(
+      "Duskthread Grips",
+    );
   });
 
   it("loads the latest account snapshot diff through the typed API", async () => {

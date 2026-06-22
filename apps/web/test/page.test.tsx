@@ -80,6 +80,27 @@ describe("home dashboard", () => {
       "not affiliated with, endorsed by, or associated with Grinding Gear Games",
     );
   });
+
+  it("shows demo snapshot equipment and passive tree when snapshot API is unavailable", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(null, { status: 503 })),
+    );
+
+    const html = renderToStaticMarkup(await Home());
+
+    expect(html).toContain("Demo snapshot");
+    expect(html).toContain("Level 45 Monk");
+    expect(html).toContain("Monkette");
+    expect(html).toContain("Duskthread Grips");
+    expect(html).toContain("Calandra Demo Amulet");
+    expect(html).toContain("2 passive nodes tracked");
+    expect(html).toContain("Passive allocation preview");
+    expect(html).toContain("passive-1");
+    expect(html).toContain("passive-2");
+    expect(html).toContain("Latest account snapshot passive allocation");
+    expect(html).toContain("fallback-demo-snapshot");
+  });
 });
 
 function mockDashboardFetch() {
