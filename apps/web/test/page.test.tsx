@@ -41,6 +41,10 @@ describe("home dashboard", () => {
       "Game data derived from Path of Exile 2 community references",
     );
     expect(html).toContain("Snapshot restore");
+    expect(html).toContain("GGG account link");
+    expect(html).toContain("Ready to link");
+    expect(html).toContain("account:characters");
+    expect(html).toContain("/auth/ggg/callback");
     expect(html).toContain("snapshot-2026-06-21T10-00-00Z");
     expect(html).toContain("512 B");
     expect(html).toContain("Snapshot diff");
@@ -123,6 +127,19 @@ function mockDashboardFetch() {
           gems: 0,
           economy: 1,
           ladderBuilds: 0,
+        },
+      });
+    }
+
+    if (url.endsWith("/auth/ggg/status")) {
+      return Response.json({
+        source: "ggg-oauth-status",
+        configured: true,
+        redirectUri: "https://calandra.pages.dev/auth/ggg/callback",
+        requiredScopes: ["account:characters"],
+        features: {
+          accountLinking: true,
+          snapshotCapture: true,
         },
       });
     }

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   getDashboardDataset,
+  getDashboardGggOAuthStatus,
   getDashboardSearch,
   getDashboardSnapshotDiff,
   getDashboardSnapshots,
@@ -174,6 +175,51 @@ describe("dashboard read API client", () => {
     expect(results.uniques[0]?.name).toBe("Calandra Demo Amulet");
     expect(results.mods[0]?.id).toBe("demo-life-prefix");
     expect(results.gems[0]?.name).toBe("Spark");
+  });
+
+  it("loads safe GGG OAuth status for account linking", async () => {
+    const fetchImplementation = vi.fn(async () =>
+      Response.json({
+        source: "ggg-oauth-status",
+        configured: true,
+        redirectUri: "https://calandra.pages.dev/auth/ggg/callback",
+        requiredScopes: ["account:characters"],
+        features: {
+          accountLinking: true,
+          snapshotCapture: true,
+        },
+      }),
+    );
+
+    const status = await getDashboardGggOAuthStatus(
+      "https://calandra-api.piogreeff.workers.dev",
+      fetchImplementation,
+    );
+
+    expect(fetchImplementation).toHaveBeenCalledWith(
+      "https://calandra-api.piogreeff.workers.dev/auth/ggg/status",
+    );
+    expect(status.source).toBe("api");
+    expect(status.features.accountLinking).toBe(true);
+    expect(JSON.stringify(status)).not.toContain("clientSecret");
+  });
+
+  it("falls back to disabled GGG OAuth status when the API is unavailable", async () => {
+    const status = await getDashboardGggOAuthStatus(
+      "https://calandra-api.piogreeff.workers.dev",
+      vi.fn(async () => new Response(null, { status: 503 })),
+    );
+
+    expect(status).toEqual({
+      source: "fallback",
+      configured: false,
+      redirectUri: "https://calandra.pages.dev/auth/ggg/callback",
+      requiredScopes: ["account:characters"],
+      features: {
+        accountLinking: false,
+        snapshotCapture: false,
+      },
+    });
   });
 
   it("returns empty fallback search results for blank or unavailable searches", async () => {

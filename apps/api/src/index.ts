@@ -23,6 +23,7 @@ import {
   openApiDocument,
   gggOAuthTokenExchangeRequestSchema,
   gggOAuthTokenExchangeResponseSchema,
+  gggOAuthStatusResponseSchema,
   poe2CharacterSnapshotCaptureRequestSchema,
   poe2StoredTokenSnapshotCaptureRequestSchema,
   priceCheckRequestSchema,
@@ -107,6 +108,24 @@ api.get("/health", (context) => {
 
 api.get("/openapi.json", (context) => {
   return context.json(openApiDocument);
+});
+
+api.get("/auth/ggg/status", (context) => {
+  const accountLinking = isGggOAuthExchangeConfigured(context);
+  const snapshotCapture = isGggOAuthSnapshotCaptureConfigured(context);
+
+  return context.json(
+    gggOAuthStatusResponseSchema.parse({
+      source: "ggg-oauth-status",
+      configured: accountLinking && snapshotCapture,
+      redirectUri: getGggOAuthRedirectUri(context),
+      requiredScopes: [gggOAuthScopes.accountCharacters],
+      features: {
+        accountLinking,
+        snapshotCapture,
+      },
+    }),
+  );
 });
 
 api.post("/advisor/upgrades", async (context) => {
@@ -1104,6 +1123,24 @@ function isGggOAuthExchangeConfigured(
     context.env.GGG_TOKEN_ENCRYPTION_KEY &&
     context.env.SNAPSHOT_BUCKET?.put,
   );
+}
+
+function isGggOAuthSnapshotCaptureConfigured(
+  context: Context<{ Bindings: Bindings }>,
+) {
+  return Boolean(
+    context.env.GGG_OAUTH_CLIENT_ID &&
+      context.env.GGG_TOKEN_ENCRYPTION_KEY &&
+      context.env.GGG_USER_AGENT &&
+      context.env.SNAPSHOT_BUCKET?.get &&
+      context.env.SNAPSHOT_BUCKET?.put,
+  );
+}
+
+function getGggOAuthRedirectUri(context: Context<{ Bindings: Bindings }>) {
+  const appUrl = context.env.APP_URL ?? "https://calandra.pages.dev";
+
+  return `${appUrl.replace(/\/$/, "")}/auth/ggg/callback`;
 }
 
 function parseGggOAuthScopes(scopes: readonly string[] | undefined) {

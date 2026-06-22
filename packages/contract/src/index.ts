@@ -221,6 +221,17 @@ export const gggOAuthTokenExchangeResponseSchema = z.object({
   }),
 });
 
+export const gggOAuthStatusResponseSchema = z.object({
+  source: z.literal("ggg-oauth-status"),
+  configured: z.boolean(),
+  redirectUri: z.string().url(),
+  requiredScopes: z.array(z.string().min(1)),
+  features: z.object({
+    accountLinking: z.boolean(),
+    snapshotCapture: z.boolean(),
+  }),
+});
+
 export const accountSnapshotListItemSchema = z.object({
   account: z.string().min(1),
   snapshotId: z.string().min(1),
@@ -816,6 +827,24 @@ export const openApiDocument = {
           },
           "503": {
             description: "GGG OAuth token storage is not configured",
+          },
+        },
+      },
+    },
+    "/auth/ggg/status": {
+      get: {
+        operationId: "getGggOAuthStatus",
+        summary: "Get safe hosted GGG OAuth configuration status",
+        responses: {
+          "200": {
+            description: "Non-secret GGG OAuth status for browser clients",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/GggOAuthStatusResponse",
+                },
+              },
+            },
           },
         },
       },
@@ -1445,6 +1474,33 @@ export const openApiDocument = {
           },
         },
       },
+      GggOAuthStatusResponse: {
+        type: "object",
+        required: [
+          "source",
+          "configured",
+          "redirectUri",
+          "requiredScopes",
+          "features",
+        ],
+        properties: {
+          source: { type: "string", enum: ["ggg-oauth-status"] },
+          configured: { type: "boolean" },
+          redirectUri: { type: "string", format: "uri" },
+          requiredScopes: {
+            type: "array",
+            items: { type: "string", minLength: 1 },
+          },
+          features: {
+            type: "object",
+            required: ["accountLinking", "snapshotCapture"],
+            properties: {
+              accountLinking: { type: "boolean" },
+              snapshotCapture: { type: "boolean" },
+            },
+          },
+        },
+      },
       AccountSnapshotListItem: {
         type: "object",
         required: ["account", "snapshotId", "objectKey"],
@@ -1857,6 +1913,9 @@ export type GggOAuthTokenExchangeRequest = z.infer<
 >;
 export type GggOAuthTokenExchangeResponse = z.infer<
   typeof gggOAuthTokenExchangeResponseSchema
+>;
+export type GggOAuthStatusResponse = z.infer<
+  typeof gggOAuthStatusResponseSchema
 >;
 export type AccountSnapshotListItem = z.infer<
   typeof accountSnapshotListItemSchema

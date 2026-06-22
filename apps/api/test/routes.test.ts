@@ -171,6 +171,59 @@ describe("api routes", () => {
     });
   });
 
+  it("returns safe public GGG OAuth status when hosted account linking is configured", async () => {
+    const response = await api.request("/auth/ggg/status", undefined, {
+      APP_URL: "https://calandra.pages.dev",
+      GGG_OAUTH_CLIENT_ID: "ggg-client-id",
+      GGG_TOKEN_ENCRYPTION_KEY: base64Key(3),
+      GGG_USER_AGENT:
+        "calandra/0.1.0 (+https://calandra.pages.dev; maintainer@calandra.dev)",
+      SNAPSHOT_BUCKET: {
+        async get() {
+          return null;
+        },
+        async put() {
+          return undefined;
+        },
+      },
+    });
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+
+    expect(body).toEqual({
+      source: "ggg-oauth-status",
+      configured: true,
+      redirectUri: "https://calandra.pages.dev/auth/ggg/callback",
+      requiredScopes: ["account:characters"],
+      features: {
+        accountLinking: true,
+        snapshotCapture: true,
+      },
+    });
+    expect(JSON.stringify(body)).not.toContain("ggg-client-id");
+    expect(JSON.stringify(body)).not.toContain("GGG_TOKEN_ENCRYPTION_KEY");
+    expect(JSON.stringify(body)).not.toContain("SNAPSHOT_WRITE_TOKEN");
+  });
+
+  it("returns disabled GGG OAuth status without exposing missing secrets", async () => {
+    const response = await api.request("/auth/ggg/status", undefined, {
+      APP_URL: "https://calandra.pages.dev",
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      source: "ggg-oauth-status",
+      configured: false,
+      redirectUri: "https://calandra.pages.dev/auth/ggg/callback",
+      requiredScopes: ["account:characters"],
+      features: {
+        accountLinking: false,
+        snapshotCapture: false,
+      },
+    });
+  });
+
   it("returns empty patch-versioned Phase 1 read collections before the dataset is imported", async () => {
     const env = { APP_URL: "https://calandra.pages.dev" };
 

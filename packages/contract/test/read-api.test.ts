@@ -15,6 +15,7 @@ import {
   datasetSearchResponseSchema,
   economyCollectionSchema,
   gemCollectionSchema,
+  gggOAuthStatusResponseSchema,
   ladderBuildCollectionSchema,
   modCollectionSchema,
   openApiDocument,
@@ -738,6 +739,31 @@ describe("account snapshot contract", () => {
       openApiDocument.components.schemas.GggOAuthTokenExchangeResponse,
     ).toBeDefined();
   });
+
+  it("models safe hosted GGG OAuth configuration status without secrets", () => {
+    const response = gggOAuthStatusResponseSchema.parse({
+      source: "ggg-oauth-status",
+      configured: true,
+      redirectUri: "https://calandra.pages.dev/auth/ggg/callback",
+      requiredScopes: ["account:characters"],
+      features: {
+        accountLinking: true,
+        snapshotCapture: true,
+      },
+    });
+
+    expect(response.configured).toBe(true);
+    expect(JSON.stringify(response)).not.toContain("clientSecret");
+    expect(JSON.stringify(response)).not.toContain("encryption");
+    expect(JSON.stringify(response)).not.toContain("write-token");
+    expect(openApiDocument.paths["/auth/ggg/status"]?.get?.operationId).toBe(
+      "getGggOAuthStatus",
+    );
+    expect(
+      openApiDocument.components.schemas.GggOAuthStatusResponse,
+    ).toBeDefined();
+  });
+
   it("models stored-token official PoE2 character snapshot capture requests", () => {
     const request = poe2StoredTokenSnapshotCaptureRequestSchema.parse({
       account: "example",

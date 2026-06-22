@@ -5,6 +5,7 @@ import {
   datasetManifestSchema,
   datasetSearchResponseSchema,
   economyCollectionSchema,
+  gggOAuthStatusResponseSchema,
   itemCollectionSchema,
   uniqueCollectionSchema,
   type AccountSnapshotDiff,
@@ -12,6 +13,7 @@ import {
   type DatasetManifest,
   type DatasetSearchResponse,
   type EconomyPrice,
+  type GggOAuthStatusResponse,
   type Item,
   type UniqueItem,
 } from "@calandra/contract";
@@ -43,6 +45,10 @@ export type DashboardSnapshotDiff = {
   reason: "ready" | "insufficient-snapshots" | "unavailable";
   account: string;
   diff: AccountSnapshotDiff | null;
+};
+
+export type DashboardGggOAuthStatus = Omit<GggOAuthStatusResponse, "source"> & {
+  source: "api" | "fallback";
 };
 
 export type DashboardSearchResults = DatasetSearchResponse & {
@@ -134,6 +140,19 @@ function fallbackSnapshotDiff(
   };
 }
 
+function fallbackGggOAuthStatus(): DashboardGggOAuthStatus {
+  return {
+    source: "fallback",
+    configured: false,
+    redirectUri: "https://calandra.pages.dev/auth/ggg/callback",
+    requiredScopes: ["account:characters"],
+    features: {
+      accountLinking: false,
+      snapshotCapture: false,
+    },
+  };
+}
+
 export async function getDashboardDataset(
   apiBaseUrl = defaultApiBaseUrl,
   fetchImplementation: typeof fetch = fetch,
@@ -198,6 +217,29 @@ export async function getDashboardSnapshots(
     };
   } catch {
     return fallbackSnapshots(account);
+  }
+}
+
+export async function getDashboardGggOAuthStatus(
+  apiBaseUrl = defaultApiBaseUrl,
+  fetchImplementation: typeof fetch = fetch,
+): Promise<DashboardGggOAuthStatus> {
+  try {
+    const status = await fetchJson(
+      fetchImplementation,
+      `${apiBaseUrl}/auth/ggg/status`,
+      gggOAuthStatusResponseSchema.parse,
+    );
+
+    return {
+      source: "api",
+      configured: status.configured,
+      redirectUri: status.redirectUri,
+      requiredScopes: status.requiredScopes,
+      features: status.features,
+    };
+  } catch {
+    return fallbackGggOAuthStatus();
   }
 }
 
