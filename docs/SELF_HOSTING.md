@@ -48,32 +48,34 @@ If `CALANDRA_API_BASE_URL` is unset, the MCP server uses the temporary hosted AP
 
 Every environment variable is documented in [`.env.example`](../.env.example) — app, AI/AI Gateway, GGG OAuth, Cloudflare bindings, Neon, and Better Auth. Nothing is secret in that file; copy it to `.env` and fill it in.
 
-| Key                       | Purpose                                                                                                                          |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `NODE_ENV`                | Runtime mode for local scripts and apps.                                                                                         |
-| `APP_URL`                 | Public web app URL; defaults to the temporary Cloudflare Pages URL until a permanent domain exists.                              |
-| `API_URL`                 | Public API URL; defaults to the temporary Workers URL until a permanent domain exists.                                           |
-| `CALANDRA_API_BASE_URL`   | API base URL used by the local MCP stdio server; defaults to the temporary hosted Worker if unset.                               |
-| `DATASET_VERSION`         | Published `{league, patch}` dataset version to import; `latest` follows the newest published artifact.                           |
-| `DATASET_R2_PREFIX`       | R2 object prefix for published artifacts; the API reads `${DATASET_R2_PREFIX}/{league}/{patch}.json`.                            |
-| `SNAPSHOT_R2_PREFIX`      | R2 object prefix for persisted account snapshots; the Worker writes `${SNAPSHOT_R2_PREFIX}/{account}/{snapshot}.json`.           |
-| `SNAPSHOT_WRITE_TOKEN`    | Optional bearer token required before `POST /snapshots` accepts writes; set it as a Worker secret on hosted/self-hosted APIs.    |
-| `DATASET_ARTIFACT_JSON`   | Optional dev/self-host Worker binding for a published artifact JSON payload; production should load published artifacts from R2. |
-| `OPENAI_API_KEY`          | OpenAI key used through Cloudflare AI Gateway for advisor explanations.                                                          |
-| `AI_GATEWAY_URL`          | Cloudflare AI Gateway endpoint for caching and cost control.                                                                     |
-| `AI_SESSION_BUDGET_USD`   | Hard per-session advisory budget in USD.                                                                                         |
-| `GGG_OAUTH_CLIENT_ID`     | Grinding Gear Games OAuth application client id.                                                                                 |
-| `GGG_OAUTH_CLIENT_SECRET` | Grinding Gear Games OAuth application client secret.                                                                             |
-| `GGG_OAUTH_REDIRECT_URI`  | OAuth callback URL registered with Grinding Gear Games.                                                                          |
-| `GGG_USER_AGENT`          | Required descriptive User-Agent with project URL and contact.                                                                    |
-| `CLOUDFLARE_ACCOUNT_ID`   | Cloudflare account id for Workers, KV, R2, Vectorize, and AI Gateway resources.                                                  |
-| `CLOUDFLARE_API_TOKEN`    | Cloudflare API token with least-privilege deployment/resource permissions.                                                       |
-| `KV_ECONOMY`              | Workers KV binding name for economy cache data.                                                                                  |
-| `R2_BUCKET`               | R2 bucket name for published datasets and cached images.                                                                         |
-| `VECTORIZE_INDEX`         | Vectorize index name for mods, crafting rules, and uniques retrieval.                                                            |
-| `DATABASE_URL`            | Optional Neon Postgres connection string for personal snapshots and history.                                                     |
-| `BETTER_AUTH_SECRET`      | Better Auth signing/encryption secret.                                                                                           |
-| `BETTER_AUTH_URL`         | Public Better Auth base URL, normally matching `APP_URL`.                                                                        |
+| Key                        | Purpose                                                                                                                          |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                 | Runtime mode for local scripts and apps.                                                                                         |
+| `APP_URL`                  | Public web app URL; defaults to the temporary Cloudflare Pages URL until a permanent domain exists.                              |
+| `API_URL`                  | Public API URL; defaults to the temporary Workers URL until a permanent domain exists.                                           |
+| `CALANDRA_API_BASE_URL`    | API base URL used by the local MCP stdio server; defaults to the temporary hosted Worker if unset.                               |
+| `DATASET_VERSION`          | Published `{league, patch}` dataset version to import; `latest` follows the newest published artifact.                           |
+| `DATASET_R2_PREFIX`        | R2 object prefix for published artifacts; the API reads `${DATASET_R2_PREFIX}/{league}/{patch}.json`.                            |
+| `SNAPSHOT_R2_PREFIX`       | R2 object prefix for persisted account snapshots; the Worker writes `${SNAPSHOT_R2_PREFIX}/{account}/{snapshot}.json`.           |
+| `SNAPSHOT_WRITE_TOKEN`     | Optional bearer token required before `POST /snapshots` accepts writes; set it as a Worker secret on hosted/self-hosted APIs.    |
+| `DATASET_ARTIFACT_JSON`    | Optional dev/self-host Worker binding for a published artifact JSON payload; production should load published artifacts from R2. |
+| `OPENAI_API_KEY`           | OpenAI key used through Cloudflare AI Gateway for advisor explanations.                                                          |
+| `AI_GATEWAY_URL`           | Cloudflare AI Gateway endpoint for caching and cost control.                                                                     |
+| `AI_SESSION_BUDGET_USD`    | Hard per-session advisory budget in USD.                                                                                         |
+| `GGG_OAUTH_CLIENT_ID`      | Grinding Gear Games OAuth application client id.                                                                                 |
+| `GGG_OAUTH_CLIENT_SECRET`  | Grinding Gear Games OAuth application client secret.                                                                             |
+| `GGG_OAUTH_REDIRECT_URI`   | OAuth callback URL registered with Grinding Gear Games.                                                                          |
+| `GGG_TOKEN_R2_PREFIX`      | R2 object prefix for encrypted GGG OAuth token envelopes; defaults to `oauth/ggg`.                                               |
+| `GGG_TOKEN_ENCRYPTION_KEY` | 32-byte base64/base64url key used to encrypt GGG OAuth tokens at rest; set it as a Worker secret in production.                  |
+| `GGG_USER_AGENT`           | Required descriptive User-Agent with project URL and contact.                                                                    |
+| `CLOUDFLARE_ACCOUNT_ID`    | Cloudflare account id for Workers, KV, R2, Vectorize, and AI Gateway resources.                                                  |
+| `CLOUDFLARE_API_TOKEN`     | Cloudflare API token with least-privilege deployment/resource permissions.                                                       |
+| `KV_ECONOMY`               | Workers KV binding name for economy cache data.                                                                                  |
+| `R2_BUCKET`                | R2 bucket name for published datasets and cached images.                                                                         |
+| `VECTORIZE_INDEX`          | Vectorize index name for mods, crafting rules, and uniques retrieval.                                                            |
+| `DATABASE_URL`             | Optional Neon Postgres connection string for personal snapshots and history.                                                     |
+| `BETTER_AUTH_SECRET`       | Better Auth signing/encryption secret.                                                                                           |
+| `BETTER_AUTH_URL`          | Public Better Auth base URL, normally matching `APP_URL`.                                                                        |
 
 ## Keeping data current
 

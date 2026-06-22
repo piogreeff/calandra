@@ -21,6 +21,8 @@ import {
   ladderBuildCollectionSchema,
   modCollectionSchema,
   openApiDocument,
+  gggOAuthTokenExchangeRequestSchema,
+  gggOAuthTokenExchangeResponseSchema,
   poe2CharacterSnapshotCaptureRequestSchema,
   priceCheckRequestSchema,
   priceCheckResponseSchema,
@@ -38,8 +40,13 @@ import {
   GggApiConfigurationError,
   GggApiHttpError,
   GggApiScopeError,
+  GggOAuthTokenEncryptionError,
   capturePoe2CharacterSnapshot,
   createGggApiClient,
+  encryptGggOAuthTokenSet,
+  exchangeGggOAuthAuthorizationCode,
+  gggOAuthScopes,
+  type GggOAuthScope,
 } from "@calandra/ggg-api";
 import { Hono, type Context } from "hono";
 
@@ -53,6 +60,11 @@ type Bindings = {
   SNAPSHOT_BUCKET?: SnapshotBucket;
   GGG_USER_AGENT?: string;
   GGG_API_BASE_URL?: string;
+  GGG_OAUTH_CLIENT_ID?: string;
+  GGG_OAUTH_CLIENT_SECRET?: string;
+  GGG_OAUTH_TOKEN_URL?: string;
+  GGG_TOKEN_ENCRYPTION_KEY?: string;
+  GGG_TOKEN_R2_PREFIX?: string;
 };
 
 export const api = new Hono<{ Bindings: Bindings }>();
@@ -297,6 +309,136 @@ api.get("/snapshots/:account", async (context) => {
   );
 });
 
+api.post("/auth/ggg/exchange", async (context) => {
+  if (!isSnapshotWriteAuthorized(context)) {
+    return context.json({ error: "snapshot write is unauthorized" }, 401);
+  }
+
+  const rawBody = await readJsonBody(context);
+  const parsed = gggOAuthTokenExchangeRequestSchema.safeParse(rawBody);
+
+  if (!parsed.success) {
+    return context.json(
+      { error: "invalid GGG OAuth token exchange request" },
+      400,
+    );
+  }
+
+  const clientId = context.env.GGG_OAUTH_CLIENT_ID;
+  const snapshotBucket = context.env.SNAPSHOT_BUCKET;
+
+  if (
+    !clientId ||
+    !context.env.GGG_TOKEN_ENCRYPTION_KEY ||
+    !snapshotBucket?.put
+  ) {
+    return context.json(
+      { error: "GGG OAuth token exchange is not configured" },
+      503,
+    );
+  }
+
+  const scopes = parseGggOAuthScopes(parsed.data.scopes);
+
+  if (!scopes.ok) {
+    return context.json(
+      { error: "invalid GGG OAuth token exchange request" },
+      400,
+    );
+  }
+
+  let encryptionKey: Uint8Array;
+
+  try {
+    encryptionKey = parseGggTokenEncryptionKey(
+      context.env.GGG_TOKEN_ENCRYPTION_KEY,
+    );
+  } catch {
+    return context.json(
+      { error: "GGG OAuth token exchange is not configured" },
+      503,
+    );
+  }
+
+  try {
+    const tokenSet = await exchangeGggOAuthAuthorizationCode({
+      clientId,
+      ...(context.env.GGG_OAUTH_CLIENT_SECRET
+        ? { clientSecret: context.env.GGG_OAUTH_CLIENT_SECRET }
+        : {}),
+      code: parsed.data.code,
+      codeVerifier: parsed.data.codeVerifier,
+      redirectUri: parsed.data.redirectUri,
+      ...(scopes.scopes ? { scopes: scopes.scopes } : {}),
+      fetch: (url, init) => fetch(url, init),
+      now: new Date(),
+      ...(context.env.GGG_OAUTH_TOKEN_URL
+        ? { tokenUrl: context.env.GGG_OAUTH_TOKEN_URL }
+        : {}),
+    });
+    const encryptedTokenSet = await encryptGggOAuthTokenSet(tokenSet, {
+      key: encryptionKey,
+    });
+    const objectKey = getGggOAuthTokenObjectKey(context, parsed.data.account);
+    await snapshotBucket.put(
+      objectKey,
+      JSON.stringify({
+        account: parsed.data.account,
+        provider: "ggg",
+        updatedAt: new Date().toISOString(),
+        token: buildStoredGggOAuthTokenMetadata(tokenSet),
+        encryptedTokenSet,
+      }),
+      { httpMetadata: { contentType: "application/json; charset=utf-8" } },
+    );
+
+    return context.json(
+      gggOAuthTokenExchangeResponseSchema.parse({
+        source: "ggg-oauth-token-store",
+        account: parsed.data.account,
+        objectKey,
+        token: {
+          tokenType: "encrypted",
+          ...buildStoredGggOAuthTokenMetadata(tokenSet),
+        },
+      }),
+      201,
+    );
+  } catch (error) {
+    if (
+      error instanceof GggApiHttpError &&
+      (error.status === 401 || error.status === 403)
+    ) {
+      return context.json(
+        { error: "GGG OAuth code was rejected", status: error.status },
+        401,
+      );
+    }
+
+    if (error instanceof GggApiConfigurationError) {
+      return context.json(
+        { error: "GGG OAuth token exchange is not configured" },
+        503,
+      );
+    }
+
+    if (error instanceof GggOAuthTokenEncryptionError) {
+      return context.json(
+        { error: "GGG OAuth token exchange is not configured" },
+        503,
+      );
+    }
+
+    if (error instanceof GggApiHttpError) {
+      return context.json(
+        { error: "GGG OAuth token exchange failed", status: error.status },
+        502,
+      );
+    }
+
+    throw error;
+  }
+});
 api.post("/snapshots", async (context) => {
   if (!isSnapshotWriteAuthorized(context)) {
     return context.json({ error: "snapshot write is unauthorized" }, 401);
@@ -752,6 +894,69 @@ function getSnapshotObjectKey(
 ) {
   return `${getSnapshotAccountPrefix(context, snapshot.account)}${encodeURIComponent(snapshot.id)}.json`;
 }
+function getGggOAuthTokenObjectKey(
+  context: Context<{ Bindings: Bindings }>,
+  account: string,
+) {
+  const prefix = context.env.GGG_TOKEN_R2_PREFIX ?? "oauth/ggg";
+
+  return `${prefix}/${encodeURIComponent(account)}/token.json`;
+}
+
+function isGggOAuthExchangeConfigured(
+  context: Context<{ Bindings: Bindings }>,
+) {
+  return Boolean(
+    context.env.GGG_OAUTH_CLIENT_ID &&
+    context.env.GGG_TOKEN_ENCRYPTION_KEY &&
+    context.env.SNAPSHOT_BUCKET?.put,
+  );
+}
+
+function parseGggOAuthScopes(scopes: readonly string[] | undefined) {
+  if (!scopes) {
+    return { ok: true as const };
+  }
+
+  const allowedScopes = new Set(Object.values(gggOAuthScopes));
+
+  if (scopes.some((scope) => !allowedScopes.has(scope as GggOAuthScope))) {
+    return { ok: false as const };
+  }
+
+  return { ok: true as const, scopes: scopes as readonly GggOAuthScope[] };
+}
+
+function parseGggTokenEncryptionKey(value: string | undefined) {
+  const decode = (globalThis as { atob?: (encoded: string) => string }).atob;
+
+  if (!value || !decode) {
+    throw new Error("GGG token encryption key is unavailable");
+  }
+
+  const base64 = value.trim().replaceAll("-", "+").replaceAll("_", "/");
+  const padded = base64.padEnd(
+    base64.length + ((4 - (base64.length % 4)) % 4),
+    "=",
+  );
+  const binary = decode(padded);
+
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+}
+
+function buildStoredGggOAuthTokenMetadata(tokenSet: {
+  expiresAt: string;
+  scope: readonly string[];
+  username?: string;
+  sub?: string;
+}) {
+  return {
+    expiresAt: tokenSet.expiresAt,
+    scope: [...tokenSet.scope],
+    ...(tokenSet.username ? { username: tokenSet.username } : {}),
+    ...(tokenSet.sub ? { sub: tokenSet.sub } : {}),
+  };
+}
 
 function getSnapshotAccountPrefix(
   context: Context<{ Bindings: Bindings }>,
@@ -762,9 +967,7 @@ function getSnapshotAccountPrefix(
   return `${prefix}/${encodeURIComponent(account)}/`;
 }
 
-function isSnapshotWriteAuthorized(
-  context: Context<{ Bindings: Bindings }>,
-) {
+function isSnapshotWriteAuthorized(context: Context<{ Bindings: Bindings }>) {
   const writeToken = context.env.SNAPSHOT_WRITE_TOKEN;
 
   if (!writeToken) {
@@ -968,12 +1171,9 @@ function matchesMod(mod: DatasetArtifact["mods"][number], query: string) {
 }
 
 function matchesGem(gem: DatasetArtifact["gems"][number], query: string) {
-  return [
-    gem.id,
-    gem.name,
-    gem.kind,
-    ...(gem.tags ?? []),
-  ].some((value) => normalizeSearchValue(value).includes(query));
+  return [gem.id, gem.name, gem.kind, ...(gem.tags ?? [])].some((value) =>
+    normalizeSearchValue(value).includes(query),
+  );
 }
 
 async function sha256Hex(value: string) {

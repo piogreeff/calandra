@@ -195,6 +195,26 @@ export const poe2CharacterSnapshotCaptureRequestSchema = z.object({
   capturedAt: z.string().datetime().optional(),
   snapshotId: z.string().min(1).optional(),
 });
+export const gggOAuthTokenExchangeRequestSchema = z.object({
+  account: z.string().min(1),
+  code: z.string().min(1),
+  codeVerifier: z.string().min(1),
+  redirectUri: z.string().url(),
+  scopes: z.array(z.string().min(1)).optional(),
+});
+
+export const gggOAuthTokenExchangeResponseSchema = z.object({
+  source: z.literal("ggg-oauth-token-store"),
+  account: z.string().min(1),
+  objectKey: z.string().min(1),
+  token: z.object({
+    tokenType: z.literal("encrypted"),
+    expiresAt: z.string().datetime(),
+    scope: z.array(z.string().min(1)),
+    username: z.string().min(1).optional(),
+    sub: z.string().min(1).optional(),
+  }),
+});
 
 export const accountSnapshotListItemSchema = z.object({
   account: z.string().min(1),
@@ -757,6 +777,44 @@ export const openApiDocument = {
         },
       },
     },
+    "/auth/ggg/exchange": {
+      post: {
+        operationId: "exchangeGggOAuthToken",
+        summary:
+          "Exchange a GGG OAuth authorization code and store encrypted tokens",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                $ref: "#/components/schemas/GggOAuthTokenExchangeRequest",
+              },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "Encrypted GGG OAuth token storage metadata",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/GggOAuthTokenExchangeResponse",
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Invalid GGG OAuth token exchange request",
+          },
+          "401": {
+            description: "Token exchange is unauthorized by Calandra",
+          },
+          "503": {
+            description: "GGG OAuth token storage is not configured",
+          },
+        },
+      },
+    },
     "/snapshots/capture/poe2-character": {
       post: {
         operationId: "capturePoe2CharacterSnapshot",
@@ -1292,6 +1350,43 @@ export const openApiDocument = {
           snapshotId: { type: "string", minLength: 1 },
         },
       },
+      GggOAuthTokenExchangeRequest: {
+        type: "object",
+        required: ["account", "code", "codeVerifier", "redirectUri"],
+        properties: {
+          account: { type: "string", minLength: 1 },
+          code: { type: "string", minLength: 1 },
+          codeVerifier: { type: "string", minLength: 1 },
+          redirectUri: { type: "string", format: "uri" },
+          scopes: {
+            type: "array",
+            items: { type: "string", minLength: 1 },
+          },
+        },
+      },
+      GggOAuthTokenExchangeResponse: {
+        type: "object",
+        required: ["source", "account", "objectKey", "token"],
+        properties: {
+          source: { type: "string", enum: ["ggg-oauth-token-store"] },
+          account: { type: "string", minLength: 1 },
+          objectKey: { type: "string", minLength: 1 },
+          token: {
+            type: "object",
+            required: ["tokenType", "expiresAt", "scope"],
+            properties: {
+              tokenType: { type: "string", enum: ["encrypted"] },
+              expiresAt: { type: "string", format: "date-time" },
+              scope: {
+                type: "array",
+                items: { type: "string", minLength: 1 },
+              },
+              username: { type: "string", minLength: 1 },
+              sub: { type: "string", minLength: 1 },
+            },
+          },
+        },
+      },
       AccountSnapshotListItem: {
         type: "object",
         required: ["account", "snapshotId", "objectKey"],
@@ -1677,9 +1772,7 @@ export type PriceCheckRequest = z.infer<typeof priceCheckRequestSchema>;
 export type PriceCheckResponse = z.infer<typeof priceCheckResponseSchema>;
 export type LadderBuild = z.infer<typeof ladderBuildSchema>;
 export type LadderBuildCollection = z.infer<typeof ladderBuildCollectionSchema>;
-export type DatasetSearchResponse = z.infer<
-  typeof datasetSearchResponseSchema
->;
+export type DatasetSearchResponse = z.infer<typeof datasetSearchResponseSchema>;
 export type AccountSnapshotSource = z.infer<typeof accountSnapshotSourceSchema>;
 export type AccountSnapshotCapabilities = z.infer<
   typeof accountSnapshotCapabilitiesSchema
@@ -1697,6 +1790,12 @@ export type AccountSnapshotWriteResponse = z.infer<
 >;
 export type Poe2CharacterSnapshotCaptureRequest = z.infer<
   typeof poe2CharacterSnapshotCaptureRequestSchema
+>;
+export type GggOAuthTokenExchangeRequest = z.infer<
+  typeof gggOAuthTokenExchangeRequestSchema
+>;
+export type GggOAuthTokenExchangeResponse = z.infer<
+  typeof gggOAuthTokenExchangeResponseSchema
 >;
 export type AccountSnapshotListItem = z.infer<
   typeof accountSnapshotListItemSchema

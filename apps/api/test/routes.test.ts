@@ -37,6 +37,7 @@ const r2ArtifactSha256 =
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 describe("api routes", () => {
@@ -556,20 +557,20 @@ describe("api routes", () => {
                     league: "Dawn of the Hunt",
                     patch: "0.2.0",
                     generatedAt: "2026-06-21T00:00:00.000Z",
-        artifactKey: "datasets/Dawn of the Hunt/0.2.0.json",
-        sha256: r2ArtifactSha256,
-        sources: datasetSources,
-        qualityGates: {
-          uniqueImageCoverage: {
-            resolved: 0,
-            expected: 0,
-            ratio: 1,
-            minimum: 0.95,
-          },
-        },
-        counts: {
-          items: 1,
-          uniques: 0,
+                    artifactKey: "datasets/Dawn of the Hunt/0.2.0.json",
+                    sha256: r2ArtifactSha256,
+                    sources: datasetSources,
+                    qualityGates: {
+                      uniqueImageCoverage: {
+                        resolved: 0,
+                        expected: 0,
+                        ratio: 1,
+                        minimum: 0.95,
+                      },
+                    },
+                    counts: {
+                      items: 1,
+                      uniques: 0,
                       mods: 0,
                       gems: 0,
                       economy: 0,
@@ -1250,9 +1251,7 @@ describe("api routes", () => {
         });
       }
 
-      if (
-        url === "https://api.pathofexile.com/character/poe2/CalandraTest"
-      ) {
+      if (url === "https://api.pathofexile.com/character/poe2/CalandraTest") {
         return jsonResponse({
           character: {
             id: "character-1",
@@ -1370,6 +1369,188 @@ describe("api routes", () => {
     expect(JSON.stringify(storedObjects)).not.toContain("ggg-access-token");
   });
 
+  it("exchanges a GGG OAuth code, encrypts the token set, and stores only encrypted tokens", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-21T10:00:00.000Z"));
+    const storedObjects: Array<{
+      key: string;
+      value: string;
+      options: unknown;
+    }> = [];
+    const fetch = vi.fn(async (url: string, init?: RequestInit) => {
+      expect(url).toBe("https://www.pathofexile.com/oauth/token");
+      expect(init?.method).toBe("POST");
+      expect(init?.headers).toMatchObject({
+        accept: "application/json",
+        "content-type": "application/x-www-form-urlencoded",
+      });
+      const params = new URLSearchParams(String(init?.body));
+      expect(Object.fromEntries(params)).toEqual({
+        client_id: "calandra-client-id",
+        grant_type: "authorization_code",
+        code: "authorization-code",
+        redirect_uri: "https://calandra.pages.dev/auth/ggg/callback",
+        code_verifier: "pkce-verifier",
+        scope: "account:characters",
+      });
+
+      return jsonResponse({
+        access_token: "ggg-access-token",
+        refresh_token: "ggg-refresh-token",
+        token_type: "bearer",
+        expires_in: 3600,
+        scope: "account:characters",
+        username: "CalandraAccount",
+        sub: "c5b9c286-8d05-47af-be41-67ab10a8c53e",
+      });
+    });
+    vi.stubGlobal("fetch", fetch);
+
+    const response = await api.request(
+      "/auth/ggg/exchange",
+      {
+        method: "POST",
+        headers: {
+          authorization: "Bearer snapshot-write-token",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          account: "example",
+          code: "authorization-code",
+          codeVerifier: "pkce-verifier",
+          redirectUri: "https://calandra.pages.dev/auth/ggg/callback",
+          scopes: ["account:characters"],
+        }),
+      },
+      {
+        APP_URL: "https://calandra.pages.dev",
+        SNAPSHOT_WRITE_TOKEN: "snapshot-write-token",
+        GGG_OAUTH_CLIENT_ID: "calandra-client-id",
+        GGG_TOKEN_ENCRYPTION_KEY: base64Key(7),
+        GGG_TOKEN_R2_PREFIX: "oauth/ggg",
+        SNAPSHOT_BUCKET: {
+          async put(key: string, value: string, options: unknown) {
+            storedObjects.push({ key, value, options });
+          },
+        },
+      },
+    );
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toEqual({
+      source: "ggg-oauth-token-store",
+      account: "example",
+      objectKey: "oauth/ggg/example/token.json",
+      token: {
+        tokenType: "encrypted",
+        expiresAt: "2026-06-21T11:00:00.000Z",
+        scope: ["account:characters"],
+        username: "CalandraAccount",
+        sub: "c5b9c286-8d05-47af-be41-67ab10a8c53e",
+      },
+    });
+    expect(storedObjects).toHaveLength(1);
+    expect(storedObjects[0]?.key).toBe("oauth/ggg/example/token.json");
+    expect(storedObjects[0]?.options).toEqual({
+      httpMetadata: { contentType: "application/json; charset=utf-8" },
+    });
+    const stored = JSON.parse(storedObjects[0]?.value ?? "{}");
+    expect(stored).toMatchObject({
+      account: "example",
+      provider: "ggg",
+      updatedAt: "2026-06-21T10:00:00.000Z",
+      token: {
+        expiresAt: "2026-06-21T11:00:00.000Z",
+        scope: ["account:characters"],
+        username: "CalandraAccount",
+        sub: "c5b9c286-8d05-47af-be41-67ab10a8c53e",
+      },
+      encryptedTokenSet: {
+        version: 1,
+        algorithm: "AES-256-GCM",
+      },
+    });
+    expect(stored.encryptedTokenSet.iv).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(stored.encryptedTokenSet.ciphertext).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(storedObjects[0]?.value).not.toContain("ggg-access-token");
+    expect(storedObjects[0]?.value).not.toContain("ggg-refresh-token");
+  });
+
+  it("rejects GGG OAuth exchange without snapshot write authorization", async () => {
+    const response = await api.request(
+      "/auth/ggg/exchange",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          account: "example",
+          code: "authorization-code",
+          codeVerifier: "pkce-verifier",
+          redirectUri: "https://calandra.pages.dev/auth/ggg/callback",
+        }),
+      },
+      {
+        APP_URL: "https://calandra.pages.dev",
+        SNAPSHOT_WRITE_TOKEN: "snapshot-write-token",
+      },
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      error: "snapshot write is unauthorized",
+    });
+  });
+
+  it("rejects malformed GGG OAuth exchange payloads", async () => {
+    const response = await api.request(
+      "/auth/ggg/exchange",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          account: "example",
+          code: "",
+          codeVerifier: "",
+          redirectUri: "not-a-url",
+        }),
+      },
+      { APP_URL: "https://calandra.pages.dev" },
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "invalid GGG OAuth token exchange request",
+    });
+  });
+
+  it("requires GGG OAuth exchange configuration before accepting token storage", async () => {
+    const response = await api.request(
+      "/auth/ggg/exchange",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          account: "example",
+          code: "authorization-code",
+          codeVerifier: "pkce-verifier",
+          redirectUri: "https://calandra.pages.dev/auth/ggg/callback",
+        }),
+      },
+      {
+        APP_URL: "https://calandra.pages.dev",
+        SNAPSHOT_BUCKET: {
+          async put() {
+            throw new Error("exchange must stop before writing tokens");
+          },
+        },
+      },
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: "GGG OAuth token exchange is not configured",
+    });
+  });
   it("rejects official PoE2 character snapshot capture without GGG configuration", async () => {
     const response = await api.request(
       "/snapshots/capture/poe2-character",
@@ -1928,4 +2109,12 @@ function jsonResponse(body: unknown): Response {
     status: 200,
     headers: { "content-type": "application/json" },
   });
+}
+function base64Key(seed: number) {
+  const bytes = Uint8Array.from(
+    { length: 32 },
+    (_, index) => (seed + index) % 256,
+  );
+
+  return btoa(String.fromCharCode(...bytes));
 }

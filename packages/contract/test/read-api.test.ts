@@ -18,6 +18,8 @@ import {
   ladderBuildCollectionSchema,
   modCollectionSchema,
   openApiDocument,
+  gggOAuthTokenExchangeRequestSchema,
+  gggOAuthTokenExchangeResponseSchema,
   poe2CharacterSnapshotCaptureRequestSchema,
   priceCheckRequestSchema,
   priceCheckResponseSchema,
@@ -323,7 +325,9 @@ describe("phase 1 read API contract", () => {
       openApiDocument.components.schemas.Gem.properties.attributeRequirements,
     ).toBeDefined();
     expect(openApiDocument.components.schemas.DatasetManifest).toBeDefined();
-    expect(openApiDocument.components.schemas.DatasetSearchResponse).toBeDefined();
+    expect(
+      openApiDocument.components.schemas.DatasetSearchResponse,
+    ).toBeDefined();
     expect(
       openApiDocument.components.schemas.DatasetManifest.properties
         .qualityGates,
@@ -688,6 +692,50 @@ describe("account snapshot contract", () => {
       openApiDocument.components.schemas.Poe2CharacterSnapshotCaptureRequest
         .properties,
     ).not.toHaveProperty("refreshToken");
+  });
+
+  it("models GGG OAuth token exchange storage without returning plaintext tokens", () => {
+    const request = gggOAuthTokenExchangeRequestSchema.parse({
+      account: "example",
+      code: "authorization-code",
+      codeVerifier: "pkce-verifier",
+      redirectUri: "https://calandra.pages.dev/auth/ggg/callback",
+      scopes: ["account:characters"],
+    });
+
+    expect(request).toEqual({
+      account: "example",
+      code: "authorization-code",
+      codeVerifier: "pkce-verifier",
+      redirectUri: "https://calandra.pages.dev/auth/ggg/callback",
+      scopes: ["account:characters"],
+    });
+
+    const response = gggOAuthTokenExchangeResponseSchema.parse({
+      source: "ggg-oauth-token-store",
+      account: "example",
+      objectKey: "oauth/ggg/example/token.json",
+      token: {
+        tokenType: "encrypted",
+        expiresAt: "2026-06-21T11:00:00.000Z",
+        scope: ["account:characters"],
+        username: "CalandraAccount",
+        sub: "c5b9c286-8d05-47af-be41-67ab10a8c53e",
+      },
+    });
+
+    expect(response.token.tokenType).toBe("encrypted");
+    expect(JSON.stringify(response)).not.toContain("accessToken");
+    expect(JSON.stringify(response)).not.toContain("refreshToken");
+    expect(openApiDocument.paths["/auth/ggg/exchange"]?.post?.operationId).toBe(
+      "exchangeGggOAuthToken",
+    );
+    expect(
+      openApiDocument.components.schemas.GggOAuthTokenExchangeRequest,
+    ).toBeDefined();
+    expect(
+      openApiDocument.components.schemas.GggOAuthTokenExchangeResponse,
+    ).toBeDefined();
   });
 
   it("models persisted account snapshot list responses", () => {
