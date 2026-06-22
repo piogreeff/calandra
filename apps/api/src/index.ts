@@ -1055,10 +1055,10 @@ api.get("/items", async (context) => {
   const version = getVersionedQuery(context);
   if (!version.ok) return context.json(version.body, 400);
   const artifact = await getMatchingArtifact(context, version);
+  const responseVersion = getDatasetResponseVersion(artifact, version);
 
   const collection = itemCollectionSchema.parse({
-    league: version.league,
-    patch: version.patch,
+    ...responseVersion,
     items: artifact?.items ?? [],
   });
 
@@ -1094,10 +1094,11 @@ api.get("/uniques", async (context) => {
   const version = getVersionedQuery(context);
   if (!version.ok) return context.json(version.body, 400);
   const artifact = await getMatchingArtifact(context, version);
+  const responseVersion = getDatasetResponseVersion(artifact, version);
 
   return context.json(
     uniqueCollectionSchema.parse({
-      ...version,
+      ...responseVersion,
       uniques: artifact?.uniques ?? [],
     }),
   );
@@ -1107,9 +1108,13 @@ api.get("/mods", async (context) => {
   const version = getVersionedQuery(context);
   if (!version.ok) return context.json(version.body, 400);
   const artifact = await getMatchingArtifact(context, version);
+  const responseVersion = getDatasetResponseVersion(artifact, version);
 
   return context.json(
-    modCollectionSchema.parse({ ...version, mods: artifact?.mods ?? [] }),
+    modCollectionSchema.parse({
+      ...responseVersion,
+      mods: artifact?.mods ?? [],
+    }),
   );
 });
 
@@ -1117,9 +1122,13 @@ api.get("/gems", async (context) => {
   const version = getVersionedQuery(context);
   if (!version.ok) return context.json(version.body, 400);
   const artifact = await getMatchingArtifact(context, version);
+  const responseVersion = getDatasetResponseVersion(artifact, version);
 
   return context.json(
-    gemCollectionSchema.parse({ ...version, gems: artifact?.gems ?? [] }),
+    gemCollectionSchema.parse({
+      ...responseVersion,
+      gems: artifact?.gems ?? [],
+    }),
   );
 });
 
@@ -1131,11 +1140,11 @@ api.get("/economy/:league", async (context) => {
     return context.json({ error: "patch query parameter is required" }, 400);
   }
   const artifact = await getMatchingArtifact(context, { league, patch });
+  const responseVersion = getDatasetResponseVersion(artifact, { league, patch });
 
   return context.json(
     economyCollectionSchema.parse({
-      league,
-      patch,
+      ...responseVersion,
       prices: artifact?.economy ?? [],
     }),
   );
@@ -1145,12 +1154,12 @@ api.get("/search", async (context) => {
   const search = getDatasetSearchQuery(context);
   if (!search.ok) return context.json(search.body, 400);
   const artifact = await getMatchingArtifact(context, search);
+  const responseVersion = getDatasetResponseVersion(artifact, search);
   const query = normalizeSearchValue(search.q);
 
   return context.json(
     datasetSearchResponseSchema.parse({
-      league: search.league,
-      patch: search.patch,
+      ...responseVersion,
       query: search.q,
       items: artifact?.items.filter((item) => matchesItem(item, query)) ?? [],
       uniques:
@@ -1170,13 +1179,13 @@ api.post("/price/check", async (context) => {
   }
 
   const artifact = await getMatchingArtifact(context, parsed.data);
+  const responseVersion = getDatasetResponseVersion(artifact, parsed.data);
   const priceMatch = findPriceMatch(artifact?.economy ?? [], parsed.data.item);
 
   return context.json(
     priceCheckResponseSchema.parse({
       source: "published-dataset",
-      league: parsed.data.league,
-      patch: parsed.data.patch,
+      ...responseVersion,
       item: parsed.data.item,
       price: priceMatch?.price ?? null,
       matchedBy: priceMatch?.matchedBy ?? null,
@@ -1188,10 +1197,11 @@ api.get("/builds/ladder", async (context) => {
   const version = getVersionedQuery(context);
   if (!version.ok) return context.json(version.body, 400);
   const artifact = await getMatchingArtifact(context, version);
+  const responseVersion = getDatasetResponseVersion(artifact, version);
 
   return context.json(
     ladderBuildCollectionSchema.parse({
-      ...version,
+      ...responseVersion,
       builds: artifact?.ladderBuilds ?? [],
     }),
   );
@@ -1222,11 +1232,7 @@ async function getMatchingArtifact(
 ) {
   const artifact = await getDatasetArtifact(context, version);
 
-  if (
-    !artifact ||
-    artifact.league !== version.league ||
-    artifact.patch !== version.patch
-  ) {
+  if (!artifact || !matchesRequestedDatasetVersion(artifact, version)) {
     return undefined;
   }
 
@@ -1242,17 +1248,20 @@ async function getMatchingDatasetManifest(
   if (raw) {
     const artifact = parseDatasetArtifact(raw);
 
-    if (
-      artifact.league !== version.league ||
-      artifact.patch !== version.patch
-    ) {
+    if (!matchesRequestedDatasetVersion(artifact, version)) {
       return undefined;
     }
 
     return buildInlineDatasetManifest({ artifact, artifactRaw: raw });
   }
 
-  const objectKey = getDatasetObjectKey(context, version);
+  const resolved = await resolveDatasetVersion(context, version);
+
+  if (!resolved) {
+    return undefined;
+  }
+
+  const objectKey = resolved.artifactKey;
   const object = await context.env.DATA_BUCKET?.get(objectKey);
 
   if (!object) {
@@ -1262,12 +1271,12 @@ async function getMatchingDatasetManifest(
   const artifactRaw = await object.text();
   const artifact = parseDatasetArtifact(artifactRaw);
 
-  if (artifact.league !== version.league || artifact.patch !== version.patch) {
+  if (!matchesRequestedDatasetVersion(artifact, resolved)) {
     return undefined;
   }
 
   const manifestObject = await context.env.DATA_BUCKET?.get(
-    getDatasetManifestKey(context, version),
+    resolved.manifestKey,
   );
 
   if (!manifestObject) {
@@ -1287,10 +1296,20 @@ async function getDatasetArtifact(
   const raw = context.env.DATASET_ARTIFACT_JSON;
 
   if (raw) {
-    return parseDatasetArtifact(raw);
+    const artifact = parseDatasetArtifact(raw);
+
+    return matchesRequestedDatasetVersion(artifact, version)
+      ? artifact
+      : undefined;
   }
 
-  const objectKey = getDatasetObjectKey(context, version);
+  const resolved = await resolveDatasetVersion(context, version);
+
+  if (!resolved) {
+    return undefined;
+  }
+
+  const objectKey = resolved.artifactKey;
   const object = await context.env.DATA_BUCKET?.get(objectKey);
 
   if (!object) {
@@ -1300,7 +1319,7 @@ async function getDatasetArtifact(
   const artifactRaw = await object.text();
   const artifact = parseDatasetArtifact(artifactRaw);
   const manifestObject = await context.env.DATA_BUCKET?.get(
-    getDatasetManifestKey(context, version),
+    resolved.manifestKey,
   );
 
   if (!manifestObject) {
@@ -1311,6 +1330,31 @@ async function getDatasetArtifact(
   await validateDatasetManifest({ artifact, artifactRaw, manifest, objectKey });
 
   return artifact;
+}
+
+async function resolveDatasetVersion(
+  context: Context<{ Bindings: Bindings }>,
+  version: { league: string; patch: string },
+): Promise<DatasetLatestPointer | undefined> {
+  if (version.patch !== "latest") {
+    return {
+      league: version.league,
+      patch: version.patch,
+      generatedAt: "",
+      artifactKey: getDatasetObjectKey(context, version),
+      manifestKey: getDatasetManifestKey(context, version),
+    };
+  }
+
+  const latestObject = await context.env.DATA_BUCKET?.get(
+    getDatasetLatestKey(context, version.league),
+  );
+
+  if (!latestObject) {
+    return undefined;
+  }
+
+  return parseDatasetLatestPointer(await latestObject.text(), version.league);
 }
 
 function parseDatasetArtifact(raw: string) {
@@ -1331,6 +1375,57 @@ function parseDatasetManifest(raw: string) {
       "Dataset manifest failed validation",
     );
   }
+}
+
+function parseDatasetLatestPointer(raw: string, league: string) {
+  try {
+    const pointer = JSON.parse(raw.replace(/^\uFEFF/, "")) as Partial<
+      DatasetLatestPointer
+    >;
+
+    if (
+      pointer.league !== league ||
+      typeof pointer.patch !== "string" ||
+      !pointer.patch.trim() ||
+      typeof pointer.generatedAt !== "string" ||
+      typeof pointer.artifactKey !== "string" ||
+      typeof pointer.manifestKey !== "string"
+    ) {
+      throw new Error("invalid latest pointer");
+    }
+
+    return {
+      league: pointer.league,
+      patch: pointer.patch,
+      generatedAt: pointer.generatedAt,
+      artifactKey: pointer.artifactKey,
+      manifestKey: pointer.manifestKey,
+    };
+  } catch {
+    throw new DatasetManifestValidationError(
+      "Dataset latest pointer failed validation",
+    );
+  }
+}
+
+function matchesRequestedDatasetVersion(
+  artifact: DatasetArtifact,
+  version: { league: string; patch: string },
+) {
+  return (
+    artifact.league === version.league &&
+    (version.patch === "latest" || artifact.patch === version.patch)
+  );
+}
+
+function getDatasetResponseVersion(
+  artifact: DatasetArtifact | undefined,
+  fallback: { league: string; patch: string },
+) {
+  return {
+    league: artifact?.league ?? fallback.league,
+    patch: artifact?.patch ?? fallback.patch,
+  };
 }
 
 async function readJsonBody(context: Context<{ Bindings: Bindings }>) {
@@ -1357,6 +1452,15 @@ function getDatasetManifestKey(
   const prefix = context.env.DATASET_R2_PREFIX ?? "datasets";
 
   return `${prefix}/${version.league}/${version.patch}.manifest.json`;
+}
+
+function getDatasetLatestKey(
+  context: Context<{ Bindings: Bindings }>,
+  league: string,
+) {
+  const prefix = context.env.DATASET_R2_PREFIX ?? "datasets";
+
+  return `${prefix}/${league}/latest.json`;
 }
 
 function getSnapshotObjectKey(
@@ -1843,6 +1947,14 @@ function getCorsHeaders() {
 
 type DatasetBucket = {
   get(key: string): Promise<DatasetObject | null>;
+};
+
+type DatasetLatestPointer = {
+  league: string;
+  patch: string;
+  generatedAt: string;
+  artifactKey: string;
+  manifestKey: string;
 };
 
 type SnapshotBucket = {

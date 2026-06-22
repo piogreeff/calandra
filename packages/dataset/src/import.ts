@@ -55,6 +55,8 @@ export type DatasetPublishResult = DatasetImportResult & {
   outputPath: string;
   manifestKey: string;
   manifestPath: string;
+  latestKey: string;
+  latestPath: string;
   sha256: string;
 };
 
@@ -143,11 +145,14 @@ export async function publishDatasetArtifact(
     options.publishDirectory,
     ...manifestKey.split("/"),
   );
+  const latestKey = getDatasetLatestKey(result.league, options.r2Prefix);
+  const latestPath = join(options.publishDirectory, ...latestKey.split("/"));
   const artifactJson = `${JSON.stringify(result.artifact, null, 2)}\n`;
   const sha256 = createHash("sha256").update(artifactJson).digest("hex");
 
   await mkdir(dirname(outputPath), { recursive: true });
   await mkdir(dirname(manifestPath), { recursive: true });
+  await mkdir(dirname(latestPath), { recursive: true });
   await writeFile(outputPath, artifactJson, "utf8");
   await writeFile(
     manifestPath,
@@ -173,6 +178,21 @@ export async function publishDatasetArtifact(
     )}\n`,
     "utf8",
   );
+  await writeFile(
+    latestPath,
+    `${JSON.stringify(
+      {
+        league: result.league,
+        patch: result.patch,
+        generatedAt: result.generatedAt,
+        artifactKey: objectKey,
+        manifestKey,
+      },
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  );
 
   return {
     ...result,
@@ -180,6 +200,8 @@ export async function publishDatasetArtifact(
     outputPath,
     manifestKey,
     manifestPath,
+    latestKey,
+    latestPath,
     sha256,
   };
 }
@@ -206,6 +228,8 @@ export async function publishDatasetArtifactToR2(
     artifactPath: result.outputPath,
     manifestObjectKey: result.manifestKey,
     manifestPath: result.manifestPath,
+    latestObjectKey: result.latestKey,
+    latestPath: result.latestPath,
   });
 
   for (const command of uploadCommands) {
@@ -240,20 +264,28 @@ export function getDatasetManifestKey(
   return `${r2Prefix}/${league}/${patch}.manifest.json`;
 }
 
+export function getDatasetLatestKey(league: string, r2Prefix = "datasets") {
+  return `${r2Prefix}/${league}/latest.json`;
+}
+
 export function getR2UploadCommands({
   r2Bucket,
   artifactObjectKey,
   artifactPath,
   manifestObjectKey,
   manifestPath,
+  latestObjectKey,
+  latestPath,
 }: {
   r2Bucket: string;
   artifactObjectKey: string;
   artifactPath: string;
   manifestObjectKey: string;
   manifestPath: string;
+  latestObjectKey?: string;
+  latestPath?: string;
 }) {
-  return [
+  const commands = [
     [
       "r2",
       "object",
@@ -277,6 +309,22 @@ export function getR2UploadCommands({
       "--remote",
     ],
   ];
+
+  if (latestObjectKey && latestPath) {
+    commands.push([
+      "r2",
+      "object",
+      "put",
+      `${r2Bucket}/${latestObjectKey}`,
+      "--file",
+      latestPath,
+      "--content-type",
+      "application/json",
+      "--remote",
+    ]);
+  }
+
+  return commands;
 }
 
 function getDatasetCounts(artifact: DatasetArtifact) {

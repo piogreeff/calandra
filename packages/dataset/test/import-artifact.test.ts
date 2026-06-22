@@ -363,6 +363,48 @@ describe("dataset artifact import", () => {
     );
   });
 
+  it("publishes a latest pointer for the selected league", async () => {
+    const directory = await mkdtemp(
+      join(tmpdir(), "calandra-dataset-latest-"),
+    );
+    const artifactPath = join(directory, "source.json");
+    const publishDirectory = join(directory, "publish");
+
+    await writeFile(
+      artifactPath,
+      JSON.stringify({
+        league: "Dawn of the Hunt",
+        patch: "0.2.0",
+        generatedAt: "2026-06-21T00:00:00.000Z",
+        source: "published-artifact",
+        sources: datasetSources,
+        items: [],
+        uniques: [],
+        mods: [],
+        gems: [],
+        economy: [],
+        ladderBuilds: [],
+      }),
+      "utf8",
+    );
+
+    const result = await publishDatasetArtifact({
+      artifactPath,
+      publishDirectory,
+      r2Prefix: "datasets",
+    });
+    const latest = JSON.parse(await readFile(result.latestPath, "utf8"));
+
+    expect(result.latestKey).toBe("datasets/Dawn of the Hunt/latest.json");
+    expect(latest).toEqual({
+      league: "Dawn of the Hunt",
+      patch: "0.2.0",
+      generatedAt: "2026-06-21T00:00:00.000Z",
+      artifactKey: "datasets/Dawn of the Hunt/0.2.0.json",
+      manifestKey: "datasets/Dawn of the Hunt/0.2.0.manifest.json",
+    });
+  });
+
   it("preserves source attribution in published artifacts and manifests", async () => {
     const directory = await mkdtemp(
       join(tmpdir(), "calandra-dataset-provenance-"),
@@ -619,6 +661,7 @@ describe("dataset artifact import", () => {
     expect(result.uploadedObjects).toEqual([
       "calandra-data/datasets/Dawn of the Hunt/0.2.0.json",
       "calandra-data/datasets/Dawn of the Hunt/0.2.0.manifest.json",
+      "calandra-data/datasets/Dawn of the Hunt/latest.json",
     ]);
     expect(commands).toEqual([
       {
@@ -649,6 +692,20 @@ describe("dataset artifact import", () => {
             "Dawn of the Hunt",
             "0.2.0.manifest.json",
           ),
+          "--content-type",
+          "application/json",
+          "--remote",
+        ],
+      },
+      {
+        command: "wrangler",
+        args: [
+          "r2",
+          "object",
+          "put",
+          "calandra-data/datasets/Dawn of the Hunt/latest.json",
+          "--file",
+          join(publishDirectory, "datasets", "Dawn of the Hunt", "latest.json"),
           "--content-type",
           "application/json",
           "--remote",

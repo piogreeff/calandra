@@ -703,6 +703,83 @@ describe("api routes", () => {
     ]);
   });
 
+  it("resolves the latest patch pointer before reading a published R2 dataset", async () => {
+    const requestedKeys: string[] = [];
+    const env = {
+      APP_URL: "https://calandra.pages.dev",
+      DATASET_R2_PREFIX: "datasets",
+      DATA_BUCKET: {
+        async get(key: string) {
+          requestedKeys.push(key);
+
+          return {
+            async text() {
+              if (key.endsWith("/latest.json")) {
+                return JSON.stringify({
+                  league: "Dawn of the Hunt",
+                  patch: "0.2.0",
+                  generatedAt: "2026-06-21T00:00:00.000Z",
+                  artifactKey: "datasets/Dawn of the Hunt/0.2.0.json",
+                  manifestKey: "datasets/Dawn of the Hunt/0.2.0.manifest.json",
+                });
+              }
+
+              return key.endsWith(".manifest.json")
+                ? JSON.stringify({
+                    league: "Dawn of the Hunt",
+                    patch: "0.2.0",
+                    generatedAt: "2026-06-21T00:00:00.000Z",
+                    artifactKey: "datasets/Dawn of the Hunt/0.2.0.json",
+                    sha256: r2ArtifactSha256,
+                    sources: datasetSources,
+                    qualityGates: {
+                      uniqueImageCoverage: {
+                        resolved: 0,
+                        expected: 0,
+                        ratio: 1,
+                        minimum: 0.95,
+                      },
+                    },
+                    counts: {
+                      items: 1,
+                      uniques: 0,
+                      mods: 0,
+                      gems: 0,
+                      economy: 0,
+                      ladderBuilds: 0,
+                    },
+                  })
+                : r2Artifact;
+            },
+          };
+        },
+      },
+    };
+
+    await expectJson(
+      "/items?league=Dawn%20of%20the%20Hunt&patch=latest",
+      env,
+      {
+        league: "Dawn of the Hunt",
+        patch: "0.2.0",
+        items: [
+          {
+            id: "expert-siphoning-wand",
+            name: "Expert Siphoning Wand",
+            category: "wand",
+            rarity: "magic",
+          },
+        ],
+      },
+    );
+
+    expect(requestedKeys).toEqual([
+      "datasets/Dawn of the Hunt/latest.json",
+      "datasets/Dawn of the Hunt/0.2.0.json",
+      "datasets/Dawn of the Hunt/0.2.0.manifest.json",
+    ]);
+  });
+
   it("serves a validated R2 dataset manifest", async () => {
     const response = await api.request(
       "/datasets/manifest?league=Dawn%20of%20the%20Hunt&patch=0.2.0",
