@@ -51,13 +51,13 @@ import {
 } from "../lib/read-api";
 
 const navItems = [
-  { label: "Overview", icon: Gauge, current: true },
-  { label: "Character", icon: Swords },
-  { label: "Gear", icon: ShieldCheck },
-  { label: "Crafting", icon: Hammer },
-  { label: "Economy", icon: Activity },
-  { label: "Snapshots", icon: History },
-  { label: "Settings", icon: Settings },
+  { label: "Overview", icon: Gauge, href: "#overview", current: true },
+  { label: "Character", icon: Swords, href: "#character" },
+  { label: "Gear", icon: ShieldCheck, href: "#gear" },
+  { label: "Crafting", icon: Hammer, href: "#crafting" },
+  { label: "Economy", icon: Activity, href: "#economy" },
+  { label: "Snapshots", icon: History, href: "#snapshots" },
+  { label: "Settings", icon: Settings, href: "#settings" },
 ];
 
 const gggDisclaimer =
@@ -79,7 +79,7 @@ type VisualLoadoutPreview = {
     slot: string;
     name: string;
     rarity: string;
-    iconUrl: string;
+    iconUrl: string | undefined;
     stats: string[];
   }>;
   passiveTree: {
@@ -329,7 +329,7 @@ export default async function Home({
               return (
                 <a
                   key={item.label}
-                  href="#"
+                  href={item.href}
                   className={`flex min-h-10 shrink-0 items-center gap-2 rounded-md px-3 text-sm transition lg:gap-3 ${
                     item.current
                       ? "bg-primary text-primary-content"
@@ -345,7 +345,10 @@ export default async function Home({
         </aside>
 
         <section className="min-w-0">
-          <header className="flex flex-col gap-4 border-b border-base-300/60 bg-base-100/75 px-4 py-4 backdrop-blur md:flex-row md:items-center md:justify-between lg:px-6">
+          <header
+            id="overview"
+            className="flex flex-col gap-4 border-b border-base-300/60 bg-base-100/75 px-4 py-4 backdrop-blur md:flex-row md:items-center md:justify-between lg:px-6"
+          >
             <div>
               <h1 className="text-xl font-semibold tracking-normal text-base-content md:text-2xl">
                 Overview
@@ -370,7 +373,10 @@ export default async function Home({
 
           <div className="grid grid-cols-[minmax(0,1fr)] gap-4 px-4 py-4 xl:grid-cols-[minmax(0,1fr)_20rem] lg:px-6">
             <div className="min-w-0 xl:col-span-2">
-              <CharacterBuildPreviewPanel loadout={visualLoadoutPreview} />
+              <CharacterBuildPreviewPanel
+                loadout={visualLoadoutPreview}
+                visualSummary={datasetVisualSummary}
+              />
             </div>
 
             <div className="min-w-0 space-y-4">
@@ -436,7 +442,10 @@ export default async function Home({
               </section>
 
               <section className="grid grid-cols-[minmax(0,1fr)] gap-4 2xl:grid-cols-[minmax(0,1fr)_18rem]">
-                <div className="min-w-0 rounded-lg border border-base-300/70 bg-base-200/72">
+                <div
+                  id="gear"
+                  className="min-w-0 rounded-lg border border-base-300/70 bg-base-200/72"
+                >
                   <DatasetSearchPanel
                     initialItems={dataset.items}
                     datasetSource={datasetSource}
@@ -446,6 +455,7 @@ export default async function Home({
                 </div>
 
                 <Panel
+                  id="economy"
                   title="Economy pulse"
                   icon={<Activity className="size-4" aria-hidden="true" />}
                 >
@@ -520,6 +530,7 @@ export default async function Home({
               </Panel>
 
               <Panel
+                id="crafting"
                 title="Crafting calculator"
                 icon={<Hammer className="size-4" aria-hidden="true" />}
               >
@@ -617,6 +628,7 @@ export default async function Home({
               </Panel>
 
               <Panel
+                id="snapshots"
                 title="Snapshot restore"
                 icon={<History className="size-4" aria-hidden="true" />}
               >
@@ -1030,6 +1042,7 @@ export default async function Home({
               </Panel>
 
               <Panel
+                id="settings"
                 title="GGG account link"
                 icon={<KeyRound className="size-4" aria-hidden="true" />}
               >
@@ -1064,67 +1077,108 @@ export default async function Home({
 
 function CharacterBuildPreviewPanel({
   loadout,
+  visualSummary,
 }: {
   loadout: VisualLoadoutPreview;
+  visualSummary: DashboardDatasetVisualSummary;
 }) {
+  const equippedItems = equipmentSlots
+    .map((slot) => findEquipmentSlot(loadout.equipment, slot))
+    .filter((item): item is VisualLoadoutPreview["equipment"][number] =>
+      Boolean(item),
+    );
+  const openSlots = equipmentSlots.filter(
+    (slot) => !findEquipmentSlot(loadout.equipment, slot),
+  );
+  const imageBackedCount = equippedItems.filter((item) => item.iconUrl).length;
+  const passiveNodePreview = loadout.passiveTree.nodeIds.slice(0, 6);
+  const visualSamples = getVisualSummarySamples(visualSummary);
+
   return (
     <Panel
-      title="Character build preview"
+      id="character"
+      title="Loadout workbench"
       icon={<Swords className="size-4" aria-hidden="true" />}
+      className="overflow-hidden"
     >
-      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[minmax(0,1fr)_18rem]">
-        <div className="min-w-0">
-          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[18rem_minmax(0,1fr)_18rem]">
+        <div className="min-w-0 rounded-md border border-base-300/70 bg-base-100/45 p-4">
+          <div className="flex flex-col gap-3">
             <div className="min-w-0">
               <p className="text-xs font-medium uppercase text-base-content/55">
                 Level {loadout.character.level} {loadout.character.className}
               </p>
-              <h3 className="truncate text-lg font-semibold text-base-content">
+              <h3 className="mt-1 truncate text-2xl font-semibold text-base-content">
                 {loadout.character.name}
               </h3>
-              <p className="mt-1 text-sm text-base-content/60">
+              <p className="mt-2 text-sm text-base-content/60">
                 {loadout.character.league}
               </p>
             </div>
-            <p className="rounded-md border border-info/35 bg-info/10 px-3 py-2 text-xs font-medium text-info">
+            <p className="w-fit rounded-md border border-info/35 bg-info/10 px-3 py-2 text-xs font-medium text-info">
               {loadout.sourceLabel}
             </p>
           </div>
 
-          <section aria-label="Visual equipment" className="min-w-0">
-            <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-base-content">
-              <ImageIcon className="size-4 text-primary" aria-hidden="true" />
-              <h3>Visual equipment</h3>
-            </div>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-3">
-              {equipmentSlots.map((slot) => {
-                const item = findEquipmentSlot(loadout.equipment, slot);
+          <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
+            <MetricTile label="Equipped" value={`${equippedItems.length}`} />
+            <MetricTile label="Images" value={`${imageBackedCount}`} />
+            <MetricTile label="Open" value={`${openSlots.length}`} />
+          </div>
 
-                return item ? (
-                  <article
-                    key={slot}
-                    className="min-w-0 rounded-md border border-base-300/70 bg-base-100/45 p-3"
-                  >
-                    <div className="aspect-square rounded-md border border-base-300/70 bg-base-300/35 p-2">
-                      <img
-                        src={item.iconUrl}
-                        alt={item.name}
-                        loading="lazy"
-                        className="h-full w-full object-contain"
-                      />
+          <p className="mt-3 text-sm text-base-content/65">
+            {equippedItems.length} equipped slots - {imageBackedCount} with
+            images - {openSlots.length} open slots
+          </p>
+
+          <div className="mt-4 space-y-2 text-sm">
+            {loadout.stats.map((stat) => (
+              <div
+                key={stat.label}
+                className="flex items-center justify-between gap-3 border-b border-base-300/60 pb-2 last:border-0 last:pb-0"
+              >
+                <span className="text-base-content/60">{stat.label}</span>
+                <span className="font-semibold text-base-content">
+                  {stat.value}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="min-w-0 space-y-4">
+          <section aria-label="Equipped gear" className="min-w-0">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-sm font-semibold text-base-content">
+                <ImageIcon className="size-4 text-primary" aria-hidden="true" />
+                <h3>Equipped gear</h3>
+              </div>
+              <span className="rounded-md border border-base-300/70 bg-base-100/50 px-2 py-1 text-xs text-base-content/65">
+                Gear with images: {imageBackedCount}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-2">
+              {equippedItems.map((item) => (
+                <article
+                  key={`${item.slot}-${item.name}`}
+                  className="grid min-w-0 grid-cols-[4.5rem_minmax(0,1fr)] gap-3 rounded-md border border-base-300/70 bg-base-100/45 p-3"
+                >
+                  <EquipmentThumb item={item} />
+                  <div className="min-w-0">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs uppercase text-base-content/55">
+                          {item.slot}
+                        </p>
+                        <h4 className="mt-1 truncate text-sm font-semibold text-base-content">
+                          {item.name}
+                        </h4>
+                      </div>
+                      <span className="shrink-0 rounded-md border border-primary/25 bg-primary/10 px-2 py-1 text-xs capitalize text-primary">
+                        {item.rarity}
+                      </span>
                     </div>
-                    <p className="mt-3 text-xs uppercase text-base-content/55">
-                      {slot}
-                    </p>
-                    <p className="mt-1 text-xs font-medium text-success">
-                      {slot} equipped
-                    </p>
-                    <h4 className="truncate text-sm font-semibold text-base-content">
-                      {item.name}
-                    </h4>
-                    <p className="mt-1 text-xs capitalize text-primary">
-                      {item.rarity}
-                    </p>
                     <ul className="mt-2 space-y-1 text-xs leading-5 text-base-content/60">
                       {item.stats.map((stat) => (
                         <li key={stat} className="truncate">
@@ -1132,49 +1186,57 @@ function CharacterBuildPreviewPanel({
                         </li>
                       ))}
                     </ul>
-                  </article>
-                ) : (
-                  <article
-                    key={slot}
-                    className="min-h-36 rounded-md border border-dashed border-base-300/80 bg-base-100/30 p-3"
-                  >
-                    <div className="grid aspect-square place-items-center rounded-md border border-base-300/60 bg-base-300/20">
-                      <ImageIcon
-                        className="size-6 text-base-content/35"
-                        aria-hidden="true"
+                  </div>
+                </article>
+              ))}
+
+              {equippedItems.length === 0 ? (
+                <p className="rounded-md border border-dashed border-base-300/70 bg-base-100/30 p-4 text-sm text-base-content/65">
+                  No equipped gear captured yet.
+                </p>
+              ) : null}
+            </div>
+          </section>
+          <section
+            aria-label="Image-backed catalog samples"
+            className="min-w-0 rounded-md border border-base-300/70 bg-base-100/45 p-3"
+          >
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-base-content">
+                Image-backed catalog samples
+              </h3>
+              <span className="rounded-md border border-base-300/70 bg-base-200/70 px-2 py-1 text-xs text-base-content/65">
+                {visualSummary.response.totalVisualItems} image-backed records
+              </span>
+            </div>
+            {visualSamples.length > 0 ? (
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                {visualSamples.map((sample) => (
+                  <div key={sample.id} className="min-w-0">
+                    <div className="aspect-square rounded-md border border-base-300/70 bg-base-300/35 p-2">
+                      <img
+                        src={sample.iconUrl}
+                        alt={`${sample.name} icon`}
+                        title={sample.iconAttribution}
+                        loading="lazy"
+                        className="h-full w-full object-contain"
                       />
                     </div>
-                    <p className="mt-3 text-xs uppercase text-base-content/55">
-                      {slot}
+                    <p className="mt-1 truncate text-xs font-medium text-base-content">
+                      {sample.name}
                     </p>
-                    <p className="mt-1 text-sm font-semibold text-base-content/65">
-                      {slot} slot empty
-                    </p>
-                  </article>
-                );
-              })}
-            </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="rounded-md border border-dashed border-base-300/70 bg-base-200/55 p-3 text-sm text-base-content/65">
+                No usable image-backed samples in the current artifact.
+              </p>
+            )}
           </section>
         </div>
 
         <div className="min-w-0 space-y-3">
-          <div className="rounded-md border border-base-300/70 bg-base-100/45 p-3">
-            <h3 className="text-sm font-semibold text-base-content">Stats</h3>
-            <div className="mt-3 space-y-2 text-sm">
-              {loadout.stats.map((stat) => (
-                <div
-                  key={stat.label}
-                  className="flex items-center justify-between gap-3 border-b border-base-300/60 pb-2 last:border-0 last:pb-0"
-                >
-                  <span className="text-base-content/60">{stat.label}</span>
-                  <span className="font-semibold text-base-content">
-                    {stat.value}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
           <div className="rounded-md border border-base-300/70 bg-base-100/45 p-3">
             <div className="flex items-center gap-2">
               <Network className="size-4 text-primary" aria-hidden="true" />
@@ -1188,22 +1250,19 @@ function CharacterBuildPreviewPanel({
             <p className="mt-2 text-sm leading-6 text-base-content/65">
               {loadout.passiveTree.focus}
             </p>
-            <div className="mt-3 rounded-md border border-base-300/70 bg-base-200/65 p-3">
-              <p className="text-xs font-medium uppercase text-base-content/55">
-                Passive allocation preview
-              </p>
-              <div className="mt-3 grid grid-cols-3 gap-2" role="list">
-                {loadout.passiveTree.nodeIds.slice(0, 6).map((nodeId) => (
-                  <div
+            {passiveNodePreview.length > 0 ? (
+              <div className="mt-3 flex flex-wrap gap-2" role="list">
+                {passiveNodePreview.map((nodeId) => (
+                  <span
                     key={nodeId}
-                    className="relative grid min-h-14 place-items-center rounded-md border border-primary/35 bg-primary/10 px-2 text-center text-[0.7rem] font-semibold leading-4 text-primary before:absolute before:left-[-0.6rem] before:top-1/2 before:hidden before:h-px before:w-2 before:bg-primary/45 sm:before:block"
+                    className="rounded-md border border-primary/25 bg-primary/10 px-2 py-1 text-xs font-medium text-primary"
                     role="listitem"
                   >
-                    <span className="break-all">{nodeId}</span>
-                  </div>
+                    {nodeId}
+                  </span>
                 ))}
               </div>
-            </div>
+            ) : null}
             <p className="mt-3 rounded-md border border-warning/35 bg-warning/10 p-2 text-xs leading-5 text-warning">
               {loadout.passiveTree.source}
             </p>
@@ -1216,6 +1275,51 @@ function CharacterBuildPreviewPanel({
               Open passive tree reference
               <ExternalLink className="size-4" aria-hidden="true" />
             </a>
+          </div>
+
+          <div className="rounded-md border border-base-300/70 bg-base-100/45 p-3">
+            <h3 className="text-sm font-semibold text-base-content">
+              Open slots
+            </h3>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {openSlots.map((slot) => (
+                <span
+                  key={slot}
+                  className="rounded-md border border-base-300/70 bg-base-200/70 px-2 py-1 text-xs text-base-content/65"
+                >
+                  {slot}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-md border border-base-300/70 bg-base-100/45 p-3">
+            <h3 className="text-sm font-semibold text-base-content">
+              Workbench actions
+            </h3>
+            <div className="mt-3 grid gap-2">
+              <a
+                className="btn btn-primary btn-sm justify-between"
+                href="#gear"
+              >
+                Search item data
+                <ChevronRight className="size-4" aria-hidden="true" />
+              </a>
+              <a
+                className="btn btn-outline btn-sm justify-between"
+                href="#snapshots"
+              >
+                Restore snapshot
+                <ChevronRight className="size-4" aria-hidden="true" />
+              </a>
+              <a
+                className="btn btn-outline btn-sm justify-between"
+                href="#economy"
+              >
+                Check economy
+                <ChevronRight className="size-4" aria-hidden="true" />
+              </a>
+            </div>
           </div>
         </div>
       </div>
@@ -1236,8 +1340,10 @@ function DatasetVisualCatalogPanel({
       icon={<ImageIcon className="size-4" aria-hidden="true" />}
     >
       <div className="mb-3 rounded-md border border-info/30 bg-info/10 p-3 text-xs font-medium text-info">
-        {visualSummary.source === "api" ? "Published R2 artifact" : "Demo fallback"} -{" "}
-        {visualSummary.response.totalVisualItems} image-backed records
+        {visualSummary.source === "api"
+          ? "Published R2 artifact"
+          : "Demo fallback"}{" "}
+        - {visualSummary.response.totalVisualItems} image-backed records
       </div>
       <div className="space-y-3">
         {categories.map((category) => (
@@ -1258,24 +1364,29 @@ function DatasetVisualCatalogPanel({
                 {category.iconCount} icons
               </span>
             </div>
-            {category.featured.length > 0 ? (
+            {category.featured.some((item) =>
+              isUsableVisualIcon(item.iconUrl),
+            ) ? (
               <div className="mt-3 grid grid-cols-2 gap-2">
-                {category.featured.slice(0, 4).map((item) => (
-                  <div key={item.id} className="min-w-0">
-                    <div className="aspect-square rounded-md border border-base-300/70 bg-base-300/35 p-2">
-                      <img
-                        src={item.iconUrl}
-                        alt={`${item.name} icon`}
-                        title={item.iconAttribution}
-                        loading="lazy"
-                        className="h-full w-full object-contain"
-                      />
+                {category.featured
+                  .filter((item) => isUsableVisualIcon(item.iconUrl))
+                  .slice(0, 4)
+                  .map((item) => (
+                    <div key={item.id} className="min-w-0">
+                      <div className="aspect-square rounded-md border border-base-300/70 bg-base-300/35 p-2">
+                        <img
+                          src={item.iconUrl}
+                          alt={`${item.name} icon`}
+                          title={item.iconAttribution}
+                          loading="lazy"
+                          className="h-full w-full object-contain"
+                        />
+                      </div>
+                      <p className="mt-1 truncate text-xs font-medium text-base-content">
+                        {item.name}
+                      </p>
                     </div>
-                    <p className="mt-1 truncate text-xs font-medium text-base-content">
-                      {item.name}
-                    </p>
-                  </div>
-                ))}
+                  ))}
               </div>
             ) : (
               <p className="mt-3 rounded-md border border-dashed border-base-300/70 p-3 text-xs text-base-content/60">
@@ -1287,6 +1398,19 @@ function DatasetVisualCatalogPanel({
       </div>
     </Panel>
   );
+}
+
+function getVisualSummarySamples(visualSummary: DashboardDatasetVisualSummary) {
+  return visualSummary.response.categories
+    .flatMap((category) => category.featured)
+    .filter((item) => isUsableVisualIcon(item.iconUrl))
+    .slice(0, 4);
+}
+
+function isUsableVisualIcon(iconUrl: string) {
+  const lowerIconUrl = iconUrl.toLowerCase();
+
+  return !lowerIconUrl.includes("calandra.pages.dev/demo-");
 }
 
 function createVisualLoadoutPreview(
@@ -1400,13 +1524,67 @@ function toVisualEquipment(
     slot: item.slot,
     name: item.name,
     rarity: item.rarity ?? "normal",
-    iconUrl: item.iconUrl ?? demoItemIcon(item.slot, "#67e8f9", "#0e7490"),
+    iconUrl: normalizeGearIconUrl(item.iconUrl),
     stats: item.stats
       ? Object.entries(item.stats)
           .slice(0, 2)
           .map(([key, value]) => `${formatStatLabel(key)} ${value}`)
       : [fallbackStat],
   }));
+}
+
+function normalizeGearIconUrl(iconUrl: string | undefined) {
+  if (!iconUrl) {
+    return undefined;
+  }
+
+  const lowerIconUrl = iconUrl.toLowerCase();
+
+  if (
+    lowerIconUrl.startsWith("data:image/svg+xml") ||
+    lowerIconUrl.includes("calandra.pages.dev/demo-")
+  ) {
+    return undefined;
+  }
+
+  return iconUrl;
+}
+
+function MetricTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-base-300/70 bg-base-200/70 p-2">
+      <p className="text-xs text-base-content/55">{label}</p>
+      <p className="mt-1 text-lg font-semibold text-base-content">{value}</p>
+    </div>
+  );
+}
+
+function EquipmentThumb({
+  item,
+}: {
+  item: VisualLoadoutPreview["equipment"][number];
+}) {
+  if (!item.iconUrl) {
+    return (
+      <div className="grid aspect-square place-items-center rounded-md border border-dashed border-base-300/80 bg-base-300/25 p-2 text-center text-[0.7rem] font-medium leading-4 text-base-content/45">
+        <div>
+          <ImageIcon className="mx-auto size-4" aria-hidden="true" />
+          <span className="mt-1 block">No image</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="aspect-square rounded-md border border-base-300/70 bg-base-300/35 p-2">
+      <img
+        src={item.iconUrl}
+        alt={item.name}
+        loading="lazy"
+        className="h-full w-full object-contain"
+      />
+    </div>
+  );
 }
 
 function findEquipmentSlot(
@@ -1619,16 +1797,23 @@ function demoItemIcon(label: string, accent: string, shadow: string) {
 }
 
 function Panel({
+  id,
   title,
   icon,
   children,
+  className = "",
 }: {
+  id?: string;
   title: string;
   icon: React.ReactNode;
   children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <section className="min-w-0 rounded-lg border border-base-300/70 bg-base-200/72 p-4 shadow-sm shadow-black/10">
+    <section
+      id={id}
+      className={`min-w-0 rounded-lg border border-base-300/70 bg-base-200/72 p-4 shadow-sm shadow-black/10 ${className}`}
+    >
       <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-base-content">
         <span className="grid size-7 place-items-center rounded-md border border-base-300 bg-base-300/50 text-primary">
           {icon}

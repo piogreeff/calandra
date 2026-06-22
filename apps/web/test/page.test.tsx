@@ -75,9 +75,7 @@ describe("home dashboard", () => {
     );
     expect(
       requestedUrls.some((url) =>
-        url.endsWith(
-          "/snapshots/RealAccount/snapshot-2026-06-21T10-00-00Z",
-        ),
+        url.endsWith("/snapshots/RealAccount/snapshot-2026-06-21T10-00-00Z"),
       ),
     ).toBe(false);
     expect(html).toContain("Selected snapshot");
@@ -142,24 +140,30 @@ describe("home dashboard", () => {
     const html = renderToStaticMarkup(await Home({}));
 
     expect(html).toContain("Deterministic upgrade rankings");
-    expect(html).toContain("Character build preview");
-    expect(html).toContain("Visual equipment");
+    expect(html).toContain("Loadout workbench");
+    expect(html).toContain("Gear with images");
+    expect(html).toContain("Image-backed catalog samples");
+    expect(html).toContain("3 equipped slots");
+    expect(html).toContain("2 with images");
+    expect(html).toContain("8 open slots");
+    expect(html).toContain("Workbench actions");
     expect(html).toContain("Published ladder build");
     expect(html).toContain("Level 92 Deadeye");
-    expect(html).toContain("Weapon equipped");
+    expect(html).toContain("Equipped gear");
     expect(html).toContain("Stormneedle Spear");
     expect(html).toContain(
       "https://calandra-assets.example/images/Dawn%20of%20the%20Hunt/0.2.0/builds/deadeye-1/weapon.png",
     );
-    expect(html).toContain("Helmet slot empty");
-    expect(html).toContain("Gloves equipped");
+    expect(html).toContain("Open slots");
+    expect(html).toContain("Helmet");
+    expect(html).toContain("No image");
     expect(html).toContain("Passive tree");
     expect(html).toContain("2 passive nodes tracked");
     expect(html).toContain("Open passive tree reference");
     expect(html).toContain("Published poe.ninja ladder passive summary");
     expect(html).toContain("Duskthread Grips");
-    expect(html).toContain('alt="Duskthread Grips"');
-    expect(html).toContain("https://calandra.pages.dev/demo-gloves.svg");
+    expect(html).toContain("No image");
+    expect(html).not.toContain("demo-gloves.svg");
     expect(html).toContain("Calandra Demo Amulet");
     expect(html).toContain(
       "https://calandra-assets.example/images/Dawn%20of%20the%20Hunt/0.2.0/builds/deadeye-1/amulet.png",
@@ -268,7 +272,6 @@ describe("home dashboard", () => {
     expect(html).toContain("Duskthread Grips");
     expect(html).toContain("Calandra Demo Amulet");
     expect(html).toContain("2 passive nodes tracked");
-    expect(html).toContain("Passive allocation preview");
     expect(html).toContain("passive-1");
     expect(html).toContain("passive-2");
     expect(html).toContain("Latest account snapshot passive allocation");
