@@ -32,6 +32,7 @@ import {
   poe2StoredTokenSnapshotCaptureRequestSchema,
   priceCheckRequestSchema,
   priceCheckResponseSchema,
+  snapshotUpgradeAdvisorRequestSchema,
   upgradeAdvisorRequestSchema,
   upgradeAdvisorResponseSchema,
   uniqueCollectionSchema,
@@ -152,6 +153,55 @@ api.post("/advisor/upgrades", async (context) => {
     upgradeAdvisorResponseSchema.parse({
       source: "deterministic-engine",
       upgrades,
+    }),
+  );
+});
+
+api.post("/advisor/snapshots/:account/:snapshotId", async (context) => {
+  if (!isSnapshotReadAuthorized(context)) {
+    return context.json({ error: "snapshot read is unauthorized" }, 401);
+  }
+
+  const version = getVersionedQuery(context);
+  if (!version.ok) return context.json(version.body, 400);
+
+  const rawBody = await readJsonBody(context);
+  const parsed = snapshotUpgradeAdvisorRequestSchema.safeParse(rawBody);
+
+  if (!parsed.success) {
+    return context.json(
+      { error: "invalid snapshot upgrade advisor request" },
+      400,
+    );
+  }
+
+  const snapshotResult = await getStoredAccountSnapshot(context, {
+    account: context.req.param("account"),
+    snapshotId: context.req.param("snapshotId"),
+  });
+
+  if (!snapshotResult.ok) {
+    return context.json(snapshotResult.body, snapshotResult.status);
+  }
+
+  const artifact = await getMatchingArtifact(context, version);
+  const character = snapshotResult.snapshot.characters[0];
+  const ranked = rankLoadoutUpgrades({
+    weights: parsed.data.weights,
+    equipped: toAdvisorGearItems(character?.equipment ?? []),
+    candidates: toSnapshotUpgradeCandidates(
+      artifact?.ladderBuilds.flatMap((build) => build.equipment ?? []) ?? [],
+      artifact?.economy ?? [],
+    ),
+    ...(parsed.data.maxBudgetChaos === undefined
+      ? {}
+      : { maxBudgetChaos: parsed.data.maxBudgetChaos }),
+  });
+
+  return context.json(
+    upgradeAdvisorResponseSchema.parse({
+      source: "deterministic-engine",
+      upgrades: ranked,
     }),
   );
 });
@@ -1903,6 +1953,49 @@ function findPriceMatch(
   return nameMatch ? { price: nameMatch, matchedBy: "name" as const } : null;
 }
 
+function toAdvisorGearItems(equipment: GearWithStats[]) {
+  return equipment.filter(hasUsableStats).map((item) => ({
+    slot: item.slot,
+    name: item.name,
+    stats: item.stats,
+  }));
+}
+
+function toSnapshotUpgradeCandidates(
+  equipment: GearWithStats[],
+  prices: DatasetArtifact["economy"],
+) {
+  return equipment.filter(hasUsableStats).map((item) => {
+    const price = findGearPrice(prices, item);
+
+    return {
+      slot: item.slot,
+      name: item.name,
+      stats: item.stats,
+      ...(price ? { estimatedCostChaos: price.chaosEquivalent } : {}),
+    };
+  });
+}
+
+function hasUsableStats(
+  item: GearWithStats,
+): item is GearWithStats & { stats: Record<string, number> } {
+  return Boolean(item.stats && Object.keys(item.stats).length > 0);
+}
+
+function findGearPrice(
+  prices: DatasetArtifact["economy"],
+  item: GearWithStats,
+) {
+  return (
+    (item.itemId ? prices.find((price) => price.id === item.itemId) : null) ??
+    prices.find(
+      (price) =>
+        normalizeSearchValue(price.name) === normalizeSearchValue(item.name),
+    )
+  );
+}
+
 function matchesItem(item: DatasetArtifact["items"][number], query: string) {
   return [item.id, item.name, item.category, item.rarity].some((value) =>
     normalizeSearchValue(value).includes(query),
@@ -2048,6 +2141,13 @@ type SnapshotListedObject = {
   key: string;
   uploaded?: Date | string;
   size?: number;
+};
+
+type GearWithStats = {
+  slot: string;
+  name: string;
+  itemId?: string | undefined;
+  stats?: Record<string, number> | undefined;
 };
 
 class DatasetManifestValidationError extends Error {}

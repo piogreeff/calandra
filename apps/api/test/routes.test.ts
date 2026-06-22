@@ -1300,6 +1300,129 @@ describe("api routes", () => {
     });
   });
 
+  it("ranks snapshot gear upgrades from published ladder and economy data", async () => {
+    const response = await api.request(
+      "/advisor/snapshots/example/snapshot-1?league=Dawn%20of%20the%20Hunt&patch=0.2.0",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          weights: { life: 1, fireResistance: 0.5 },
+          maxBudgetChaos: 20,
+        }),
+      },
+      {
+        APP_URL: "https://calandra.pages.dev",
+        DATASET_ARTIFACT_JSON: JSON.stringify({
+          league: "Dawn of the Hunt",
+          patch: "0.2.0",
+          generatedAt: "2026-06-21T00:00:00.000Z",
+          source: "published-artifact",
+          sources: datasetSources,
+          items: [],
+          uniques: [],
+          mods: [],
+          gems: [],
+          economy: [
+            {
+              id: "heavy-gloves",
+              name: "Heavy Gloves",
+              chaosEquivalent: 12,
+              updatedAt: "2026-06-21T00:00:00.000Z",
+            },
+            {
+              id: "expensive-gloves",
+              name: "Expensive Gloves",
+              chaosEquivalent: 50,
+              updatedAt: "2026-06-21T00:00:00.000Z",
+            },
+          ],
+          ladderBuilds: [
+            {
+              id: "deadeye-1",
+              account: "example",
+              character: "CalandraTest",
+              className: "Deadeye",
+              level: 92,
+              equipment: [
+                {
+                  slot: "gloves",
+                  name: "Heavy Gloves",
+                  itemId: "heavy-gloves",
+                  stats: { life: 90, fireResistance: 20 },
+                },
+                {
+                  slot: "gloves",
+                  name: "Expensive Gloves",
+                  itemId: "expensive-gloves",
+                  stats: { life: 120, fireResistance: 30 },
+                },
+                {
+                  slot: "boots",
+                  name: "Fast Boots",
+                  stats: { life: 70 },
+                },
+              ],
+            },
+          ],
+        }),
+        SNAPSHOT_R2_PREFIX: "snapshots",
+        SNAPSHOT_BUCKET: {
+          async get(key: string) {
+            expect(key).toBe("snapshots/example/snapshot-1.json");
+
+            return {
+              async text() {
+                return JSON.stringify({
+                  id: "snapshot-1",
+                  account: "example",
+                  capturedAt: "2026-06-21T10:00:00.000Z",
+                  source: "manual-import",
+                  capabilities: { characters: true, stashes: false },
+                  characters: [
+                    {
+                      id: "character-1",
+                      name: "CalandraTest",
+                      className: "Deadeye",
+                      level: 73,
+                      league: "Dawn of the Hunt",
+                      equipment: [
+                        {
+                          slot: "gloves",
+                          name: "Current Gloves",
+                          stats: { life: 40 },
+                        },
+                      ],
+                    },
+                  ],
+                });
+              },
+            };
+          },
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      source: "deterministic-engine",
+      upgrades: [
+        {
+          slot: "gloves",
+          currentName: "Current Gloves",
+          candidateName: "Heavy Gloves",
+          currentScore: 40,
+          candidateScore: 100,
+          scoreDelta: 60,
+          estimatedCostChaos: 12,
+          valuePerChaos: 5,
+          currentMissingStats: ["fireResistance"],
+          candidateMissingStats: [],
+        },
+      ],
+    });
+  });
+
   it("rejects malformed upgrade advisor payloads", async () => {
     const response = await api.request(
       "/advisor/upgrades",

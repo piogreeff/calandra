@@ -351,6 +351,11 @@ export const upgradeAdvisorRequestSchema = z.object({
   maxBudgetChaos: z.number().nonnegative().optional(),
 });
 
+export const snapshotUpgradeAdvisorRequestSchema = z.object({
+  weights: advisorStatsSchema,
+  maxBudgetChaos: z.number().nonnegative().optional(),
+});
+
 export const upgradeAdvisorResultSchema = z.object({
   slot: z.string().min(1),
   currentName: z.string().min(1),
@@ -1183,6 +1188,57 @@ export const openApiDocument = {
         },
       },
     },
+    "/advisor/snapshots/{account}/{snapshotId}": {
+      post: {
+        operationId: "rankSnapshotUpgradeCandidates",
+        summary:
+          "Rank upgrade candidates for one persisted account snapshot with published dataset prices",
+        parameters: [
+          {
+            name: "account",
+            in: "path",
+            required: true,
+            schema: { type: "string", minLength: 1 },
+          },
+          {
+            name: "snapshotId",
+            in: "path",
+            required: true,
+            schema: { type: "string", minLength: 1 },
+          },
+          ...versionedQueryParameters,
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                $ref: "#/components/schemas/SnapshotUpgradeAdvisorRequest",
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Deterministic snapshot upgrade rankings",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/UpgradeAdvisorResponse" },
+              },
+            },
+          },
+          "400": {
+            description: "Invalid snapshot upgrade advisor request",
+          },
+          "404": {
+            description: "Account snapshot not found",
+          },
+          "503": {
+            description: "Snapshot storage is not configured",
+          },
+        },
+      },
+    },
     "/crafting/estimate": {
       post: {
         operationId: "estimateCraftingPlan",
@@ -1858,6 +1914,14 @@ export const openApiDocument = {
           maxBudgetChaos: { type: "number", minimum: 0 },
         },
       },
+      SnapshotUpgradeAdvisorRequest: {
+        type: "object",
+        required: ["weights"],
+        properties: {
+          weights: { type: "object", additionalProperties: { type: "number" } },
+          maxBudgetChaos: { type: "number", minimum: 0 },
+        },
+      },
       UpgradeAdvisorResult: {
         type: "object",
         required: [
@@ -2170,6 +2234,9 @@ export type UpgradeAdvisorCandidate = z.infer<
   typeof upgradeAdvisorCandidateSchema
 >;
 export type UpgradeAdvisorRequest = z.infer<typeof upgradeAdvisorRequestSchema>;
+export type SnapshotUpgradeAdvisorRequest = z.infer<
+  typeof snapshotUpgradeAdvisorRequestSchema
+>;
 export type UpgradeAdvisorResult = z.infer<typeof upgradeAdvisorResultSchema>;
 export type UpgradeAdvisorResponse = z.infer<
   typeof upgradeAdvisorResponseSchema

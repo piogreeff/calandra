@@ -29,6 +29,7 @@ import {
   poe2StoredTokenSnapshotCaptureRequestSchema,
   priceCheckRequestSchema,
   priceCheckResponseSchema,
+  snapshotUpgradeAdvisorRequestSchema,
   upgradeAdvisorRequestSchema,
   upgradeAdvisorResponseSchema,
   uniqueCollectionSchema,
@@ -465,6 +466,16 @@ describe("phase 1 read API contract", () => {
     expect(openApiDocument.paths["/advisor/upgrades"]?.post?.operationId).toBe(
       "rankUpgradeCandidates",
     );
+    expect(
+      snapshotUpgradeAdvisorRequestSchema.parse({
+        weights: { life: 1, fireResistance: 0.5 },
+        maxBudgetChaos: 20,
+      }).maxBudgetChaos,
+    ).toBe(20);
+    expect(
+      openApiDocument.paths["/advisor/snapshots/{account}/{snapshotId}"]?.post
+        ?.operationId,
+    ).toBe("rankSnapshotUpgradeCandidates");
   });
 
   it("models deterministic crafting estimate requests and responses", () => {
