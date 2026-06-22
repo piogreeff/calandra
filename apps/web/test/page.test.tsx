@@ -22,6 +22,18 @@ describe("home dashboard", () => {
     const html = renderToStaticMarkup(await Home());
 
     expect(html).toContain("Deterministic upgrade rankings");
+    expect(html).toContain("Character build preview");
+    expect(html).toContain("Visual equipment");
+    expect(html).toContain("Passive tree");
+    expect(html).toContain("95 passive nodes tracked");
+    expect(html).toContain("Open passive tree reference");
+    expect(html).toContain("Link-out reference only");
+    expect(html).toContain("Duskthread Grips");
+    expect(html).toContain('alt="Duskthread Grips"');
+    expect(html).toContain('alt="Calandra Demo Amulet"');
+    expect(html).toContain(
+      "https://poe.ninja/poe2/builds/runesofaldur/character/heygyus-0416/ResurrectGodAura/passive-tree",
+    );
     expect(html).toContain("Duskthread Grips");
     expect(html).toContain("+43.4");
     expect(html).toContain("14.47 / chaos");

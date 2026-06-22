@@ -3,10 +3,13 @@ import {
   Bot,
   ChevronRight,
   Database,
+  ExternalLink,
   Gauge,
   Hammer,
   History,
+  ImageIcon,
   KeyRound,
+  Network,
   RotateCcw,
   Settings,
   ShieldCheck,
@@ -83,6 +86,74 @@ const advisorPreview = {
 
 const gggDisclaimer =
   "Unofficial fan tool. Calandra is not affiliated with, endorsed by, or associated with Grinding Gear Games. Path of Exile 2 and related content are the property of Grinding Gear Games.";
+
+const passiveTreeReferenceUrl =
+  "https://poe.ninja/poe2/builds/runesofaldur/character/heygyus-0416/ResurrectGodAura/passive-tree";
+
+const visualLoadoutPreview = {
+  character: {
+    name: "ResurrectGodAura",
+    className: "Martial Artist",
+    level: 95,
+    league: dashboardDatasetVersion.league,
+  },
+  stats: [
+    { label: "Life", value: "1,497" },
+    { label: "Energy shield", value: "2,379" },
+    { label: "Evasion rating", value: "14,776" },
+    { label: "Resistances", value: "77 / 76 / 75 / 72" },
+  ],
+  equipment: [
+    {
+      slot: "Weapon",
+      name: "Calandra Demo Wand",
+      rarity: "magic",
+      iconUrl: demoItemIcon("Wand", "#67e8f9", "#0e7490"),
+      stats: ["Spell damage base", "Patch 0.2.0"],
+    },
+    {
+      slot: "Body armour",
+      name: "Calandra Demo Robe",
+      rarity: "rare",
+      iconUrl: demoItemIcon("Robe", "#bef264", "#3f6212"),
+      stats: ["Energy shield shell", "Defensive anchor"],
+    },
+    {
+      slot: "Amulet",
+      name: "Calandra Demo Amulet",
+      rarity: "unique",
+      iconUrl: demoItemIcon("Amulet", "#fbbf24", "#92400e"),
+      stats: ["Gold rarity anchor", "Amulet slot target"],
+    },
+    {
+      slot: "Gloves",
+      name: "Duskthread Grips",
+      rarity: "rare",
+      iconUrl: demoItemIcon("Gloves", "#f87171", "#991b1b"),
+      stats: ["+43.4 score delta", "Attack speed gap closed"],
+    },
+    {
+      slot: "Boots",
+      name: "Wanderstep Boots",
+      rarity: "rare",
+      iconUrl: demoItemIcon("Boots", "#a78bfa", "#5b21b6"),
+      stats: ["Movement-speed target", "+15.5 score delta"],
+    },
+    {
+      slot: "Charm",
+      name: "Stormbind Charm",
+      rarity: "rare",
+      iconUrl: demoItemIcon("Charm", "#22d3ee", "#155e75"),
+      stats: ["Lightning damage target", "+21.2 score delta"],
+    },
+  ],
+  passiveTree: {
+    allocated: 95,
+    focus: "Aura pathing, spirit reservation, defensive wheel coverage",
+    source: "Link-out reference only; not scraped or bundled.",
+    referenceUrl: passiveTreeReferenceUrl,
+  },
+};
 
 export default async function Home() {
   const [dataset, gggOAuthStatus, snapshotList] = await Promise.all([
@@ -177,6 +248,10 @@ export default async function Home() {
           </header>
 
           <div className="grid grid-cols-[minmax(0,1fr)] gap-4 px-4 py-4 xl:grid-cols-[minmax(0,1fr)_20rem] lg:px-6">
+            <div className="min-w-0 xl:col-span-2">
+              <CharacterBuildPreviewPanel loadout={visualLoadoutPreview} />
+            </div>
+
             <div className="min-w-0 space-y-4">
               <section
                 className="grid grid-cols-[minmax(0,1fr)] gap-4 md:grid-cols-3"
@@ -556,6 +631,126 @@ export default async function Home() {
   );
 }
 
+function CharacterBuildPreviewPanel({
+  loadout,
+}: {
+  loadout: typeof visualLoadoutPreview;
+}) {
+  return (
+    <Panel
+      title="Character build preview"
+      icon={<Swords className="size-4" aria-hidden="true" />}
+    >
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="min-w-0">
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-medium uppercase text-base-content/55">
+                Level {loadout.character.level} {loadout.character.className}
+              </p>
+              <h3 className="truncate text-lg font-semibold text-base-content">
+                {loadout.character.name}
+              </h3>
+              <p className="mt-1 text-sm text-base-content/60">
+                {loadout.character.league}
+              </p>
+            </div>
+            <p className="rounded-md border border-info/35 bg-info/10 px-3 py-2 text-xs font-medium text-info">
+              Preview loadout
+            </p>
+          </div>
+
+          <section aria-label="Visual equipment" className="min-w-0">
+            <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-base-content">
+              <ImageIcon className="size-4 text-primary" aria-hidden="true" />
+              <h3>Visual equipment</h3>
+            </div>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+              {loadout.equipment.map((item) => (
+                <article
+                  key={`${item.slot}-${item.name}`}
+                  className="min-w-0 rounded-md border border-base-300/70 bg-base-100/45 p-3"
+                >
+                  <div className="aspect-square rounded-md border border-base-300/70 bg-base-300/35 p-2">
+                    <img
+                      src={item.iconUrl}
+                      alt={item.name}
+                      loading="lazy"
+                      className="h-full w-full object-contain"
+                    />
+                  </div>
+                  <p className="mt-3 text-xs uppercase text-base-content/55">
+                    {item.slot}
+                  </p>
+                  <h4 className="truncate text-sm font-semibold text-base-content">
+                    {item.name}
+                  </h4>
+                  <p className="mt-1 text-xs capitalize text-primary">
+                    {item.rarity}
+                  </p>
+                  <ul className="mt-2 space-y-1 text-xs leading-5 text-base-content/60">
+                    {item.stats.map((stat) => (
+                      <li key={stat} className="truncate">
+                        {stat}
+                      </li>
+                    ))}
+                  </ul>
+                </article>
+              ))}
+            </div>
+          </section>
+        </div>
+
+        <div className="min-w-0 space-y-3">
+          <div className="rounded-md border border-base-300/70 bg-base-100/45 p-3">
+            <h3 className="text-sm font-semibold text-base-content">Stats</h3>
+            <div className="mt-3 space-y-2 text-sm">
+              {loadout.stats.map((stat) => (
+                <div
+                  key={stat.label}
+                  className="flex items-center justify-between gap-3 border-b border-base-300/60 pb-2 last:border-0 last:pb-0"
+                >
+                  <span className="text-base-content/60">{stat.label}</span>
+                  <span className="font-semibold text-base-content">
+                    {stat.value}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-md border border-base-300/70 bg-base-100/45 p-3">
+            <div className="flex items-center gap-2">
+              <Network className="size-4 text-primary" aria-hidden="true" />
+              <h3 className="text-sm font-semibold text-base-content">
+                Passive tree
+              </h3>
+            </div>
+            <p className="mt-3 text-2xl font-semibold text-base-content">
+              {loadout.passiveTree.allocated} passive nodes tracked
+            </p>
+            <p className="mt-2 text-sm leading-6 text-base-content/65">
+              {loadout.passiveTree.focus}
+            </p>
+            <p className="mt-3 rounded-md border border-warning/35 bg-warning/10 p-2 text-xs leading-5 text-warning">
+              {loadout.passiveTree.source}
+            </p>
+            <a
+              href={loadout.passiveTree.referenceUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="btn btn-primary btn-sm mt-3 w-full"
+            >
+              Open passive tree reference
+              <ExternalLink className="size-4" aria-hidden="true" />
+            </a>
+          </div>
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
 function formatSnapshotTimestamp(value: string | undefined) {
   if (!value) {
     return "Pending";
@@ -610,6 +805,18 @@ function formatSnapshotDiffEmptyState(
   }
 
   return "Snapshot diff is unavailable from the temporary API.";
+}
+
+function demoItemIcon(label: string, accent: string, shadow: string) {
+  const initials = label
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160"><rect width="160" height="160" rx="18" fill="#101820"/><rect x="14" y="14" width="132" height="132" rx="14" fill="#172330" stroke="${accent}" stroke-width="3"/><path d="M80 28 118 78 80 132 42 78Z" fill="${shadow}" opacity=".72"/><path d="M80 38 106 79 80 120 54 79Z" fill="${accent}" opacity=".88"/><circle cx="80" cy="79" r="18" fill="#f8fafc" opacity=".18"/><text x="80" y="91" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="26" font-weight="700" fill="#f8fafc">${initials}</text></svg>`;
+
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
 function Panel({
