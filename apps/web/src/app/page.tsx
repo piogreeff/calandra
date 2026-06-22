@@ -193,7 +193,16 @@ const fallbackVisualLoadoutPreview: VisualLoadoutPreview = {
   },
 };
 
-export default async function Home() {
+type HomeSearchParams = {
+  account?: string | string[];
+};
+
+export default async function Home({
+  searchParams,
+}: {
+  searchParams?: Promise<HomeSearchParams>;
+}) {
+  const selectedAccount = resolveSelectedAccount(await searchParams);
   const snapshotReadToken = process.env["SNAPSHOT_READ_TOKEN"]?.trim();
   const snapshotReadOptions = snapshotReadToken ? { snapshotReadToken } : {};
   const [dataset, gggOAuthStatus, snapshotList, ladderBuilds] =
@@ -201,7 +210,7 @@ export default async function Home() {
     getDashboardDataset(),
     getDashboardGggOAuthStatus(),
     getDashboardSnapshots(
-      "example",
+      selectedAccount,
       defaultApiBaseUrl,
       fetch,
       snapshotReadOptions,
@@ -480,6 +489,9 @@ export default async function Home() {
                         <h3 className="mt-1 break-all text-sm font-semibold text-base-content">
                           {latestSnapshot.snapshotId}
                         </h3>
+                        <p className="mt-1 break-all text-xs text-base-content/55">
+                          {latestSnapshot.objectKey}
+                        </p>
                       </div>
                       <RotateCcw
                         className="size-4 shrink-0 text-primary"
@@ -710,6 +722,7 @@ export default async function Home() {
                 <GggOAuthLinkPanel
                   status={gggOAuthStatus}
                   apiBaseUrl={defaultApiBaseUrl}
+                  defaultAccount={snapshotList.account}
                 />
               </Panel>
 
@@ -914,6 +927,14 @@ function createVisualLoadoutPreview(
       referenceUrl: fallbackVisualLoadoutPreview.passiveTree.referenceUrl,
     },
   };
+}
+
+function resolveSelectedAccount(searchParams: HomeSearchParams | undefined) {
+  const account = Array.isArray(searchParams?.account)
+    ? searchParams.account[0]
+    : searchParams?.account;
+
+  return account?.trim() || "example";
 }
 
 function buildSnapshotStatRows(snapshot: AccountSnapshot) {

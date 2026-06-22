@@ -16,10 +16,35 @@ const datasetSources = [
 ] as const;
 
 describe("home dashboard", () => {
+  it("loads snapshot panels for the selected account query", async () => {
+    const fetchImplementation = mockDashboardFetch();
+    vi.stubGlobal("fetch", fetchImplementation);
+
+    const html = renderToStaticMarkup(
+      await Home({ searchParams: Promise.resolve({ account: "RealAccount" }) }),
+    );
+
+    const requestedUrls = fetchImplementation.mock.calls.map(([input]) =>
+      String(input),
+    );
+
+    expect(requestedUrls).toContain(
+      "https://calandra-api.piogreeff.workers.dev/snapshots/RealAccount",
+    );
+    expect(requestedUrls).toContain(
+      "https://calandra-api.piogreeff.workers.dev/snapshots/RealAccount/snapshot-2026-06-21T10-00-00Z",
+    );
+    expect(requestedUrls.some((url) => url.includes("/snapshots/example"))).toBe(
+      false,
+    );
+    expect(html).toContain('value="RealAccount"');
+    expect(html).toContain("snapshots/RealAccount/");
+  });
+
   it("shows deterministic advisor rankings and temporary endpoints", async () => {
     vi.stubGlobal("fetch", mockDashboardFetch());
 
-    const html = renderToStaticMarkup(await Home());
+    const html = renderToStaticMarkup(await Home({}));
 
     expect(html).toContain("Deterministic upgrade rankings");
     expect(html).toContain("Character build preview");
@@ -93,7 +118,7 @@ describe("home dashboard", () => {
       vi.fn(async () => new Response(null, { status: 503 })),
     );
 
-    const html = renderToStaticMarkup(await Home());
+    const html = renderToStaticMarkup(await Home({}));
 
     expect(html).toContain("Demo snapshot");
     expect(html).toContain("Level 45 Monk");
@@ -215,6 +240,73 @@ function mockDashboardFetch() {
           accountLinking: true,
           snapshotCapture: true,
         },
+      });
+    }
+
+    if (url.endsWith("/snapshots/RealAccount")) {
+      return Response.json({
+        source: "snapshot-store",
+        account: "RealAccount",
+        snapshots: [
+          {
+            account: "RealAccount",
+            snapshotId: "snapshot-2026-06-21T09-00-00Z",
+            objectKey:
+              "snapshots/RealAccount/snapshot-2026-06-21T09-00-00Z.json",
+            uploadedAt: "2026-06-21T09:01:00.000Z",
+            size: 480,
+          },
+          {
+            account: "RealAccount",
+            snapshotId: "snapshot-2026-06-21T10-00-00Z",
+            objectKey:
+              "snapshots/RealAccount/snapshot-2026-06-21T10-00-00Z.json",
+            uploadedAt: "2026-06-21T10:01:00.000Z",
+            size: 512,
+          },
+        ],
+      });
+    }
+
+    if (url.includes("/snapshots/RealAccount/diff?")) {
+      return Response.json({
+        beforeSnapshotId: "snapshot-2026-06-21T09-00-00Z",
+        afterSnapshotId: "snapshot-2026-06-21T10-00-00Z",
+        beforeCapturedAt: "2026-06-21T09:00:00.000Z",
+        afterCapturedAt: "2026-06-21T10:00:00.000Z",
+        characterChanges: [],
+        stashChanges: [],
+      });
+    }
+
+    if (url.includes("/snapshots/RealAccount/snapshot-2026-06-21T10-00-00Z")) {
+      return Response.json({
+        id: "snapshot-2026-06-21T10-00-00Z",
+        account: "RealAccount",
+        capturedAt: "2026-06-21T10:00:00.000Z",
+        source: "manual-import",
+        capabilities: { characters: true, stashes: true },
+        characters: [
+          {
+            id: "char-1",
+            name: "RealMonk",
+            className: "Monk",
+            level: 45,
+            league: "Dawn of the Hunt",
+            passiveSkillIds: ["passive-1", "passive-2"],
+            equipment: [
+              {
+                slot: "Gloves",
+                name: "Duskthread Grips",
+                rarity: "rare",
+                iconUrl: "https://calandra.pages.dev/demo-gloves.svg",
+                iconAttribution:
+                  "Synthetic Calandra demo icon; no game art is bundled.",
+              },
+            ],
+          },
+        ],
+        stashes: [],
       });
     }
 
