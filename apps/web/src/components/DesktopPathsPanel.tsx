@@ -19,6 +19,9 @@ import {
   runDesktopLocalConfigBackup,
   setDesktopOverlayMode,
   subscribeDesktopClipboardHotkey,
+  writeDesktopBuildFile,
+  type DesktopBuildFileWritePlan,
+  type DesktopBuildFileWriteRequest,
   type DesktopClipboardItemCapture,
   type DesktopClipboardItemCaptureRequest,
   type DesktopLocalBackupFileRequest,
@@ -40,6 +43,12 @@ type LocalBackupState =
   | { status: "running" }
   | { status: "success"; plan: DesktopLocalConfigBackupPlan }
   | { status: "empty" }
+  | { status: "error"; message: string };
+
+type AdvisorBuildExportState =
+  | { status: "idle" }
+  | { status: "running" }
+  | { status: "success"; plan: DesktopBuildFileWritePlan }
   | { status: "error"; message: string };
 
 type ClipboardCaptureState =
@@ -71,6 +80,7 @@ export function DesktopPathsPanel({
   subscribeClipboardHotkey = subscribeDesktopClipboardHotkey,
   discoverBackupFiles = discoverDesktopLocalConfigBackupFiles,
   runBackup = runDesktopLocalConfigBackup,
+  writeBuildFile = writeDesktopBuildFile,
   clientLogPollIntervalMs = defaultClientLogPollIntervalMs,
   now = defaultNow,
 }: {
@@ -97,6 +107,9 @@ export function DesktopPathsPanel({
   runBackup?: (
     request: DesktopLocalConfigBackupRequest,
   ) => Promise<DesktopLocalConfigBackupPlan>;
+  writeBuildFile?: (
+    request: DesktopBuildFileWriteRequest,
+  ) => Promise<DesktopBuildFileWritePlan>;
   clientLogPollIntervalMs?: number;
   now?: () => Date;
 }) {
@@ -109,6 +122,10 @@ export function DesktopPathsPanel({
   const [clipboardState, setClipboardState] = useState<ClipboardCaptureState>({
     status: "idle",
   });
+  const [buildExportState, setBuildExportState] =
+    useState<AdvisorBuildExportState>({
+      status: "idle",
+    });
   const [overlayState, setOverlayState] = useState<OverlayModeState>({
     status: "idle",
     overlayEnabled: false,
@@ -218,6 +235,29 @@ export function DesktopPathsPanel({
         overlayEnabled: !overlayEnabled,
         message:
           error instanceof Error ? error.message : "Overlay mode change failed",
+      });
+    }
+  }
+
+  async function handleAdvisorBuildExport() {
+    if (!paths) return;
+
+    setBuildExportState({ status: "running" });
+
+    try {
+      const plan = await writeBuildFile(
+        createAdvisorBuildExportRequest({
+          buildPlannerDirectory: paths.buildPlannerDirectory,
+          capturedAt: now().toISOString(),
+        }),
+      );
+
+      setBuildExportState({ status: "success", plan });
+    } catch (error) {
+      setBuildExportState({
+        status: "error",
+        message:
+          error instanceof Error ? error.message : ".build export failed",
       });
     }
   }
@@ -371,6 +411,20 @@ export function DesktopPathsPanel({
           <ClipboardCaptureStatus state={clipboardState} />
           <button
             type="button"
+            className="btn btn-info btn-sm w-full"
+            disabled={buildExportState.status === "running"}
+            onClick={() => void handleAdvisorBuildExport()}
+          >
+            {buildExportState.status === "running" ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <FolderOpen className="size-4" aria-hidden="true" />
+            )}
+            Export advisor build
+          </button>
+          <AdvisorBuildExportStatus state={buildExportState} />
+          <button
+            type="button"
             className="btn btn-primary btn-sm w-full"
             disabled={backupState.status === "running"}
             onClick={() => void handleLocalBackup()}
@@ -403,7 +457,10 @@ export function createClipboardCaptureRequest(
 export function createClipboardHotkeyCaptureRequest(
   capturedAt: string,
 ): DesktopClipboardItemCaptureRequest {
-  return createClipboardCaptureRequestWithPrefix("clipboard-hotkey", capturedAt);
+  return createClipboardCaptureRequestWithPrefix(
+    "clipboard-hotkey",
+    capturedAt,
+  );
 }
 
 function createClipboardCaptureRequestWithPrefix(
@@ -452,6 +509,23 @@ export function createOverlayModeRequest({
   return {
     actionId: `overlay-${capturedAt.replace(/[:.]/g, "-")}`,
     overlayEnabled,
+    userInitiated: true,
+  };
+}
+
+export function createAdvisorBuildExportRequest({
+  buildPlannerDirectory,
+  capturedAt,
+}: {
+  buildPlannerDirectory: string;
+  capturedAt: string;
+}): DesktopBuildFileWriteRequest {
+  return {
+    buildPlannerDirectory,
+    fileName: "Calandra Advisor Export",
+    content:
+      "[build]\nname=Calandra Advisor Export\nsource=calandra\nnotes=Generated from the deterministic advisor preview.\n",
+    actionId: `advisor-export-${capturedAt.replace(/[:.]/g, "-")}`,
     userInitiated: true,
   };
 }
@@ -568,6 +642,37 @@ function OverlayModeStatus({ state }: { state: OverlayModeState }) {
             {state.plan.overlayEnabled ? "Overlay active" : "Overlay closed"}
           </span>
         </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-md border border-error/35 bg-error/10 p-3 text-xs text-error">
+      <div className="flex items-center gap-2 font-semibold">
+        <XCircle className="size-4" aria-hidden="true" />
+        <span>{state.message}</span>
+      </div>
+    </div>
+  );
+}
+
+function AdvisorBuildExportStatus({
+  state,
+}: {
+  state: AdvisorBuildExportState;
+}) {
+  if (state.status === "idle" || state.status === "running") {
+    return null;
+  }
+
+  if (state.status === "success") {
+    return (
+      <div className="rounded-md border border-success/30 bg-success/10 p-3 text-xs text-success">
+        <div className="mb-2 flex items-center gap-2 font-semibold">
+          <CheckCircle2 className="size-4" aria-hidden="true" />
+          <span>Advisor build exported</span>
+        </div>
+        <p className="break-all font-mono leading-5">{state.plan.outputPath}</p>
       </div>
     );
   }

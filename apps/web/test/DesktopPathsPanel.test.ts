@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  createAdvisorBuildExportRequest,
   createClipboardCaptureRequest,
   createClipboardHotkeyCaptureRequest,
   createLocalConfigBackupRequest,
@@ -65,6 +66,24 @@ describe("DesktopPathsPanel helpers", () => {
     ).toEqual({
       actionId: "overlay-2026-06-21T18-55-00-000Z",
       overlayEnabled: true,
+      userInitiated: true,
+    });
+  });
+
+  it("builds a user-initiated advisor .build export request", () => {
+    expect(
+      createAdvisorBuildExportRequest({
+        buildPlannerDirectory:
+          "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2\\BuildPlanner",
+        capturedAt: "2026-06-21T19:05:00.000Z",
+      }),
+    ).toEqual({
+      buildPlannerDirectory:
+        "C:\\Users\\Pio\\Documents\\My Games\\Path of Exile 2\\BuildPlanner",
+      fileName: "Calandra Advisor Export",
+      content:
+        "[build]\nname=Calandra Advisor Export\nsource=calandra\nnotes=Generated from the deterministic advisor preview.\n",
+      actionId: "advisor-export-2026-06-21T19-05-00-000Z",
       userInitiated: true,
     });
   });
