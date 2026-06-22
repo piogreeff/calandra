@@ -3,6 +3,7 @@ import {
   completeDashboardGggOAuthLink,
   getDashboardDataset,
   getDashboardGggOAuthStatus,
+  getDashboardLadderBuilds,
   getDashboardSearch,
   getDashboardLatestSnapshot,
   getDashboardSnapshotDiff,
@@ -178,6 +179,49 @@ describe("dashboard read API client", () => {
     expect(results.uniques[0]?.name).toBe("Calandra Demo Amulet");
     expect(results.mods[0]?.id).toBe("demo-life-prefix");
     expect(results.gems[0]?.name).toBe("Spark");
+  });
+
+  it("loads patch-versioned ladder builds from the typed read API", async () => {
+    const fetchImplementation = vi.fn(async () =>
+      Response.json({
+        league: "Dawn of the Hunt",
+        patch: "0.2.0",
+        builds: [
+          {
+            id: "deadeye-1",
+            account: "example",
+            character: "CalandraTest",
+            className: "Deadeye",
+            level: 92,
+          },
+        ],
+      }),
+    );
+
+    const builds = await getDashboardLadderBuilds(
+      "https://calandra-api.piogreeff.workers.dev",
+      fetchImplementation,
+    );
+
+    expect(fetchImplementation).toHaveBeenCalledWith(
+      "https://calandra-api.piogreeff.workers.dev/builds/ladder?league=Dawn+of+the+Hunt&patch=0.2.0",
+    );
+    expect(builds.source).toBe("api");
+    expect(builds.builds[0]).toMatchObject({
+      character: "CalandraTest",
+      className: "Deadeye",
+      level: 92,
+    });
+  });
+
+  it("falls back to demo ladder builds when the temporary API is unavailable", async () => {
+    const builds = await getDashboardLadderBuilds(
+      "https://calandra-api.piogreeff.workers.dev",
+      vi.fn(async () => new Response(null, { status: 503 })),
+    );
+
+    expect(builds.source).toBe("fallback");
+    expect(builds.builds[0]?.character).toBe("ResurrectGodAura");
   });
 
   it("loads safe GGG OAuth status for account linking", async () => {

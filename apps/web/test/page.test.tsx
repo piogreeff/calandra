@@ -73,6 +73,10 @@ describe("home dashboard", () => {
     expect(html).toContain("Duskthread Grips");
     expect(html).toContain("Currency Tab");
     expect(html).toContain("+7 items");
+    expect(html).toContain("Ladder builds");
+    expect(html).toContain("CalandraTest");
+    expect(html).toContain("Level 92 Deadeye");
+    expect(html).toContain("example");
     expect(html).toContain("Desktop shell");
     expect(html).toContain("Checking desktop shell");
     expect(html).toContain("Loot filters, BuildPlanner files");
@@ -152,6 +156,22 @@ function mockDashboardFetch() {
             name: "Divine Orb",
             chaosEquivalent: 142,
             updatedAt: "2026-06-21T13:15:00.000Z",
+          },
+        ],
+      });
+    }
+
+    if (url.includes("/builds/ladder?")) {
+      return Response.json({
+        league: "Dawn of the Hunt",
+        patch: "0.2.0",
+        builds: [
+          {
+            id: "deadeye-1",
+            account: "example",
+            character: "CalandraTest",
+            className: "Deadeye",
+            level: 92,
           },
         ],
       });

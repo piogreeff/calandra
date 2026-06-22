@@ -12,6 +12,7 @@ import {
   gggOAuthStatusResponseSchema,
   gggOAuthTokenExchangeResponseSchema,
   itemCollectionSchema,
+  ladderBuildCollectionSchema,
   uniqueCollectionSchema,
   type AccountSnapshot,
   type AccountSnapshotDiff,
@@ -24,6 +25,7 @@ import {
   type GggOAuthStatusResponse,
   type GggOAuthTokenExchangeResponse,
   type Item,
+  type LadderBuild,
   type UniqueItem,
 } from "@calandra/contract";
 
@@ -69,6 +71,11 @@ export type DashboardGggOAuthStatus = Omit<GggOAuthStatusResponse, "source"> & {
 
 export type DashboardSearchResults = DatasetSearchResponse & {
   source: "api" | "fallback";
+};
+
+export type DashboardLadderBuilds = {
+  source: "api" | "fallback";
+  builds: LadderBuild[];
 };
 
 const fallbackDataset: DashboardDataset = {
@@ -138,6 +145,16 @@ const fallbackDataset: DashboardDataset = {
 
 const fallbackDemoSnapshotId = "fallback-demo-snapshot";
 const fallbackDemoCapturedAt = "2026-06-21T10:00:00.000Z";
+
+const fallbackLadderBuilds: LadderBuild[] = [
+  {
+    id: "demo-resurrect-god-aura",
+    account: "heygyus-0416",
+    character: "ResurrectGodAura",
+    className: "Martial Artist",
+    level: 95,
+  },
+];
 
 function fallbackSnapshots(account: string): DashboardSnapshots {
   return {
@@ -368,6 +385,30 @@ export async function getDashboardSearch(
     };
   } catch {
     return fallbackSearchResults(normalizedQuery);
+  }
+}
+
+export async function getDashboardLadderBuilds(
+  apiBaseUrl = defaultApiBaseUrl,
+  fetchImplementation: typeof fetch = fetch,
+): Promise<DashboardLadderBuilds> {
+  try {
+    const query = new URLSearchParams(dashboardDatasetVersion);
+    const collection = await fetchJson(
+      fetchImplementation,
+      `${apiBaseUrl}/builds/ladder?${query.toString()}`,
+      ladderBuildCollectionSchema.parse,
+    );
+
+    return {
+      source: "api",
+      builds: collection.builds,
+    };
+  } catch {
+    return {
+      source: "fallback",
+      builds: fallbackLadderBuilds,
+    };
   }
 }
 

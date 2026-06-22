@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Sparkles,
   Swords,
+  Trophy,
   WalletCards,
 } from "lucide-react";
 import type {
@@ -31,6 +32,7 @@ import {
   defaultApiBaseUrl,
   getDashboardDataset,
   getDashboardGggOAuthStatus,
+  getDashboardLadderBuilds,
   getDashboardLatestSnapshot,
   getDashboardSnapshotDiff,
   getDashboardSnapshots,
@@ -192,10 +194,12 @@ const fallbackVisualLoadoutPreview: VisualLoadoutPreview = {
 };
 
 export default async function Home() {
-  const [dataset, gggOAuthStatus, snapshotList] = await Promise.all([
+  const [dataset, gggOAuthStatus, snapshotList, ladderBuilds] =
+    await Promise.all([
     getDashboardDataset(),
     getDashboardGggOAuthStatus(),
     getDashboardSnapshots("example"),
+    getDashboardLadderBuilds(),
   ]);
   const [snapshotDiff, latestSnapshotDetail] = await Promise.all([
     getDashboardSnapshotDiff(snapshotList.account, snapshotList.snapshots),
@@ -564,6 +568,48 @@ export default async function Home() {
                 ) : (
                   <p className="rounded-md border border-base-300/70 bg-base-100/45 p-3 text-sm text-base-content/70">
                     {formatSnapshotDiffEmptyState(snapshotDiff.reason)}
+                  </p>
+                )}
+              </Panel>
+
+              <Panel
+                title="Ladder builds"
+                icon={<Trophy className="size-4" aria-hidden="true" />}
+              >
+                <div className="mb-3 rounded-md border border-base-300/70 bg-base-100/45 p-3 text-xs font-medium text-base-content/65">
+                  {ladderBuilds.source === "api"
+                    ? "Published ladder artifact"
+                    : "Demo ladder fallback"}
+                </div>
+                {ladderBuilds.builds.length > 0 ? (
+                  <div className="space-y-3">
+                    {ladderBuilds.builds.slice(0, 4).map((build) => (
+                      <article
+                        key={build.id}
+                        className="rounded-md border border-base-300/70 bg-base-100/45 p-3"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-xs uppercase text-base-content/55">
+                              {build.account}
+                            </p>
+                            <h3 className="truncate text-sm font-semibold text-base-content">
+                              {build.character}
+                            </h3>
+                          </div>
+                          <span className="shrink-0 rounded-md bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
+                            Level {build.level}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-sm text-base-content/65">
+                          Level {build.level} {build.className}
+                        </p>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="rounded-md border border-base-300/70 bg-base-100/45 p-3 text-sm text-base-content/70">
+                    No ladder builds in this published dataset yet.
                   </p>
                 )}
               </Panel>
