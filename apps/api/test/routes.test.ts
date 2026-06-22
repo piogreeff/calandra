@@ -1533,6 +1533,188 @@ describe("api routes", () => {
     expect(storedObjects[0]?.value).not.toContain("ggg-refresh-token");
   });
 
+  it("starts browser-safe GGG OAuth by storing PKCE verifier server-side", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-21T10:00:00.000Z"));
+    const storedObjects: Array<{ key: string; value: string }> = [];
+
+    const response = await api.request(
+      "/auth/ggg/start",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ account: "example" }),
+      },
+      {
+        APP_URL: "https://calandra.pages.dev",
+        GGG_OAUTH_CLIENT_ID: "calandra-client-id",
+        GGG_TOKEN_R2_PREFIX: "oauth/ggg",
+        SNAPSHOT_BUCKET: {
+          async put(key: string, value: string) {
+            storedObjects.push({ key, value });
+          },
+        },
+      },
+    );
+
+    expect(response.status).toBe(201);
+    const body = (await response.json()) as {
+      authorizationUrl: string;
+      state: string;
+    };
+    const authorizationUrl = new URL(body.authorizationUrl);
+
+    expect(body).toMatchObject({
+      source: "ggg-oauth-start",
+      account: "example",
+      expiresAt: "2026-06-21T10:10:00.000Z",
+      redirectUri: "https://calandra.pages.dev/auth/ggg/callback",
+      requiredScopes: ["account:characters"],
+    });
+    expect(body.state).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(authorizationUrl.origin).toBe("https://www.pathofexile.com");
+    expect(authorizationUrl.pathname).toBe("/oauth/authorize");
+    expect(authorizationUrl.searchParams.get("client_id")).toBe(
+      "calandra-client-id",
+    );
+    expect(authorizationUrl.searchParams.get("scope")).toBe(
+      "account:characters",
+    );
+    expect(authorizationUrl.searchParams.get("state")).toBe(body.state);
+    expect(authorizationUrl.searchParams.get("code_challenge")).toMatch(
+      /^[A-Za-z0-9_-]+$/,
+    );
+    expect(JSON.stringify(body)).not.toContain("codeVerifier");
+    expect(storedObjects).toHaveLength(1);
+    expect(storedObjects[0]?.key).toBe(`oauth/ggg/pending/${body.state}.json`);
+    expect(storedObjects[0]?.value).toContain("codeVerifier");
+  });
+
+  it("completes browser-safe GGG OAuth and stores encrypted tokens without a write token", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-21T10:00:00.000Z"));
+    const storedObjects: Array<{ key: string; value: string }> = [];
+    const pendingState = JSON.stringify({
+      account: "example",
+      provider: "ggg",
+      state: "oauth-state",
+      codeVerifier: "pkce-verifier",
+      redirectUri: "https://calandra.pages.dev/auth/ggg/callback",
+      scopes: ["account:characters"],
+      createdAt: "2026-06-21T09:59:00.000Z",
+      expiresAt: "2026-06-21T10:09:00.000Z",
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        expect(url).toBe("https://www.pathofexile.com/oauth/token");
+        const params = new URLSearchParams(String(init?.body));
+        expect(Object.fromEntries(params)).toMatchObject({
+          client_id: "calandra-client-id",
+          grant_type: "authorization_code",
+          code: "authorization-code",
+          redirect_uri: "https://calandra.pages.dev/auth/ggg/callback",
+          code_verifier: "pkce-verifier",
+          scope: "account:characters",
+        });
+
+        return jsonResponse({
+          access_token: "ggg-access-token",
+          refresh_token: "ggg-refresh-token",
+          token_type: "bearer",
+          expires_in: 3600,
+          scope: "account:characters",
+          username: "CalandraAccount",
+        });
+      }),
+    );
+
+    const response = await api.request(
+      "/auth/ggg/complete",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          state: "oauth-state",
+          code: "authorization-code",
+        }),
+      },
+      {
+        APP_URL: "https://calandra.pages.dev",
+        GGG_OAUTH_CLIENT_ID: "calandra-client-id",
+        GGG_TOKEN_ENCRYPTION_KEY: base64Key(7),
+        GGG_TOKEN_R2_PREFIX: "oauth/ggg",
+        SNAPSHOT_WRITE_TOKEN: "snapshot-write-token",
+        SNAPSHOT_BUCKET: {
+          async get(key: string) {
+            return key === "oauth/ggg/pending/oauth-state.json"
+              ? {
+                  async text() {
+                    return pendingState;
+                  },
+                }
+              : null;
+          },
+          async put(key: string, value: string) {
+            storedObjects.push({ key, value });
+          },
+        },
+      },
+    );
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toMatchObject({
+      source: "ggg-oauth-token-store",
+      account: "CalandraAccount",
+      objectKey: "oauth/ggg/CalandraAccount/token.json",
+      token: {
+        tokenType: "encrypted",
+        expiresAt: "2026-06-21T11:00:00.000Z",
+        scope: ["account:characters"],
+        username: "CalandraAccount",
+      },
+    });
+    expect(storedObjects.map((object) => object.key)).toEqual([
+      "oauth/ggg/CalandraAccount/token.json",
+      "oauth/ggg/pending/oauth-state.json",
+    ]);
+    expect(storedObjects[0]?.value).not.toContain("ggg-access-token");
+    expect(storedObjects[0]?.value).not.toContain("ggg-refresh-token");
+    expect(storedObjects[1]?.value).toContain("consumedAt");
+  });
+
+  it("rejects GGG OAuth completion when pending state is missing", async () => {
+    const response = await api.request(
+      "/auth/ggg/complete",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          state: "missing-state",
+          code: "authorization-code",
+        }),
+      },
+      {
+        APP_URL: "https://calandra.pages.dev",
+        GGG_OAUTH_CLIENT_ID: "calandra-client-id",
+        GGG_TOKEN_ENCRYPTION_KEY: base64Key(7),
+        SNAPSHOT_BUCKET: {
+          async get() {
+            return null;
+          },
+          async put() {
+            throw new Error("complete must stop before writing tokens");
+          },
+        },
+      },
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      error: "GGG OAuth state is invalid or expired",
+    });
+  });
+
   it("rejects GGG OAuth exchange without snapshot write authorization", async () => {
     const response = await api.request(
       "/auth/ggg/exchange",

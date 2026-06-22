@@ -208,6 +208,27 @@ export const gggOAuthTokenExchangeRequestSchema = z.object({
   scopes: z.array(z.string().min(1)).optional(),
 });
 
+export const gggOAuthStartRequestSchema = z.object({
+  account: z.string().min(1),
+  redirectUri: z.string().url().optional(),
+  scopes: z.array(z.string().min(1)).optional(),
+});
+
+export const gggOAuthStartResponseSchema = z.object({
+  source: z.literal("ggg-oauth-start"),
+  account: z.string().min(1),
+  authorizationUrl: z.string().url(),
+  state: z.string().min(1),
+  expiresAt: z.string().datetime(),
+  redirectUri: z.string().url(),
+  requiredScopes: z.array(z.string().min(1)),
+});
+
+export const gggOAuthCompleteRequestSchema = z.object({
+  state: z.string().min(1),
+  code: z.string().min(1),
+});
+
 export const gggOAuthTokenExchangeResponseSchema = z.object({
   source: z.literal("ggg-oauth-token-store"),
   account: z.string().min(1),
@@ -827,6 +848,80 @@ export const openApiDocument = {
           },
           "503": {
             description: "GGG OAuth token storage is not configured",
+          },
+        },
+      },
+    },
+    "/auth/ggg/start": {
+      post: {
+        operationId: "startGggOAuthLink",
+        summary: "Start browser-safe GGG OAuth account linking",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                $ref: "#/components/schemas/GggOAuthStartRequest",
+              },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "GGG OAuth authorization URL with server-held PKCE",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/GggOAuthStartResponse",
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Invalid GGG OAuth start request",
+          },
+          "503": {
+            description: "GGG OAuth browser link is not configured",
+          },
+        },
+      },
+    },
+    "/auth/ggg/complete": {
+      post: {
+        operationId: "completeGggOAuthLink",
+        summary: "Complete browser-safe GGG OAuth account linking",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                $ref: "#/components/schemas/GggOAuthCompleteRequest",
+              },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "Encrypted GGG OAuth token storage metadata",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/GggOAuthTokenExchangeResponse",
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Invalid GGG OAuth complete request",
+          },
+          "401": {
+            description: "GGG OAuth state is invalid or expired",
+          },
+          "502": {
+            description: "GGG OAuth token exchange failed",
+          },
+          "503": {
+            description: "GGG OAuth browser link is not configured",
           },
         },
       },
@@ -1451,6 +1546,50 @@ export const openApiDocument = {
           },
         },
       },
+      GggOAuthStartRequest: {
+        type: "object",
+        required: ["account"],
+        properties: {
+          account: { type: "string", minLength: 1 },
+          redirectUri: { type: "string", format: "uri" },
+          scopes: {
+            type: "array",
+            items: { type: "string", minLength: 1 },
+          },
+        },
+      },
+      GggOAuthStartResponse: {
+        type: "object",
+        required: [
+          "source",
+          "account",
+          "authorizationUrl",
+          "state",
+          "expiresAt",
+          "redirectUri",
+          "requiredScopes",
+        ],
+        properties: {
+          source: { type: "string", enum: ["ggg-oauth-start"] },
+          account: { type: "string", minLength: 1 },
+          authorizationUrl: { type: "string", format: "uri" },
+          state: { type: "string", minLength: 1 },
+          expiresAt: { type: "string", format: "date-time" },
+          redirectUri: { type: "string", format: "uri" },
+          requiredScopes: {
+            type: "array",
+            items: { type: "string", minLength: 1 },
+          },
+        },
+      },
+      GggOAuthCompleteRequest: {
+        type: "object",
+        required: ["state", "code"],
+        properties: {
+          state: { type: "string", minLength: 1 },
+          code: { type: "string", minLength: 1 },
+        },
+      },
       GggOAuthTokenExchangeResponse: {
         type: "object",
         required: ["source", "account", "objectKey", "token"],
@@ -1910,6 +2049,11 @@ export type Poe2StoredTokenSnapshotCaptureRequest = z.infer<
 >;
 export type GggOAuthTokenExchangeRequest = z.infer<
   typeof gggOAuthTokenExchangeRequestSchema
+>;
+export type GggOAuthStartRequest = z.infer<typeof gggOAuthStartRequestSchema>;
+export type GggOAuthStartResponse = z.infer<typeof gggOAuthStartResponseSchema>;
+export type GggOAuthCompleteRequest = z.infer<
+  typeof gggOAuthCompleteRequestSchema
 >;
 export type GggOAuthTokenExchangeResponse = z.infer<
   typeof gggOAuthTokenExchangeResponseSchema

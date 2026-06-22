@@ -21,6 +21,9 @@ import {
   ladderBuildCollectionSchema,
   modCollectionSchema,
   openApiDocument,
+  gggOAuthCompleteRequestSchema,
+  gggOAuthStartRequestSchema,
+  gggOAuthStartResponseSchema,
   gggOAuthTokenExchangeRequestSchema,
   gggOAuthTokenExchangeResponseSchema,
   gggOAuthStatusResponseSchema,
@@ -45,6 +48,8 @@ import {
   GggOAuthTokenEncryptionError,
   capturePoe2CharacterSnapshot,
   createGggApiClient,
+  createGggOAuthAuthorizationUrl,
+  createGggOAuthPkcePair,
   decryptGggOAuthTokenSet,
   encryptGggOAuthTokenSet,
   exchangeGggOAuthAuthorizationCode,
@@ -74,6 +79,8 @@ type Bindings = {
 };
 
 export const api = new Hono<{ Bindings: Bindings }>();
+
+const gggOAuthPendingStateTtlMs = 10 * 60 * 1000;
 
 api.use("*", async (context, next) => {
   for (const [name, value] of Object.entries(getCorsHeaders())) {
@@ -331,6 +338,244 @@ api.get("/snapshots/:account", async (context) => {
       snapshots,
     }),
   );
+});
+
+api.post("/auth/ggg/start", async (context) => {
+  const rawBody = await readJsonBody(context);
+  const parsed = gggOAuthStartRequestSchema.safeParse(rawBody);
+
+  if (!parsed.success) {
+    return context.json({ error: "invalid GGG OAuth start request" }, 400);
+  }
+
+  const clientId = context.env.GGG_OAUTH_CLIENT_ID;
+  const snapshotBucket = context.env.SNAPSHOT_BUCKET;
+
+  if (!clientId || !snapshotBucket?.put) {
+    return context.json(
+      { error: "GGG OAuth browser link is not configured" },
+      503,
+    );
+  }
+
+  const requestedScopes = parsed.data.scopes ?? [
+    gggOAuthScopes.accountCharacters,
+  ];
+  const scopes = parseGggOAuthScopes(requestedScopes);
+
+  if (!scopes.ok || !scopes.scopes) {
+    return context.json({ error: "invalid GGG OAuth start request" }, 400);
+  }
+
+  try {
+    const now = new Date();
+    const expiresAt = new Date(
+      now.valueOf() + gggOAuthPendingStateTtlMs,
+    ).toISOString();
+    const state = createGggOAuthState();
+    const pkce = await createGggOAuthPkcePair();
+    const redirectUri =
+      parsed.data.redirectUri ?? getGggOAuthRedirectUri(context);
+    const authorizationUrl = createGggOAuthAuthorizationUrl({
+      clientId,
+      redirectUri,
+      scopes: scopes.scopes,
+      state,
+      pkce,
+    });
+
+    await snapshotBucket.put(
+      getGggOAuthPendingStateObjectKey(context, state),
+      JSON.stringify({
+        account: parsed.data.account,
+        provider: "ggg",
+        state,
+        codeVerifier: pkce.codeVerifier,
+        redirectUri,
+        scopes: scopes.scopes,
+        createdAt: now.toISOString(),
+        expiresAt,
+      }),
+      { httpMetadata: { contentType: "application/json; charset=utf-8" } },
+    );
+
+    return context.json(
+      gggOAuthStartResponseSchema.parse({
+        source: "ggg-oauth-start",
+        account: parsed.data.account,
+        authorizationUrl,
+        state,
+        expiresAt,
+        redirectUri,
+        requiredScopes: scopes.scopes,
+      }),
+      201,
+    );
+  } catch (error) {
+    if (error instanceof GggApiConfigurationError) {
+      return context.json({ error: "invalid GGG OAuth start request" }, 400);
+    }
+
+    throw error;
+  }
+});
+
+api.post("/auth/ggg/complete", async (context) => {
+  const rawBody = await readJsonBody(context);
+  const parsed = gggOAuthCompleteRequestSchema.safeParse(rawBody);
+
+  if (!parsed.success) {
+    return context.json({ error: "invalid GGG OAuth complete request" }, 400);
+  }
+
+  const clientId = context.env.GGG_OAUTH_CLIENT_ID;
+  const snapshotBucket = context.env.SNAPSHOT_BUCKET;
+
+  if (
+    !clientId ||
+    !context.env.GGG_TOKEN_ENCRYPTION_KEY ||
+    !snapshotBucket?.get ||
+    !snapshotBucket.put
+  ) {
+    return context.json(
+      { error: "GGG OAuth browser link is not configured" },
+      503,
+    );
+  }
+
+  let encryptionKey: Uint8Array;
+
+  try {
+    encryptionKey = parseGggTokenEncryptionKey(
+      context.env.GGG_TOKEN_ENCRYPTION_KEY,
+    );
+  } catch {
+    return context.json(
+      { error: "GGG OAuth browser link is not configured" },
+      503,
+    );
+  }
+
+  const pendingStateKey = getGggOAuthPendingStateObjectKey(
+    context,
+    parsed.data.state,
+  );
+  const pendingStateObject = await snapshotBucket.get(pendingStateKey);
+
+  if (!pendingStateObject) {
+    return context.json(
+      { error: "GGG OAuth state is invalid or expired" },
+      401,
+    );
+  }
+
+  const pendingState = parseStoredGggOAuthPendingState(
+    await pendingStateObject.text(),
+    parsed.data.state,
+    new Date(),
+  );
+
+  if (!pendingState) {
+    return context.json(
+      { error: "GGG OAuth state is invalid or expired" },
+      401,
+    );
+  }
+
+  const scopes = parseGggOAuthScopes(pendingState.scopes);
+
+  if (!scopes.ok || !scopes.scopes) {
+    return context.json(
+      { error: "GGG OAuth state is invalid or expired" },
+      401,
+    );
+  }
+
+  try {
+    const tokenSet = await exchangeGggOAuthAuthorizationCode({
+      clientId,
+      ...(context.env.GGG_OAUTH_CLIENT_SECRET
+        ? { clientSecret: context.env.GGG_OAUTH_CLIENT_SECRET }
+        : {}),
+      code: parsed.data.code,
+      codeVerifier: pendingState.codeVerifier,
+      redirectUri: pendingState.redirectUri,
+      scopes: scopes.scopes,
+      fetch: (url, init) => fetch(url, init),
+      now: new Date(),
+      ...(context.env.GGG_OAUTH_TOKEN_URL
+        ? { tokenUrl: context.env.GGG_OAUTH_TOKEN_URL }
+        : {}),
+    });
+    const account = tokenSet.username ?? pendingState.account;
+    const encryptedTokenSet = await encryptGggOAuthTokenSet(tokenSet, {
+      key: encryptionKey,
+    });
+    const objectKey = getGggOAuthTokenObjectKey(context, account);
+
+    await snapshotBucket.put(
+      objectKey,
+      JSON.stringify({
+        account,
+        provider: "ggg",
+        updatedAt: new Date().toISOString(),
+        token: buildStoredGggOAuthTokenMetadata(tokenSet),
+        encryptedTokenSet,
+      }),
+      { httpMetadata: { contentType: "application/json; charset=utf-8" } },
+    );
+    await snapshotBucket.put(
+      pendingStateKey,
+      JSON.stringify({
+        provider: "ggg",
+        state: parsed.data.state,
+        consumedAt: new Date().toISOString(),
+      }),
+      { httpMetadata: { contentType: "application/json; charset=utf-8" } },
+    );
+
+    return context.json(
+      gggOAuthTokenExchangeResponseSchema.parse({
+        source: "ggg-oauth-token-store",
+        account,
+        objectKey,
+        token: {
+          tokenType: "encrypted",
+          ...buildStoredGggOAuthTokenMetadata(tokenSet),
+        },
+      }),
+      201,
+    );
+  } catch (error) {
+    if (
+      error instanceof GggApiHttpError &&
+      (error.status === 401 || error.status === 403)
+    ) {
+      return context.json(
+        { error: "GGG OAuth code was rejected", status: error.status },
+        401,
+      );
+    }
+
+    if (
+      error instanceof GggApiConfigurationError ||
+      error instanceof GggOAuthTokenEncryptionError
+    ) {
+      return context.json(
+        { error: "GGG OAuth browser link is not configured" },
+        503,
+      );
+    }
+
+    if (error instanceof GggApiHttpError) {
+      return context.json(
+        { error: "GGG OAuth token exchange failed", status: error.status },
+        502,
+      );
+    }
+
+    throw error;
+  }
 });
 
 api.post("/auth/ggg/exchange", async (context) => {
@@ -1115,12 +1360,22 @@ function getGggOAuthTokenObjectKey(
   return `${prefix}/${encodeURIComponent(account)}/token.json`;
 }
 
+function getGggOAuthPendingStateObjectKey(
+  context: Context<{ Bindings: Bindings }>,
+  state: string,
+) {
+  const prefix = context.env.GGG_TOKEN_R2_PREFIX ?? "oauth/ggg";
+
+  return `${prefix}/pending/${encodeURIComponent(state)}.json`;
+}
+
 function isGggOAuthExchangeConfigured(
   context: Context<{ Bindings: Bindings }>,
 ) {
   return Boolean(
     context.env.GGG_OAUTH_CLIENT_ID &&
     context.env.GGG_TOKEN_ENCRYPTION_KEY &&
+    context.env.SNAPSHOT_BUCKET?.get &&
     context.env.SNAPSHOT_BUCKET?.put,
   );
 }
@@ -1130,10 +1385,10 @@ function isGggOAuthSnapshotCaptureConfigured(
 ) {
   return Boolean(
     context.env.GGG_OAUTH_CLIENT_ID &&
-      context.env.GGG_TOKEN_ENCRYPTION_KEY &&
-      context.env.GGG_USER_AGENT &&
-      context.env.SNAPSHOT_BUCKET?.get &&
-      context.env.SNAPSHOT_BUCKET?.put,
+    context.env.GGG_TOKEN_ENCRYPTION_KEY &&
+    context.env.GGG_USER_AGENT &&
+    context.env.SNAPSHOT_BUCKET?.get &&
+    context.env.SNAPSHOT_BUCKET?.put,
   );
 }
 
@@ -1174,6 +1429,20 @@ function parseGggTokenEncryptionKey(value: string | undefined) {
   return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 }
 
+function createGggOAuthState() {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  const encode = (globalThis as { btoa?: (value: string) => string }).btoa;
+
+  if (!encode) {
+    throw new GggApiConfigurationError("base64 encoding support is required.");
+  }
+
+  return encode(String.fromCharCode(...bytes))
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replace(/=+$/, "");
+}
+
 function buildStoredGggOAuthTokenMetadata(tokenSet: {
   expiresAt: string;
   scope: readonly string[];
@@ -1211,6 +1480,45 @@ function parseStoredGggOAuthTokenObject(raw: string, account: string) {
   return {
     encryptedTokenSet:
       value.encryptedTokenSet as unknown as EncryptedGggOAuthTokenSet,
+  };
+}
+
+function parseStoredGggOAuthPendingState(
+  raw: string,
+  state: string,
+  now: Date,
+) {
+  let value: unknown;
+
+  try {
+    value = JSON.parse(raw.replace(/^\uFEFF/, ""));
+  } catch {
+    return undefined;
+  }
+
+  if (
+    !isRecord(value) ||
+    value.provider !== "ggg" ||
+    value.state !== state ||
+    typeof value.account !== "string" ||
+    !value.account.trim() ||
+    typeof value.codeVerifier !== "string" ||
+    !value.codeVerifier.trim() ||
+    typeof value.redirectUri !== "string" ||
+    !value.redirectUri.trim() ||
+    !Array.isArray(value.scopes) ||
+    value.scopes.some((scope) => typeof scope !== "string" || !scope.trim()) ||
+    typeof value.expiresAt !== "string" ||
+    Date.parse(value.expiresAt) <= now.valueOf()
+  ) {
+    return undefined;
+  }
+
+  return {
+    account: value.account,
+    codeVerifier: value.codeVerifier,
+    redirectUri: value.redirectUri,
+    scopes: value.scopes,
   };
 }
 

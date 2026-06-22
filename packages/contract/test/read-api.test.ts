@@ -15,6 +15,9 @@ import {
   datasetSearchResponseSchema,
   economyCollectionSchema,
   gemCollectionSchema,
+  gggOAuthCompleteRequestSchema,
+  gggOAuthStartRequestSchema,
+  gggOAuthStartResponseSchema,
   gggOAuthStatusResponseSchema,
   ladderBuildCollectionSchema,
   modCollectionSchema,
@@ -761,6 +764,60 @@ describe("account snapshot contract", () => {
     );
     expect(
       openApiDocument.components.schemas.GggOAuthStatusResponse,
+    ).toBeDefined();
+  });
+
+  it("models browser-safe GGG OAuth start and complete requests without exposing PKCE secrets", () => {
+    const startRequest = gggOAuthStartRequestSchema.parse({
+      account: "example",
+      redirectUri: "https://calandra.pages.dev/auth/ggg/callback",
+      scopes: ["account:characters"],
+    });
+
+    expect(startRequest).toEqual({
+      account: "example",
+      redirectUri: "https://calandra.pages.dev/auth/ggg/callback",
+      scopes: ["account:characters"],
+    });
+
+    const startResponse = gggOAuthStartResponseSchema.parse({
+      source: "ggg-oauth-start",
+      account: "example",
+      authorizationUrl:
+        "https://www.pathofexile.com/oauth/authorize?client_id=ggg-client-id",
+      state: "oauth-state",
+      expiresAt: "2026-06-21T10:10:00.000Z",
+      redirectUri: "https://calandra.pages.dev/auth/ggg/callback",
+      requiredScopes: ["account:characters"],
+    });
+
+    expect(startResponse.source).toBe("ggg-oauth-start");
+    expect(JSON.stringify(startResponse)).not.toContain("codeVerifier");
+    expect(JSON.stringify(startResponse)).not.toContain("clientSecret");
+
+    const completeRequest = gggOAuthCompleteRequestSchema.parse({
+      state: "oauth-state",
+      code: "authorization-code",
+    });
+
+    expect(completeRequest).toEqual({
+      state: "oauth-state",
+      code: "authorization-code",
+    });
+    expect(openApiDocument.paths["/auth/ggg/start"]?.post?.operationId).toBe(
+      "startGggOAuthLink",
+    );
+    expect(openApiDocument.paths["/auth/ggg/complete"]?.post?.operationId).toBe(
+      "completeGggOAuthLink",
+    );
+    expect(
+      openApiDocument.components.schemas.GggOAuthStartRequest,
+    ).toBeDefined();
+    expect(
+      openApiDocument.components.schemas.GggOAuthStartResponse,
+    ).toBeDefined();
+    expect(
+      openApiDocument.components.schemas.GggOAuthCompleteRequest,
     ).toBeDefined();
   });
 
