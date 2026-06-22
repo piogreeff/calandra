@@ -20,6 +20,8 @@ import {
   economyCollectionSchema,
   priceCheckRequestSchema,
   priceCheckResponseSchema,
+  priceCheckTextRequestSchema,
+  priceCheckTextResponseSchema,
   snapshotUpgradeAdvisorRequestSchema,
   upgradeAdvisorRequestSchema,
   upgradeAdvisorResponseSchema,
@@ -38,6 +40,7 @@ export type CalandraMcpToolName =
   | "list_snapshots"
   | "get_snapshot"
   | "check_price"
+  | "check_price_text"
   | "get_economy";
 
 export interface CalandraMcpTool {
@@ -263,6 +266,19 @@ export function listCalandraMcpTools(): CalandraMcpTool[] {
       },
     },
     {
+      name: "check_price_text",
+      description:
+        "Parse raw Path of Exile 2 clipboard item text and check its price against Calandra's economy data.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          ...versionedToolProperties,
+          text: { type: "string", minLength: 1 },
+        },
+        required: ["league", "patch", "text"],
+      },
+    },
+    {
       name: "get_economy",
       description: "Fetch Calandra's economy prices for one league and patch.",
       inputSchema: {
@@ -336,6 +352,10 @@ export function createCalandraMcpServer(options: CalandraMcpServerOptions) {
         case "check_price":
           return jsonToolResult(
             await checkPrice(apiBaseUrl, fetchImplementation, input),
+          );
+        case "check_price_text":
+          return jsonToolResult(
+            await checkPriceText(apiBaseUrl, fetchImplementation, input),
           );
         case "get_economy":
           return jsonToolResult(
@@ -566,6 +586,22 @@ async function checkPrice(
 
   return priceCheckResponseSchema.parse(
     await fetchJson(fetchImplementation, `${apiBaseUrl}/price/check`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(request),
+    }),
+  );
+}
+
+async function checkPriceText(
+  apiBaseUrl: string,
+  fetchImplementation: FetchLike,
+  input: unknown,
+) {
+  const request = priceCheckTextRequestSchema.parse(input);
+
+  return priceCheckTextResponseSchema.parse(
+    await fetchJson(fetchImplementation, `${apiBaseUrl}/price/check-text`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(request),

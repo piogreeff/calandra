@@ -2,10 +2,10 @@ import { copyFile, mkdir, readdir, writeFile } from "node:fs/promises";
 import * as nativePath from "node:path";
 import { win32 } from "node:path";
 import {
-  priceCheckRequestSchema,
-  priceCheckResponseSchema,
+  priceCheckTextRequestSchema,
+  priceCheckTextResponseSchema,
   type Item,
-  type PriceCheckResponse,
+  type PriceCheckTextResponse,
 } from "@calandra/contract";
 import {
   parseClientLogText,
@@ -75,7 +75,7 @@ export interface ClipboardPriceCheckResult {
   actionId: string;
   capturedAt: string;
   capture: ClipboardItemCapture;
-  priceCheck: PriceCheckResponse;
+  priceCheck: PriceCheckTextResponse;
 }
 
 export interface BuildFileWriteRequest {
@@ -233,14 +233,14 @@ export async function priceClipboardItemText(
   request: ClipboardPriceCheckRequest,
 ): Promise<ClipboardPriceCheckResult> {
   const capture = captureClipboardItemText(clipboardText, request);
-  const priceCheckRequest = priceCheckRequestSchema.parse({
+  const priceCheckRequest = priceCheckTextRequestSchema.parse({
     league: request.league,
     patch: request.patch,
-    item: capture.contractItem,
+    text: clipboardText,
   });
   const fetchImplementation = request.fetch ?? fetch;
   const response = await fetchImplementation(
-    `${normalizeBaseUrl(request.apiBaseUrl)}/price/check`,
+    `${normalizeBaseUrl(request.apiBaseUrl)}/price/check-text`,
     {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -256,7 +256,7 @@ export async function priceClipboardItemText(
     actionId: capture.actionId,
     capturedAt: capture.capturedAt,
     capture,
-    priceCheck: priceCheckResponseSchema.parse(await response.json()),
+    priceCheck: priceCheckTextResponseSchema.parse(await response.json()),
   };
 }
 

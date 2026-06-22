@@ -21,6 +21,7 @@ describe("Calandra MCP tools", () => {
       "list_snapshots",
       "get_snapshot",
       "check_price",
+      "check_price_text",
       "get_economy",
     ]);
   });
@@ -833,6 +834,70 @@ describe("Calandra MCP tools", () => {
     });
   });
 
+  it("routes raw item text price checks to the parse-and-price endpoint", async () => {
+    const fetch = vi.fn(async () =>
+      jsonResponse({
+        source: "published-dataset",
+        league: "Dawn of the Hunt",
+        patch: "0.2.0",
+        item: {
+          id: "currency/divine-orb",
+          name: "Divine Orb",
+          category: "currency",
+          rarity: "currency",
+        },
+        parsedItem: {
+          itemClass: "Stackable Currency",
+          category: "currency",
+          rarity: "currency",
+          name: "Divine Orb",
+          properties: [{ name: "Stack Size", value: "1/10", augmented: false }],
+          requirements: [],
+          implicitMods: [],
+          explicitMods: [],
+          corrupted: false,
+          identified: true,
+        },
+        price: {
+          id: "divine-orb",
+          name: "Divine Orb",
+          chaosEquivalent: 142,
+          updatedAt: "2026-06-21T00:00:00.000Z",
+        },
+        matchedBy: "name",
+      }),
+    );
+    const server = createCalandraMcpServer({
+      apiBaseUrl: "https://calandra-api.workers.dev",
+      fetch,
+    });
+
+    const result = await server.callTool("check_price_text", {
+      league: "Dawn of the Hunt",
+      patch: "0.2.0",
+      text: "Item Class: Stackable Currency\nRarity: Currency\nDivine Orb",
+    });
+
+    expect(fetch).toHaveBeenCalledWith(
+      "https://calandra-api.workers.dev/price/check-text",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          league: "Dawn of the Hunt",
+          patch: "0.2.0",
+          text: "Item Class: Stackable Currency\nRarity: Currency\nDivine Orb",
+        }),
+      },
+    );
+    expect(parseToolJson(result)).toMatchObject({
+      item: { name: "Divine Orb" },
+      parsedItem: { itemClass: "Stackable Currency" },
+      price: { chaosEquivalent: 142 },
+      matchedBy: "name",
+    });
+  });
+
   it("rejects unknown tool names at runtime", async () => {
     const server = createCalandraMcpServer({
       apiBaseUrl: "https://calandra-api.workers.dev",
@@ -890,6 +955,7 @@ describe("Calandra MCP tools", () => {
         "list_snapshots",
         "get_snapshot",
         "check_price",
+        "check_price_text",
         "get_economy",
       ]);
 

@@ -149,6 +149,20 @@ Item Level: 67
           category: "body-armour",
           rarity: "rare",
         },
+        parsedItem: {
+          itemClass: "Body Armours",
+          category: "body-armour",
+          rarity: "rare",
+          name: "Dragon Shelter",
+          baseType: "Advanced Altar Robe",
+          itemLevel: 67,
+          properties: [],
+          requirements: [],
+          implicitMods: [],
+          explicitMods: ["+72 to maximum Life"],
+          corrupted: false,
+          identified: true,
+        },
         price: {
           id: "body-armour/dragon-shelter",
           name: "Dragon Shelter",
@@ -183,24 +197,29 @@ Item Level: 67
 
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(fetch).toHaveBeenCalledWith(
-      "https://calandra-api.workers.dev/price/check",
+      "https://calandra-api.workers.dev/price/check-text",
       {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           league: "Dawn of the Hunt",
           patch: "0.2.0",
-          item: {
-            id: "body-armour/dragon-shelter",
-            name: "Dragon Shelter",
-            category: "body-armour",
-            rarity: "rare",
-          },
+          text: `
+Item Class: Body Armours
+Rarity: Rare
+Dragon Shelter
+Advanced Altar Robe
+--------
+Item Level: 67
+--------
++72 to maximum Life
+`,
         }),
       },
     );
     expect(result.actionId).toBe("hotkey-price-001");
     expect(result.capture.contractItem.name).toBe("Dragon Shelter");
+    expect(result.priceCheck.parsedItem.itemLevel).toBe(67);
     expect(result.priceCheck.price?.chaosEquivalent).toBe(42);
   });
 
