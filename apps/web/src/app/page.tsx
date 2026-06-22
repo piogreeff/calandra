@@ -33,6 +33,7 @@ import {
   getDashboardLadderBuild,
   getDashboardLadderBuilds,
   getDashboardLatestSnapshot,
+  getDashboardPriceCheck,
   getDashboardSnapshotAdvisor,
   getDashboardSnapshotDiff,
   getDashboardSnapshots,
@@ -183,6 +184,7 @@ export default async function Home({
     snapshotList,
     ladderBuilds,
     craftingEstimate,
+    priceCheck,
   ] = await Promise.all([
     getDashboardDataset(),
     getDashboardGggOAuthStatus(),
@@ -194,6 +196,7 @@ export default async function Home({
     ),
     getDashboardLadderBuilds(),
     getDashboardCraftingEstimate(),
+    getDashboardPriceCheck(),
   ]);
   const latestSnapshot =
     snapshotList.snapshots[snapshotList.snapshots.length - 1];
@@ -500,6 +503,60 @@ export default async function Home({
                         "Estimate"}
                     </p>
                   </div>
+                </div>
+              </Panel>
+
+              <Panel
+                title="Clipboard price check"
+                icon={<WalletCards className="size-4" aria-hidden="true" />}
+              >
+                <div className="mb-3 rounded-md border border-info/30 bg-info/10 p-3 text-xs font-medium text-info">
+                  Parsed clipboard item - {priceCheck.response.source}
+                  {priceCheck.source === "fallback" ? " fallback" : ""}
+                </div>
+                <div className="rounded-md border border-base-300/70 bg-base-100/45 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs uppercase text-base-content/55">
+                        {priceCheck.response.parsedItem.itemClass}
+                      </p>
+                      <h3 className="truncate text-sm font-semibold text-base-content">
+                        {priceCheck.response.parsedItem.name}
+                      </h3>
+                    </div>
+                    <span className="shrink-0 rounded-md bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
+                      {priceCheck.response.price
+                        ? `${priceCheck.response.price.chaosEquivalent} chaos`
+                        : "No price"}
+                    </span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                    <div className="rounded-md bg-base-200/80 p-2">
+                      <p className="text-xs text-base-content/55">Matched</p>
+                      <p className="font-semibold text-base-content">
+                        {priceCheck.response.matchedBy
+                          ? `Matched by ${priceCheck.response.matchedBy}`
+                          : "No match"}
+                      </p>
+                    </div>
+                    <div className="rounded-md bg-base-200/80 p-2">
+                      <p className="text-xs text-base-content/55">Category</p>
+                      <p className="font-semibold capitalize text-base-content">
+                        {priceCheck.response.item.category}
+                      </p>
+                    </div>
+                  </div>
+                  {priceCheck.response.parsedItem.properties.length > 0 ? (
+                    <ul className="mt-3 space-y-1 text-xs leading-5 text-base-content/65">
+                      {priceCheck.response.parsedItem.properties
+                        .slice(0, 3)
+                        .map((property) => (
+                          <li key={`${property.name}-${property.value}`}>
+                            {property.name}: {property.value}
+                          </li>
+                        ))}
+                    </ul>
+                  ) : null}
                 </div>
               </Panel>
 

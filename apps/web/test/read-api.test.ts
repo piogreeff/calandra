@@ -6,6 +6,7 @@ import {
   getDashboardGggOAuthStatus,
   getDashboardLadderBuild,
   getDashboardLadderBuilds,
+  getDashboardPriceCheck,
   getDashboardSnapshotAdvisor,
   getDashboardSearch,
   getDashboardLatestSnapshot,
@@ -197,6 +198,78 @@ describe("dashboard read API client", () => {
 
     expect(crafting.source).toBe("fallback");
     expect(crafting.response.estimate.expectedCostChaos).toBe(8);
+  });
+
+  it("loads a raw clipboard price check from the typed API", async () => {
+    const fetchImplementation = vi.fn(
+      async (input: RequestInfo | URL, init) => {
+        expect(String(input)).toBe(
+          "https://calandra-api.piogreeff.workers.dev/price/check-text",
+        );
+        expect(init).toMatchObject({
+          method: "POST",
+          headers: { "content-type": "application/json" },
+        });
+        expect(JSON.parse(String(init?.body))).toMatchObject({
+          league: "Dawn of the Hunt",
+          patch: "0.2.0",
+          text: expect.stringContaining("Divine Orb"),
+        });
+
+        return Response.json({
+          source: "published-dataset",
+          league: "Dawn of the Hunt",
+          patch: "0.2.0",
+          item: {
+            id: "currency/divine-orb",
+            name: "Divine Orb",
+            category: "currency",
+            rarity: "currency",
+          },
+          parsedItem: {
+            itemClass: "Stackable Currency",
+            category: "currency",
+            rarity: "currency",
+            name: "Divine Orb",
+            properties: [
+              { name: "Stack Size", value: "1/10", augmented: false },
+            ],
+            requirements: [],
+            implicitMods: [],
+            explicitMods: [],
+            corrupted: false,
+            identified: true,
+          },
+          price: {
+            id: "divine-orb",
+            name: "Divine Orb",
+            chaosEquivalent: 142,
+            updatedAt: "2026-06-21T00:00:00.000Z",
+          },
+          matchedBy: "name",
+        });
+      },
+    );
+
+    const priceCheck = await getDashboardPriceCheck(
+      "https://calandra-api.piogreeff.workers.dev",
+      fetchImplementation,
+    );
+
+    expect(priceCheck.source).toBe("api");
+    expect(priceCheck.response.parsedItem.itemClass).toBe("Stackable Currency");
+    expect(priceCheck.response.price?.chaosEquivalent).toBe(142);
+  });
+
+  it("falls back to a demo raw clipboard price check when the API is unavailable", async () => {
+    const priceCheck = await getDashboardPriceCheck(
+      "https://calandra-api.piogreeff.workers.dev",
+      vi.fn(async () => new Response(null, { status: 503 })),
+    );
+
+    expect(priceCheck.source).toBe("fallback");
+    expect(priceCheck.response.parsedItem.name).toBe("Divine Orb");
+    expect(priceCheck.response.price?.chaosEquivalent).toBe(142);
   });
 
   it("loads grouped dataset search results from the typed search endpoint", async () => {

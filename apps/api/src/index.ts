@@ -34,11 +34,18 @@ import {
   poe2StoredTokenSnapshotCaptureRequestSchema,
   priceCheckRequestSchema,
   priceCheckResponseSchema,
+  priceCheckTextRequestSchema,
+  priceCheckTextResponseSchema,
   snapshotUpgradeAdvisorRequestSchema,
   upgradeAdvisorRequestSchema,
   upgradeAdvisorResponseSchema,
   uniqueCollectionSchema,
 } from "@calandra/contract";
+import {
+  ItemTextParseError,
+  parseItemText,
+  toContractItem,
+} from "@calandra/parser";
 import {
   compareBuyVsCraft,
   diffAccountSnapshots,
@@ -1248,7 +1255,10 @@ api.get("/economy/:league", async (context) => {
     return context.json({ error: "patch query parameter is required" }, 400);
   }
   const artifact = await getMatchingArtifact(context, { league, patch });
-  const responseVersion = getDatasetResponseVersion(artifact, { league, patch });
+  const responseVersion = getDatasetResponseVersion(artifact, {
+    league,
+    patch,
+  });
 
   return context.json(
     economyCollectionSchema.parse({
@@ -1295,6 +1305,42 @@ api.post("/price/check", async (context) => {
       source: "published-dataset",
       ...responseVersion,
       item: parsed.data.item,
+      price: priceMatch?.price ?? null,
+      matchedBy: priceMatch?.matchedBy ?? null,
+    }),
+  );
+});
+
+api.post("/price/check-text", async (context) => {
+  const rawBody = await readJsonBody(context);
+  const parsed = priceCheckTextRequestSchema.safeParse(rawBody);
+
+  if (!parsed.success) {
+    return context.json({ error: "invalid price check text request" }, 400);
+  }
+
+  let parsedItem: ReturnType<typeof parseItemText>;
+  try {
+    parsedItem = parseItemText(parsed.data.text);
+  } catch (error) {
+    if (error instanceof ItemTextParseError) {
+      return context.json({ error: "invalid item text" }, 400);
+    }
+
+    throw error;
+  }
+
+  const item = toContractItem(parsedItem);
+  const artifact = await getMatchingArtifact(context, parsed.data);
+  const responseVersion = getDatasetResponseVersion(artifact, parsed.data);
+  const priceMatch = findPriceMatch(artifact?.economy ?? [], item);
+
+  return context.json(
+    priceCheckTextResponseSchema.parse({
+      source: "published-dataset",
+      ...responseVersion,
+      item,
+      parsedItem,
       price: priceMatch?.price ?? null,
       matchedBy: priceMatch?.matchedBy ?? null,
     }),
@@ -1503,9 +1549,9 @@ function parseDatasetManifest(raw: string) {
 
 function parseDatasetLatestPointer(raw: string, league: string) {
   try {
-    const pointer = JSON.parse(raw.replace(/^\uFEFF/, "")) as Partial<
-      DatasetLatestPointer
-    >;
+    const pointer = JSON.parse(
+      raw.replace(/^\uFEFF/, ""),
+    ) as Partial<DatasetLatestPointer>;
 
     if (
       pointer.league !== league ||

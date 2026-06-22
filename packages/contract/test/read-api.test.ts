@@ -31,6 +31,8 @@ import {
   poe2StoredTokenSnapshotCaptureRequestSchema,
   priceCheckRequestSchema,
   priceCheckResponseSchema,
+  priceCheckTextRequestSchema,
+  priceCheckTextResponseSchema,
   snapshotUpgradeAdvisorRequestSchema,
   upgradeAdvisorRequestSchema,
   upgradeAdvisorResponseSchema,
@@ -683,6 +685,59 @@ describe("phase 1 read API contract", () => {
     );
     expect(openApiDocument.components.schemas.PriceCheckRequest).toBeDefined();
     expect(openApiDocument.components.schemas.PriceCheckResponse).toBeDefined();
+  });
+
+  it("models raw clipboard text price checks with parsed item details", () => {
+    const request = priceCheckTextRequestSchema.parse({
+      league: "Dawn of the Hunt",
+      patch: "0.2.0",
+      text: "Item Class: Stackable Currency\nRarity: Currency\nDivine Orb",
+    });
+
+    expect(request.text).toContain("Divine Orb");
+
+    const response = priceCheckTextResponseSchema.parse({
+      source: "published-dataset",
+      league: "Dawn of the Hunt",
+      patch: "0.2.0",
+      item: {
+        id: "currency/divine-orb",
+        name: "Divine Orb",
+        category: "currency",
+        rarity: "currency",
+      },
+      parsedItem: {
+        itemClass: "Stackable Currency",
+        category: "currency",
+        rarity: "currency",
+        name: "Divine Orb",
+        properties: [],
+        requirements: [],
+        implicitMods: [],
+        explicitMods: [],
+        corrupted: false,
+        identified: true,
+      },
+      price: {
+        id: "divine-orb",
+        name: "Divine Orb",
+        chaosEquivalent: 142,
+        updatedAt: "2026-06-21T00:00:00.000Z",
+      },
+      matchedBy: "name",
+    });
+
+    expect(response.parsedItem.name).toBe("Divine Orb");
+    expect(response.price?.chaosEquivalent).toBe(142);
+    expect(openApiDocument.paths["/price/check-text"]?.post?.operationId).toBe(
+      "checkPriceText",
+    );
+    expect(
+      openApiDocument.components.schemas.PriceCheckTextRequest,
+    ).toBeDefined();
+    expect(
+      openApiDocument.components.schemas.PriceCheckTextResponse,
+    ).toBeDefined();
   });
 });
 

@@ -1778,6 +1778,81 @@ describe("api routes", () => {
     });
   });
 
+  it("parses raw clipboard item text before checking price", async () => {
+    const response = await api.request(
+      "/price/check-text",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          league: "Dawn of the Hunt",
+          patch: "0.2.0",
+          text: `
+Item Class: Stackable Currency
+Rarity: Currency
+Divine Orb
+--------
+Stack Size: 1/10
+`,
+        }),
+      },
+      datasetEnv,
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      source: "published-dataset",
+      league: "Dawn of the Hunt",
+      patch: "0.2.0",
+      item: {
+        id: "currency/divine-orb",
+        name: "Divine Orb",
+        category: "currency",
+        rarity: "currency",
+      },
+      parsedItem: {
+        itemClass: "Stackable Currency",
+        category: "currency",
+        rarity: "currency",
+        name: "Divine Orb",
+        properties: [{ name: "Stack Size", value: "1/10", augmented: false }],
+        requirements: [],
+        implicitMods: [],
+        explicitMods: [],
+        corrupted: false,
+        identified: true,
+      },
+      price: {
+        id: "divine-orb",
+        name: "Divine Orb",
+        chaosEquivalent: 142,
+        updatedAt: "2026-06-21T00:00:00.000Z",
+      },
+      matchedBy: "name",
+    });
+  });
+
+  it("rejects raw clipboard text that is not a Path of Exile item", async () => {
+    const response = await api.request(
+      "/price/check-text",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          league: "Dawn of the Hunt",
+          patch: "0.2.0",
+          text: "hello world",
+        }),
+      },
+      datasetEnv,
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "invalid item text",
+    });
+  });
+
   it("rejects malformed price-check payloads", async () => {
     const response = await api.request(
       "/price/check",

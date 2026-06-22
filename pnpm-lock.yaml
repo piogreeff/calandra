@@ -38,6 +38,9 @@ importers:
       '@calandra/ggg-api':
         specifier: workspace:*
         version: link:../../packages/ggg-api
+      '@calandra/parser':
+        specifier: workspace:*
+        version: link:../../packages/parser
       hono:
         specifier: ^4.4.0
         version: 4.12.26

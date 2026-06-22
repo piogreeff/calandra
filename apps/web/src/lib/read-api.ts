@@ -16,6 +16,8 @@ import {
   itemCollectionSchema,
   ladderBuildCollectionSchema,
   ladderBuildSchema,
+  priceCheckTextRequestSchema,
+  priceCheckTextResponseSchema,
   snapshotUpgradeAdvisorRequestSchema,
   uniqueCollectionSchema,
   upgradeAdvisorResponseSchema,
@@ -32,6 +34,7 @@ import {
   type GggOAuthTokenExchangeResponse,
   type Item,
   type LadderBuild,
+  type PriceCheckTextResponse,
   type UniqueItem,
   type UpgradeAdvisorResponse,
 } from "@calandra/contract";
@@ -98,6 +101,11 @@ export type DashboardSnapshotAdvisor = {
 export type DashboardCraftingEstimate = {
   source: "api" | "fallback";
   response: DatasetCraftingEstimateResponse;
+};
+
+export type DashboardPriceCheck = {
+  source: "api" | "fallback";
+  response: PriceCheckTextResponse;
 };
 
 export type DashboardLadderBuildFilters = {
@@ -227,6 +235,17 @@ const dashboardCraftingRequest = datasetCraftingEstimateRequestSchema.parse({
   marketPriceChaos: 12,
 });
 
+const dashboardPriceCheckRequest = priceCheckTextRequestSchema.parse({
+  ...dashboardDatasetVersion,
+  text: `
+Item Class: Stackable Currency
+Rarity: Currency
+Divine Orb
+--------
+Stack Size: 1/10
+`,
+});
+
 const fallbackAdvisorResponse: UpgradeAdvisorResponse = {
   source: "deterministic-engine",
   upgrades: [
@@ -303,6 +322,36 @@ const fallbackCraftingEstimateResponse: DatasetCraftingEstimateResponse = {
       expectedCostChaos: 8,
     },
   },
+};
+
+const fallbackPriceCheckResponse: PriceCheckTextResponse = {
+  source: "published-dataset",
+  ...dashboardDatasetVersion,
+  item: {
+    id: "currency/divine-orb",
+    name: "Divine Orb",
+    category: "currency",
+    rarity: "currency",
+  },
+  parsedItem: {
+    itemClass: "Stackable Currency",
+    category: "currency",
+    rarity: "currency",
+    name: "Divine Orb",
+    properties: [{ name: "Stack Size", value: "1/10", augmented: false }],
+    requirements: [],
+    implicitMods: [],
+    explicitMods: [],
+    corrupted: false,
+    identified: true,
+  },
+  price: {
+    id: "divine-orb",
+    name: "Divine Orb",
+    chaosEquivalent: 142,
+    updatedAt: "2026-06-21T13:15:00.000Z",
+  },
+  matchedBy: "name",
 };
 
 function fallbackSnapshots(account: string): DashboardSnapshots {
@@ -461,6 +510,28 @@ export async function getDashboardCraftingEstimate(
       source: "fallback",
       response: fallbackCraftingEstimateResponse,
     };
+  }
+}
+
+export async function getDashboardPriceCheck(
+  apiBaseUrl = defaultApiBaseUrl,
+  fetchImplementation: typeof fetch = fetch,
+): Promise<DashboardPriceCheck> {
+  try {
+    const response = await fetchJson(
+      fetchImplementation,
+      `${apiBaseUrl}/price/check-text`,
+      priceCheckTextResponseSchema.parse,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(dashboardPriceCheckRequest),
+      },
+    );
+
+    return { source: "api", response };
+  } catch {
+    return { source: "fallback", response: fallbackPriceCheckResponse };
   }
 }
 

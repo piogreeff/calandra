@@ -80,6 +80,12 @@ describe("home dashboard", () => {
     expect(html).toContain("25.0%");
     expect(html).toContain("8 chaos");
     expect(html).toContain("Craft");
+    expect(html).toContain("Clipboard price check");
+    expect(html).toContain("Parsed clipboard item");
+    expect(html).toContain("Stackable Currency");
+    expect(html).toContain("Divine Orb");
+    expect(html).toContain("142 chaos");
+    expect(html).toContain("Matched by name");
     expect(html).toContain("calandra-api.piogreeff.workers.dev");
     expect(html).toContain("calandra.pages.dev");
     expect(html).toContain("Calandra Demo Wand");
@@ -279,6 +285,39 @@ function mockDashboardFetch() {
             expectedCostChaos: 8,
           },
         },
+      });
+    }
+
+    if (url.includes("/price/check-text")) {
+      return Response.json({
+        source: "published-dataset",
+        league: "Dawn of the Hunt",
+        patch: "0.2.0",
+        item: {
+          id: "currency/divine-orb",
+          name: "Divine Orb",
+          category: "currency",
+          rarity: "currency",
+        },
+        parsedItem: {
+          itemClass: "Stackable Currency",
+          category: "currency",
+          rarity: "currency",
+          name: "Divine Orb",
+          properties: [{ name: "Stack Size", value: "1/10", augmented: false }],
+          requirements: [],
+          implicitMods: [],
+          explicitMods: [],
+          corrupted: false,
+          identified: true,
+        },
+        price: {
+          id: "divine-orb",
+          name: "Divine Orb",
+          chaosEquivalent: 142,
+          updatedAt: "2026-06-21T00:00:00.000Z",
+        },
+        matchedBy: "name",
       });
     }
 

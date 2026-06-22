@@ -111,12 +111,48 @@ export const priceCheckRequestSchema = z.object({
   item: itemSchema,
 });
 
+export const parsedItemPropertySchema = z.object({
+  name: z.string().min(1),
+  value: z.string().min(1),
+  augmented: z.boolean(),
+});
+
+export const parsedItemRequirementSchema = z.object({
+  name: z.string().min(1),
+  value: z.number(),
+});
+
+export const parsedClipboardItemSchema = z.object({
+  itemClass: z.string().min(1),
+  category: z.string().min(1),
+  rarity: raritySchema,
+  name: z.string().min(1),
+  baseType: z.string().min(1).optional(),
+  itemLevel: z.number().int().nonnegative().optional(),
+  quality: z.number().nonnegative().optional(),
+  properties: z.array(parsedItemPropertySchema),
+  requirements: z.array(parsedItemRequirementSchema),
+  implicitMods: z.array(z.string().min(1)),
+  explicitMods: z.array(z.string().min(1)),
+  corrupted: z.boolean(),
+  identified: z.boolean(),
+});
+
+export const priceCheckTextRequestSchema = z.object({
+  ...versionedCollectionFields,
+  text: z.string().min(1),
+});
+
 export const priceCheckResponseSchema = z.object({
   source: z.literal("published-dataset"),
   ...versionedCollectionFields,
   item: itemSchema,
   price: economyPriceSchema.nullable(),
   matchedBy: priceCheckMatchTypeSchema.nullable(),
+});
+
+export const priceCheckTextResponseSchema = priceCheckResponseSchema.extend({
+  parsedItem: parsedClipboardItemSchema,
 });
 
 export const accountSnapshotGearItemSchema = z.object({
@@ -708,6 +744,36 @@ export const openApiDocument = {
           },
           "400": {
             description: "Invalid price check request",
+          },
+        },
+      },
+    },
+    "/price/check-text": {
+      post: {
+        operationId: "checkPriceText",
+        summary: "Parse raw clipboard item text and check its price",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/PriceCheckTextRequest" },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description:
+              "Parsed clipboard item and deterministic price check result",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/PriceCheckTextResponse",
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Invalid item text or price check request",
           },
         },
       },
@@ -1529,6 +1595,74 @@ export const openApiDocument = {
           item: { $ref: "#/components/schemas/Item" },
         },
       },
+      ParsedItemProperty: {
+        type: "object",
+        required: ["name", "value", "augmented"],
+        properties: {
+          name: { type: "string", minLength: 1 },
+          value: { type: "string", minLength: 1 },
+          augmented: { type: "boolean" },
+        },
+      },
+      ParsedItemRequirement: {
+        type: "object",
+        required: ["name", "value"],
+        properties: {
+          name: { type: "string", minLength: 1 },
+          value: { type: "number" },
+        },
+      },
+      ParsedClipboardItem: {
+        type: "object",
+        required: [
+          "itemClass",
+          "category",
+          "rarity",
+          "name",
+          "properties",
+          "requirements",
+          "implicitMods",
+          "explicitMods",
+          "corrupted",
+          "identified",
+        ],
+        properties: {
+          itemClass: { type: "string", minLength: 1 },
+          category: { type: "string", minLength: 1 },
+          rarity: { $ref: "#/components/schemas/Rarity" },
+          name: { type: "string", minLength: 1 },
+          baseType: { type: "string", minLength: 1 },
+          itemLevel: { type: "integer", minimum: 0 },
+          quality: { type: "number", minimum: 0 },
+          properties: {
+            type: "array",
+            items: { $ref: "#/components/schemas/ParsedItemProperty" },
+          },
+          requirements: {
+            type: "array",
+            items: { $ref: "#/components/schemas/ParsedItemRequirement" },
+          },
+          implicitMods: {
+            type: "array",
+            items: { type: "string", minLength: 1 },
+          },
+          explicitMods: {
+            type: "array",
+            items: { type: "string", minLength: 1 },
+          },
+          corrupted: { type: "boolean" },
+          identified: { type: "boolean" },
+        },
+      },
+      PriceCheckTextRequest: {
+        type: "object",
+        required: ["league", "patch", "text"],
+        properties: {
+          league: { type: "string", minLength: 1 },
+          patch: { type: "string", minLength: 1 },
+          text: { type: "string", minLength: 1 },
+        },
+      },
       PriceCheckResponse: {
         type: "object",
         required: ["source", "league", "patch", "item", "price", "matchedBy"],
@@ -1547,6 +1681,20 @@ export const openApiDocument = {
             nullable: true,
           },
         },
+      },
+      PriceCheckTextResponse: {
+        allOf: [
+          { $ref: "#/components/schemas/PriceCheckResponse" },
+          {
+            type: "object",
+            required: ["parsedItem"],
+            properties: {
+              parsedItem: {
+                $ref: "#/components/schemas/ParsedClipboardItem",
+              },
+            },
+          },
+        ],
       },
       LadderBuild: {
         type: "object",
@@ -2275,6 +2423,13 @@ export type EconomyCollection = z.infer<typeof economyCollectionSchema>;
 export type PriceCheckMatchType = z.infer<typeof priceCheckMatchTypeSchema>;
 export type PriceCheckRequest = z.infer<typeof priceCheckRequestSchema>;
 export type PriceCheckResponse = z.infer<typeof priceCheckResponseSchema>;
+export type ParsedItemProperty = z.infer<typeof parsedItemPropertySchema>;
+export type ParsedItemRequirement = z.infer<typeof parsedItemRequirementSchema>;
+export type ParsedClipboardItem = z.infer<typeof parsedClipboardItemSchema>;
+export type PriceCheckTextRequest = z.infer<typeof priceCheckTextRequestSchema>;
+export type PriceCheckTextResponse = z.infer<
+  typeof priceCheckTextResponseSchema
+>;
 export type PassiveTreeSummary = z.infer<typeof passiveTreeSummarySchema>;
 export type LadderBuild = z.infer<typeof ladderBuildSchema>;
 export type LadderBuildCollection = z.infer<typeof ladderBuildCollectionSchema>;
