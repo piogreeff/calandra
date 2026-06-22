@@ -299,13 +299,14 @@ function getUniqueImageCoverage(
   }
 
   const minimum = options.minimumUniqueImageCoverage ?? 0.95;
+  const resolved = artifact.uniques.filter(hasResolvedUniqueImage).length;
   const coverage = {
-    resolved: artifact.uniques.length,
+    resolved,
     expected: options.expectedUniqueCount,
     ratio:
       options.expectedUniqueCount === 0
         ? 1
-        : artifact.uniques.length / options.expectedUniqueCount,
+        : resolved / options.expectedUniqueCount,
     minimum,
   };
 
@@ -328,14 +329,19 @@ function validateUniqueImageCoverageGate(
 
   const ratio =
     coverage.expected === 0 ? 1 : coverage.resolved / coverage.expected;
+  const resolved = artifact.uniques.filter(hasResolvedUniqueImage).length;
 
   if (
-    coverage.resolved !== artifact.uniques.length ||
+    coverage.resolved !== resolved ||
     coverage.ratio !== ratio ||
     coverage.ratio < coverage.minimum
   ) {
     throw new Error("Dataset manifest unique image coverage mismatch");
   }
+}
+
+function hasResolvedUniqueImage(unique: DatasetArtifact["uniques"][number]) {
+  return unique.iconUrl.startsWith("https://");
 }
 
 function formatPercent(value: number) {

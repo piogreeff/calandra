@@ -235,6 +235,50 @@ describe("dataset artifact import", () => {
     ).rejects.toThrow("Unique image coverage 90.00% is below required 95.00%");
   });
 
+  it("counts only uniques with HTTPS icon URLs as resolved image coverage", async () => {
+    const directory = await mkdtemp(
+      join(tmpdir(), "calandra-dataset-icon-coverage-"),
+    );
+    const artifactPath = join(directory, "artifact.json");
+
+    await writeFile(
+      artifactPath,
+      JSON.stringify({
+        league: "Dawn of the Hunt",
+        patch: "0.2.0",
+        generatedAt: "2026-06-21T00:00:00.000Z",
+        source: "published-artifact",
+        sources: datasetSources,
+        items: [],
+        uniques: [
+          ...makeUniques(18),
+          {
+            id: "unique-with-insecure-icon",
+            name: "Unique With Insecure Icon",
+            category: "amulet",
+            rarity: "unique",
+            iconUrl: "http://web.poecdn.com/image/insecure-unique.png",
+            iconAttribution:
+              "Game art and item data are property of Grinding Gear Games.",
+          },
+        ],
+        mods: [],
+        gems: [],
+        economy: [],
+        ladderBuilds: [],
+      }),
+      "utf8",
+    );
+
+    await expect(
+      importDatasetArtifact({
+        artifactPath,
+        expectedUniqueCount: 20,
+        minimumUniqueImageCoverage: 0.95,
+      }),
+    ).rejects.toThrow("Unique image coverage 90.00% is below required 95.00%");
+  });
+
   it("publishes an artifact into the same object layout the API reads from R2", async () => {
     const directory = await mkdtemp(
       join(tmpdir(), "calandra-dataset-publish-"),
@@ -468,6 +512,73 @@ describe("dataset artifact import", () => {
       sources: datasetSources,
       counts: { items: 1 },
     });
+  });
+
+  it("rejects a manifest that overstates resolved HTTPS unique images", async () => {
+    const directory = await mkdtemp(
+      join(tmpdir(), "calandra-dataset-bad-image-gate-"),
+    );
+    const artifactPath = join(directory, "artifact.json");
+    const manifestPath = join(directory, "manifest.json");
+    const artifact = {
+      league: "Dawn of the Hunt",
+      patch: "0.2.0",
+      generatedAt: "2026-06-21T00:00:00.000Z",
+      source: "published-artifact",
+      sources: datasetSources,
+      items: [],
+      uniques: [
+        ...makeUniques(18),
+        {
+          id: "unique-with-insecure-icon",
+          name: "Unique With Insecure Icon",
+          category: "amulet",
+          rarity: "unique",
+          iconUrl: "http://web.poecdn.com/image/insecure-unique.png",
+          iconAttribution:
+            "Game art and item data are property of Grinding Gear Games.",
+        },
+      ],
+      mods: [],
+      gems: [],
+      economy: [],
+      ladderBuilds: [],
+    };
+    const artifactRaw = JSON.stringify(artifact);
+
+    await writeFile(artifactPath, artifactRaw, "utf8");
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        league: artifact.league,
+        patch: artifact.patch,
+        generatedAt: artifact.generatedAt,
+        artifactKey: "datasets/Dawn of the Hunt/0.2.0.json",
+        sha256: createHash("sha256").update(artifactRaw).digest("hex"),
+        sources: datasetSources,
+        counts: {
+          items: 0,
+          uniques: 19,
+          mods: 0,
+          gems: 0,
+          economy: 0,
+          ladderBuilds: 0,
+        },
+        qualityGates: {
+          uniqueImageCoverage: {
+            resolved: 19,
+            expected: 20,
+            ratio: 0.95,
+            minimum: 0.95,
+          },
+        },
+      }),
+      "utf8",
+    );
+
+    await expect(
+      importDatasetArtifact({ artifactPath, manifestPath }),
+    ).rejects.toThrow("Dataset manifest unique image coverage mismatch");
   });
 
   it("publishes an artifact and manifest to R2 with Wrangler commands", async () => {
