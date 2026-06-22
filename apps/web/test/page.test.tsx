@@ -43,6 +43,8 @@ describe("home dashboard", () => {
     expect(html).toContain("calandra-api.piogreeff.workers.dev");
     expect(html).toContain("calandra.pages.dev");
     expect(html).toContain("Calandra Demo Wand");
+    expect(html).toContain('alt="Calandra Demo Amulet icon"');
+    expect(html).toContain("https://calandra.pages.dev/demo-unique-placeholder.png");
     expect(html).toContain("Published R2 artifact");
     expect(html).toContain("Dataset manifest");
     expect(html).toContain("9aaa78cdba51");
@@ -126,7 +128,17 @@ function mockDashboardFetch() {
       return Response.json({
         league: "Dawn of the Hunt",
         patch: "0.2.0",
-        uniques: [],
+        uniques: [
+          {
+            id: "calandra-demo-amulet",
+            name: "Calandra Demo Amulet",
+            category: "amulet",
+            rarity: "unique",
+            iconUrl: "https://calandra.pages.dev/demo-unique-placeholder.png",
+            iconAttribution:
+              "Placeholder demo icon URL; no game art is bundled or served by this artifact.",
+          },
+        ],
       });
     }
 
@@ -164,7 +176,7 @@ function mockDashboardFetch() {
         },
         counts: {
           items: 1,
-          uniques: 0,
+          uniques: 1,
           mods: 0,
           gems: 0,
           economy: 1,
