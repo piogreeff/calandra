@@ -1,9 +1,14 @@
 import {
+  priceCheckRequestSchema,
+  priceCheckResponseSchema,
+  type PriceCheckResponse,
+  type Item,
+} from "@calandra/contract";
+import {
   parseClientLogText,
   parseItemText,
   toContractItem,
 } from "@calandra/parser";
-import type { Item } from "@calandra/contract";
 import type {
   ParsedClientLogLine,
   ParsedClipboardItem,
@@ -74,6 +79,20 @@ export type DesktopClipboardTextCapture = {
 export type DesktopClipboardItemCapture = DesktopClipboardTextCapture & {
   item: ParsedClipboardItem;
   contractItem: Item;
+};
+
+export type DesktopClipboardPriceCheckRequest =
+  DesktopClipboardItemCaptureRequest & {
+    apiBaseUrl: string;
+    league: string;
+    patch: string;
+  };
+
+export type DesktopClipboardPriceCheckResult = {
+  actionId: string;
+  capturedAt: string;
+  capture: DesktopClipboardItemCapture;
+  priceCheck: PriceCheckResponse;
 };
 
 export type DesktopOverlayModeRequest = {
@@ -284,6 +303,48 @@ export async function captureDesktopClipboardItem(
   };
 }
 
+export async function priceDesktopClipboardItem(
+  request: DesktopClipboardPriceCheckRequest,
+  {
+    globals = globalThis as TauriGlobals,
+    invoke,
+    fetchImplementation = fetch,
+  }: {
+    globals?: TauriGlobals;
+    invoke?: Invoke;
+    fetchImplementation?: typeof fetch;
+  } = {},
+): Promise<DesktopClipboardPriceCheckResult> {
+  const capture = await captureDesktopClipboardItem(request, {
+    globals,
+    ...(invoke ? { invoke } : {}),
+  });
+  const priceCheckRequest = priceCheckRequestSchema.parse({
+    league: request.league,
+    patch: request.patch,
+    item: capture.contractItem,
+  });
+  const response = await fetchImplementation(
+    `${normalizeBaseUrl(request.apiBaseUrl)}/price/check`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(priceCheckRequest),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Calandra price check failed with HTTP ${response.status}`);
+  }
+
+  return {
+    actionId: capture.actionId,
+    capturedAt: capture.capturedAt,
+    capture,
+    priceCheck: priceCheckResponseSchema.parse(await response.json()),
+  };
+}
+
 export async function setDesktopOverlayMode(
   request: DesktopOverlayModeRequest,
   {
@@ -388,6 +449,10 @@ export function isTauriRuntime(globals: TauriGlobals): boolean {
   return (
     globals.__TAURI__ !== undefined || globals.__TAURI_INTERNALS__ !== undefined
   );
+}
+
+function normalizeBaseUrl(value: string) {
+  return value.replace(/\/+$/, "");
 }
 
 async function loadTauriInvoke(): Promise<Invoke> {

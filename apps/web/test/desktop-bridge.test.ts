@@ -5,6 +5,7 @@ import {
   discoverDesktopLocalConfigBackupFiles,
   getDesktopPoe2Paths,
   isTauriRuntime,
+  priceDesktopClipboardItem,
   readDesktopClientLogAppend,
   readDesktopClientLogEvents,
   runDesktopLocalConfigBackup,
@@ -351,6 +352,91 @@ Item Level: 67
       capturedAt: "2026-06-21T18:45:00.000Z",
       userInitiated: true,
     });
+  });
+
+  it("prices a user-initiated clipboard item through the typed API", async () => {
+    const invoke = vi.fn(async () => ({
+      actionId: "clipboard-price-001",
+      capturedAt: "2026-06-21T18:45:00.000Z",
+      text: `
+Item Class: Body Armours
+Rarity: Rare
+Dragon Shelter
+Advanced Altar Robe
+--------
+Item Level: 67
+--------
++72 to maximum Life
+`,
+    }));
+    const fetchImplementation = vi.fn(async () =>
+      Response.json({
+        source: "published-dataset",
+        league: "Dawn of the Hunt",
+        patch: "0.2.0",
+        item: {
+          id: "body-armour/dragon-shelter",
+          name: "Dragon Shelter",
+          category: "body-armour",
+          rarity: "rare",
+        },
+        price: {
+          id: "body-armour/dragon-shelter",
+          name: "Dragon Shelter",
+          chaosEquivalent: 18,
+          updatedAt: "2026-06-21T18:30:00.000Z",
+        },
+        matchedBy: "id",
+      }),
+    );
+
+    await expect(
+      priceDesktopClipboardItem(
+        {
+          actionId: "clipboard-price-001",
+          capturedAt: "2026-06-21T18:45:00.000Z",
+          userInitiated: true,
+          apiBaseUrl: "https://calandra-api.piogreeff.workers.dev/",
+          league: "Dawn of the Hunt",
+          patch: "0.2.0",
+        },
+        {
+          globals: { __TAURI_INTERNALS__: {} },
+          invoke,
+          fetchImplementation,
+        },
+      ),
+    ).resolves.toMatchObject({
+      capture: {
+        contractItem: {
+          id: "body-armour/dragon-shelter",
+          name: "Dragon Shelter",
+        },
+      },
+      priceCheck: {
+        price: {
+          chaosEquivalent: 18,
+        },
+      },
+    });
+
+    expect(fetchImplementation).toHaveBeenCalledWith(
+      "https://calandra-api.piogreeff.workers.dev/price/check",
+      expect.objectContaining({
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          league: "Dawn of the Hunt",
+          patch: "0.2.0",
+          item: {
+            id: "body-armour/dragon-shelter",
+            name: "Dragon Shelter",
+            category: "body-armour",
+            rarity: "rare",
+          },
+        }),
+      }),
+    );
   });
 
   it("subscribes to pressed desktop clipboard hotkey events", async () => {

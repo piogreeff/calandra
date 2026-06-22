@@ -3,6 +3,7 @@ import {
   createAdvisorBuildExportRequest,
   createClipboardCaptureRequest,
   createClipboardHotkeyCaptureRequest,
+  createClipboardPriceCheckRequest,
   createLocalConfigBackupRequest,
   createOverlayModeRequest,
   defaultLocalBackupDirectory,
@@ -25,6 +26,24 @@ describe("DesktopPathsPanel helpers", () => {
       actionId: "clipboard-hotkey-2026-06-21T18-45-00-000Z",
       capturedAt: "2026-06-21T18:45:00.000Z",
       userInitiated: true,
+    });
+  });
+
+  it("builds a user-initiated clipboard price-check request", () => {
+    expect(
+      createClipboardPriceCheckRequest({
+        capturedAt: "2026-06-21T18:45:00.000Z",
+        apiBaseUrl: "https://calandra-api.piogreeff.workers.dev",
+        league: "Dawn of the Hunt",
+        patch: "0.2.0",
+      }),
+    ).toEqual({
+      actionId: "clipboard-price-2026-06-21T18-45-00-000Z",
+      capturedAt: "2026-06-21T18:45:00.000Z",
+      userInitiated: true,
+      apiBaseUrl: "https://calandra-api.piogreeff.workers.dev",
+      league: "Dawn of the Hunt",
+      patch: "0.2.0",
     });
   });
 

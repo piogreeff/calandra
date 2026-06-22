@@ -8,6 +8,7 @@ import {
   Loader2,
   MonitorUp,
   ScrollText,
+  WalletCards,
   XCircle,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -15,6 +16,7 @@ import {
   captureDesktopClipboardItem,
   discoverDesktopLocalConfigBackupFiles,
   getDesktopPoe2Paths,
+  priceDesktopClipboardItem,
   readDesktopClientLogEvents,
   runDesktopLocalConfigBackup,
   setDesktopOverlayMode,
@@ -24,6 +26,8 @@ import {
   type DesktopBuildFileWriteRequest,
   type DesktopClipboardItemCapture,
   type DesktopClipboardItemCaptureRequest,
+  type DesktopClipboardPriceCheckRequest,
+  type DesktopClipboardPriceCheckResult,
   type DesktopLocalBackupFileRequest,
   type DesktopLocalConfigBackupPlan,
   type DesktopLocalConfigBackupRequest,
@@ -31,6 +35,7 @@ import {
   type DesktopOverlayModeRequest,
   type DesktopPoe2PathState,
 } from "../lib/desktop-bridge";
+import { dashboardDatasetVersion, defaultApiBaseUrl } from "../lib/read-api";
 import type { ParsedClientLogLine } from "@calandra/parser";
 
 type DesktopPathsPanelState =
@@ -57,6 +62,12 @@ type ClipboardCaptureState =
   | { status: "success"; capture: DesktopClipboardItemCapture }
   | { status: "error"; message: string };
 
+type ClipboardPriceCheckState =
+  | { status: "idle" }
+  | { status: "running" }
+  | { status: "success"; result: DesktopClipboardPriceCheckResult }
+  | { status: "error"; message: string };
+
 type OverlayModeState =
   | { status: "idle"; overlayEnabled: boolean }
   | { status: "running"; overlayEnabled: boolean }
@@ -75,6 +86,7 @@ type ClientLogWatchState =
 export function DesktopPathsPanel({
   loadPaths = getDesktopPoe2Paths,
   captureClipboardItem = captureDesktopClipboardItem,
+  priceClipboardItem = priceDesktopClipboardItem,
   readClientLogEvents = readDesktopClientLogEvents,
   setOverlayMode = setDesktopOverlayMode,
   subscribeClipboardHotkey = subscribeDesktopClipboardHotkey,
@@ -88,6 +100,9 @@ export function DesktopPathsPanel({
   captureClipboardItem?: (
     request: DesktopClipboardItemCaptureRequest,
   ) => Promise<DesktopClipboardItemCapture>;
+  priceClipboardItem?: (
+    request: DesktopClipboardPriceCheckRequest,
+  ) => Promise<DesktopClipboardPriceCheckResult>;
   readClientLogEvents?: (request: {
     clientLogPath: string;
     offset: number;
@@ -122,6 +137,10 @@ export function DesktopPathsPanel({
   const [clipboardState, setClipboardState] = useState<ClipboardCaptureState>({
     status: "idle",
   });
+  const [priceCheckState, setPriceCheckState] =
+    useState<ClipboardPriceCheckState>({
+      status: "idle",
+    });
   const [buildExportState, setBuildExportState] =
     useState<AdvisorBuildExportState>({
       status: "idle",
@@ -213,6 +232,29 @@ export function DesktopPathsPanel({
     },
     [captureClipboardItem, now],
   );
+
+  async function handleClipboardPriceCheck() {
+    setPriceCheckState({ status: "running" });
+
+    try {
+      const result = await priceClipboardItem(
+        createClipboardPriceCheckRequest({
+          capturedAt: now().toISOString(),
+          apiBaseUrl: defaultApiBaseUrl,
+          league: dashboardDatasetVersion.league,
+          patch: dashboardDatasetVersion.patch,
+        }),
+      );
+
+      setPriceCheckState({ status: "success", result });
+    } catch (error) {
+      setPriceCheckState({
+        status: "error",
+        message:
+          error instanceof Error ? error.message : "Clipboard price check failed",
+      });
+    }
+  }
 
   async function handleOverlayToggle() {
     if (!paths) return;
@@ -411,6 +453,20 @@ export function DesktopPathsPanel({
           <ClipboardCaptureStatus state={clipboardState} />
           <button
             type="button"
+            className="btn btn-warning btn-sm w-full"
+            disabled={priceCheckState.status === "running"}
+            onClick={() => void handleClipboardPriceCheck()}
+          >
+            {priceCheckState.status === "running" ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <WalletCards className="size-4" aria-hidden="true" />
+            )}
+            Price clipboard item
+          </button>
+          <ClipboardPriceCheckStatus state={priceCheckState} />
+          <button
+            type="button"
             className="btn btn-info btn-sm w-full"
             disabled={buildExportState.status === "running"}
             onClick={() => void handleAdvisorBuildExport()}
@@ -461,6 +517,25 @@ export function createClipboardHotkeyCaptureRequest(
     "clipboard-hotkey",
     capturedAt,
   );
+}
+
+export function createClipboardPriceCheckRequest({
+  capturedAt,
+  apiBaseUrl,
+  league,
+  patch,
+}: {
+  capturedAt: string;
+  apiBaseUrl: string;
+  league: string;
+  patch: string;
+}): DesktopClipboardPriceCheckRequest {
+  return {
+    ...createClipboardCaptureRequestWithPrefix("clipboard-price", capturedAt),
+    apiBaseUrl,
+    league,
+    patch,
+  };
 }
 
 function createClipboardCaptureRequestWithPrefix(
@@ -558,6 +633,41 @@ function ClipboardCaptureStatus({ state }: { state: ClipboardCaptureState }) {
         </div>
         <p className="text-info/85">
           {state.capture.item.rarity} {state.capture.item.category}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-md border border-error/35 bg-error/10 p-3 text-xs text-error">
+      <div className="flex items-center gap-2 font-semibold">
+        <XCircle className="size-4" aria-hidden="true" />
+        <span>{state.message}</span>
+      </div>
+    </div>
+  );
+}
+
+function ClipboardPriceCheckStatus({
+  state,
+}: {
+  state: ClipboardPriceCheckState;
+}) {
+  if (state.status === "idle" || state.status === "running") {
+    return null;
+  }
+
+  if (state.status === "success") {
+    const price = state.result.priceCheck.price;
+
+    return (
+      <div className="rounded-md border border-warning/35 bg-warning/10 p-3 text-xs text-warning">
+        <div className="mb-1 flex items-center gap-2 font-semibold">
+          <CheckCircle2 className="size-4" aria-hidden="true" />
+          <span>{state.result.capture.contractItem.name}</span>
+        </div>
+        <p className="text-warning/85">
+          {price ? `${price.chaosEquivalent} chaos` : "No price match"}
         </p>
       </div>
     );
