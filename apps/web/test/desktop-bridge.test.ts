@@ -386,6 +386,20 @@ Item Level: 67
           chaosEquivalent: 18,
           updatedAt: "2026-06-21T18:30:00.000Z",
         },
+        parsedItem: {
+          itemClass: "Body Armours",
+          category: "body-armour",
+          rarity: "rare",
+          name: "Dragon Shelter",
+          baseType: "Advanced Altar Robe",
+          itemLevel: 67,
+          properties: [],
+          requirements: [],
+          implicitMods: [],
+          explicitMods: ["+72 to maximum Life"],
+          corrupted: false,
+          identified: true,
+        },
         matchedBy: "id",
       }),
     );
@@ -414,6 +428,9 @@ Item Level: 67
         },
       },
       priceCheck: {
+        parsedItem: {
+          itemLevel: 67,
+        },
         price: {
           chaosEquivalent: 18,
         },
@@ -421,19 +438,23 @@ Item Level: 67
     });
 
     expect(fetchImplementation).toHaveBeenCalledWith(
-      "https://calandra-api.piogreeff.workers.dev/price/check",
+      "https://calandra-api.piogreeff.workers.dev/price/check-text",
       expect.objectContaining({
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           league: "Dawn of the Hunt",
           patch: "0.2.0",
-          item: {
-            id: "body-armour/dragon-shelter",
-            name: "Dragon Shelter",
-            category: "body-armour",
-            rarity: "rare",
-          },
+          text: `
+Item Class: Body Armours
+Rarity: Rare
+Dragon Shelter
+Advanced Altar Robe
+--------
+Item Level: 67
+--------
++72 to maximum Life
+`,
         }),
       }),
     );

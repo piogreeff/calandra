@@ -1,7 +1,7 @@
 import {
-  priceCheckRequestSchema,
-  priceCheckResponseSchema,
-  type PriceCheckResponse,
+  priceCheckTextRequestSchema,
+  priceCheckTextResponseSchema,
+  type PriceCheckTextResponse,
   type Item,
 } from "@calandra/contract";
 import {
@@ -92,7 +92,7 @@ export type DesktopClipboardPriceCheckResult = {
   actionId: string;
   capturedAt: string;
   capture: DesktopClipboardItemCapture;
-  priceCheck: PriceCheckResponse;
+  priceCheck: PriceCheckTextResponse;
 };
 
 export type DesktopOverlayModeRequest = {
@@ -319,13 +319,13 @@ export async function priceDesktopClipboardItem(
     globals,
     ...(invoke ? { invoke } : {}),
   });
-  const priceCheckRequest = priceCheckRequestSchema.parse({
+  const priceCheckRequest = priceCheckTextRequestSchema.parse({
     league: request.league,
     patch: request.patch,
-    item: capture.contractItem,
+    text: capture.text,
   });
   const response = await fetchImplementation(
-    `${normalizeBaseUrl(request.apiBaseUrl)}/price/check`,
+    `${normalizeBaseUrl(request.apiBaseUrl)}/price/check-text`,
     {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -341,7 +341,7 @@ export async function priceDesktopClipboardItem(
     actionId: capture.actionId,
     capturedAt: capture.capturedAt,
     capture,
-    priceCheck: priceCheckResponseSchema.parse(await response.json()),
+    priceCheck: priceCheckTextResponseSchema.parse(await response.json()),
   };
 }
 
@@ -465,9 +465,8 @@ async function loadGlobalShortcutApi(): Promise<{
   registerShortcut: DesktopClipboardHotkeyRegister;
   unregisterShortcut: DesktopClipboardHotkeyUnregister;
 }> {
-  const { register, unregister } = await import(
-    "@tauri-apps/plugin-global-shortcut"
-  );
+  const { register, unregister } =
+    await import("@tauri-apps/plugin-global-shortcut");
 
   return {
     registerShortcut: register as DesktopClipboardHotkeyRegister,
