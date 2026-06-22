@@ -18,9 +18,7 @@ import {
   Trophy,
   WalletCards,
 } from "lucide-react";
-import type {
-  AccountSnapshot,
-} from "@calandra/contract";
+import type { AccountSnapshot } from "@calandra/contract";
 import { defaultTheme } from "../lib/theme";
 import { DatasetSearchPanel } from "../components/DatasetSearchPanel";
 import { DesktopPathsPanel } from "../components/DesktopPathsPanel";
@@ -179,46 +177,55 @@ export default async function Home({
   const selectedAccount = resolveSelectedAccount(await searchParams);
   const snapshotReadToken = process.env["SNAPSHOT_READ_TOKEN"]?.trim();
   const snapshotReadOptions = snapshotReadToken ? { snapshotReadToken } : {};
-  const [dataset, gggOAuthStatus, snapshotList, ladderBuilds, craftingEstimate] =
-    await Promise.all([
-      getDashboardDataset(),
-      getDashboardGggOAuthStatus(),
-      getDashboardSnapshots(
-        selectedAccount,
-        defaultApiBaseUrl,
-        fetch,
-        snapshotReadOptions,
-      ),
-      getDashboardLadderBuilds(),
-      getDashboardCraftingEstimate(),
-    ]);
+  const [
+    dataset,
+    gggOAuthStatus,
+    snapshotList,
+    ladderBuilds,
+    craftingEstimate,
+  ] = await Promise.all([
+    getDashboardDataset(),
+    getDashboardGggOAuthStatus(),
+    getDashboardSnapshots(
+      selectedAccount,
+      defaultApiBaseUrl,
+      fetch,
+      snapshotReadOptions,
+    ),
+    getDashboardLadderBuilds(),
+    getDashboardCraftingEstimate(),
+  ]);
   const latestSnapshot =
     snapshotList.snapshots[snapshotList.snapshots.length - 1];
-  const [snapshotDiff, latestSnapshotDetail, ladderBuildDetail, snapshotAdvisor] =
-    await Promise.all([
-      getDashboardSnapshotDiff(
-        snapshotList.account,
-        snapshotList.snapshots,
-        defaultApiBaseUrl,
-        fetch,
-        snapshotReadOptions,
-      ),
-      getDashboardLatestSnapshot(
-        snapshotList.account,
-        snapshotList.snapshots,
-        defaultApiBaseUrl,
-        fetch,
-        snapshotReadOptions,
-      ),
-      getDashboardLadderBuild(ladderBuilds.builds[0]?.id),
-      getDashboardSnapshotAdvisor(
-        snapshotList.account,
-        latestSnapshot?.snapshotId,
-        defaultApiBaseUrl,
-        fetch,
-        snapshotReadOptions,
-      ),
-    ]);
+  const [
+    snapshotDiff,
+    latestSnapshotDetail,
+    ladderBuildDetail,
+    snapshotAdvisor,
+  ] = await Promise.all([
+    getDashboardSnapshotDiff(
+      snapshotList.account,
+      snapshotList.snapshots,
+      defaultApiBaseUrl,
+      fetch,
+      snapshotReadOptions,
+    ),
+    getDashboardLatestSnapshot(
+      snapshotList.account,
+      snapshotList.snapshots,
+      defaultApiBaseUrl,
+      fetch,
+      snapshotReadOptions,
+    ),
+    getDashboardLadderBuild(ladderBuilds.builds[0]?.id),
+    getDashboardSnapshotAdvisor(
+      snapshotList.account,
+      latestSnapshot?.snapshotId,
+      defaultApiBaseUrl,
+      fetch,
+      snapshotReadOptions,
+    ),
+  ]);
   const endpointLabel = new URL(defaultApiBaseUrl).hostname;
   const datasetSource =
     dataset.source === "api" ? "Published R2 artifact" : "Demo fallback";
@@ -648,6 +655,14 @@ export default async function Home({
                         ladderBuildDetail.build?.id === build.id
                           ? ladderBuildDetail.build
                           : build;
+                      const passiveHighlights = [
+                        ...(buildDetail.passiveTree?.keystones ?? []).map(
+                          (name) => ({ kind: "Keystone", name }),
+                        ),
+                        ...(buildDetail.passiveTree?.notables ?? []).map(
+                          (name) => ({ kind: "Notable", name }),
+                        ),
+                      ].slice(0, 4);
 
                       return (
                         <article
@@ -679,9 +694,33 @@ export default async function Home({
                           ) : null}
                           {buildDetail.passiveSkillIds?.length ? (
                             <p className="mt-1 text-xs text-base-content/55">
-                              {buildDetail.passiveSkillIds.length} passive
-                              nodes tracked
+                              {buildDetail.passiveSkillIds.length} passive nodes
+                              tracked
                             </p>
+                          ) : null}
+                          {buildDetail.passiveTree ? (
+                            <div className="mt-3 border-t border-base-300/60 pt-3">
+                              <p className="text-xs font-medium uppercase text-base-content/55">
+                                Passive highlights
+                              </p>
+                              {passiveHighlights.length > 0 ? (
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {passiveHighlights.map((passive) => (
+                                    <span
+                                      key={`${passive.kind}-${passive.name}`}
+                                      className="rounded-md border border-primary/25 bg-primary/10 px-2 py-1 text-xs font-medium text-primary"
+                                    >
+                                      {passive.name}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : null}
+                              {buildDetail.passiveTree.summary ? (
+                                <p className="mt-2 text-xs leading-5 text-base-content/65">
+                                  {buildDetail.passiveTree.summary}
+                                </p>
+                              ) : null}
+                            </div>
                           ) : null}
                           {buildDetail.equipment?.length ? (
                             <p className="mt-1 text-xs text-base-content/55">

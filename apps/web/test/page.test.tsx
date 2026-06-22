@@ -40,9 +40,9 @@ describe("home dashboard", () => {
     expect(requestedUrls).toContain(
       "https://calandra-api.piogreeff.workers.dev/crafting/estimate-from-dataset?league=Dawn+of+the+Hunt&patch=0.2.0",
     );
-    expect(requestedUrls.some((url) => url.includes("/snapshots/example"))).toBe(
-      false,
-    );
+    expect(
+      requestedUrls.some((url) => url.includes("/snapshots/example")),
+    ).toBe(false);
     expect(html).toContain('value="RealAccount"');
     expect(html).toContain("snapshots/RealAccount/");
   });
@@ -84,7 +84,9 @@ describe("home dashboard", () => {
     expect(html).toContain("calandra.pages.dev");
     expect(html).toContain("Calandra Demo Wand");
     expect(html).toContain('alt="Calandra Demo Amulet icon"');
-    expect(html).toContain("https://calandra.pages.dev/demo-unique-placeholder.png");
+    expect(html).toContain(
+      "https://calandra.pages.dev/demo-unique-placeholder.png",
+    );
     expect(html).toContain("Published R2 artifact");
     expect(html).toContain("Dataset manifest");
     expect(html).toContain("9aaa78cdba51");
@@ -119,6 +121,13 @@ describe("home dashboard", () => {
     expect(html).toContain("#42");
     expect(html).toContain("Lightning Arrow");
     expect(html).toContain("1 gear item tracked");
+    expect(html).toContain("Passive highlights");
+    expect(html).toContain("Acrobatics");
+    expect(html).toContain("Gathering Winds");
+    expect(html).toContain("Far Shot");
+    expect(html).toContain(
+      "Projectile pathing with evasion keystone coverage.",
+    );
     expect(html).toContain("Open passive tree");
     expect(html).toContain(
       "https://poe.ninja/poe2/builds/dawn/character/example/CalandraTest/passive-tree",
@@ -224,6 +233,12 @@ function mockDashboardFetch() {
             passiveTreeUrl:
               "https://poe.ninja/poe2/builds/dawn/character/example/CalandraTest/passive-tree",
             passiveSkillIds: ["keystone-1", "notable-2"],
+            passiveTree: {
+              allocatedCount: 2,
+              keystones: ["Acrobatics"],
+              notables: ["Gathering Winds", "Far Shot"],
+              summary: "Projectile pathing with evasion keystone coverage.",
+            },
           },
         ],
       });
@@ -279,6 +294,12 @@ function mockDashboardFetch() {
         passiveTreeUrl:
           "https://poe.ninja/poe2/builds/dawn/character/example/CalandraTest/passive-tree",
         passiveSkillIds: ["keystone-1", "notable-2"],
+        passiveTree: {
+          allocatedCount: 2,
+          keystones: ["Acrobatics"],
+          notables: ["Gathering Winds", "Far Shot"],
+          summary: "Projectile pathing with evasion keystone coverage.",
+        },
         equipment: [
           {
             slot: "Gloves",
@@ -369,7 +390,11 @@ function mockDashboardFetch() {
       });
     }
 
-    if (url.includes("/advisor/snapshots/RealAccount/snapshot-2026-06-21T10-00-00Z?")) {
+    if (
+      url.includes(
+        "/advisor/snapshots/RealAccount/snapshot-2026-06-21T10-00-00Z?",
+      )
+    ) {
       return Response.json({
         source: "deterministic-engine",
         upgrades: [
@@ -508,7 +533,9 @@ function mockDashboardFetch() {
       });
     }
 
-    if (url.includes("/advisor/snapshots/example/snapshot-2026-06-21T10-00-00Z?")) {
+    if (
+      url.includes("/advisor/snapshots/example/snapshot-2026-06-21T10-00-00Z?")
+    ) {
       return Response.json({
         source: "deterministic-engine",
         upgrades: [

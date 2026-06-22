@@ -276,6 +276,11 @@ describe("dashboard read API client", () => {
             passiveTreeUrl:
               "https://poe.ninja/poe2/builds/dawn/character/example/CalandraTest/passive-tree",
             passiveSkillIds: ["keystone-1", "notable-2"],
+            passiveTree: {
+              allocatedCount: 2,
+              keystones: ["Acrobatics"],
+              notables: ["Gathering Winds", "Far Shot"],
+            },
             updatedAt: "2026-06-22T00:00:00.000Z",
           },
         ],
@@ -299,6 +304,10 @@ describe("dashboard read API client", () => {
       rank: 42,
       mainSkill: "Lightning Arrow",
       passiveSkillIds: ["keystone-1", "notable-2"],
+      passiveTree: expect.objectContaining({
+        keystones: ["Acrobatics"],
+        notables: ["Gathering Winds", "Far Shot"],
+      }),
     });
   });
 
@@ -311,6 +320,11 @@ describe("dashboard read API client", () => {
         className: "Deadeye",
         level: 92,
         passiveSkillIds: ["keystone-1", "notable-2"],
+        passiveTree: {
+          allocatedCount: 2,
+          keystones: ["Acrobatics"],
+          notables: ["Gathering Winds", "Far Shot"],
+        },
         equipment: [
           {
             slot: "Gloves",
@@ -339,6 +353,7 @@ describe("dashboard read API client", () => {
       slot: "Gloves",
       name: "Duskthread Grips",
     });
+    expect(build.build?.passiveTree?.keystones).toEqual(["Acrobatics"]);
   });
 
   it("falls back to demo ladder builds when the temporary API is unavailable", async () => {

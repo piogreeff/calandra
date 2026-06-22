@@ -190,6 +190,16 @@ const fallbackLadderBuilds: LadderBuild[] = [
     passiveTreeUrl:
       "https://poe.ninja/poe2/builds/runesofaldur/character/heygyus-0416/ResurrectGodAura/passive-tree",
     passiveSkillIds: ["aura-wheel", "spirit-path", "reservation"],
+    passiveTree: {
+      url: "https://poe.ninja/poe2/builds/runesofaldur/character/heygyus-0416/ResurrectGodAura/passive-tree",
+      allocatedCount: 95,
+      keystones: ["Acrobatics"],
+      notables: ["Aura wheel", "Spirit reservation", "Deflection"],
+      ascendancy: "Martial Artist",
+      classStart: "Monk",
+      summary:
+        "Aura pathing, spirit reservation, and defensive wheel coverage.",
+    },
     equipment: [
       {
         slot: "Gloves",
@@ -707,9 +717,7 @@ function getSnapshotReadRequestInit({
 }: DashboardSnapshotReadOptions): RequestInit | undefined {
   const token = snapshotReadToken?.trim();
 
-  return token
-    ? { headers: { authorization: `Bearer ${token}` } }
-    : undefined;
+  return token ? { headers: { authorization: `Bearer ${token}` } } : undefined;
 }
 
 function getSnapshotAdvisorRequestInit({

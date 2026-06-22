@@ -189,6 +189,15 @@ describe("api routes", () => {
           passiveTreeUrl:
             "https://poe.ninja/poe2/builds/dawn/character/example/CalandraTest/passive-tree",
           passiveSkillIds: ["keystone-1", "notable-2"],
+          passiveTree: {
+            url: "https://poe.ninja/poe2/builds/dawn/character/example/CalandraTest/passive-tree",
+            allocatedCount: 2,
+            keystones: ["Acrobatics"],
+            notables: ["Gathering Winds", "Far Shot"],
+            ascendancy: "Deadeye",
+            classStart: "Ranger",
+            summary: "Projectile pathing with evasion keystone coverage.",
+          },
           equipment: [
             {
               slot: "Gloves",
@@ -512,6 +521,15 @@ describe("api routes", () => {
             passiveTreeUrl:
               "https://poe.ninja/poe2/builds/dawn/character/example/CalandraTest/passive-tree",
             passiveSkillIds: ["keystone-1", "notable-2"],
+            passiveTree: {
+              url: "https://poe.ninja/poe2/builds/dawn/character/example/CalandraTest/passive-tree",
+              allocatedCount: 2,
+              keystones: ["Acrobatics"],
+              notables: ["Gathering Winds", "Far Shot"],
+              ascendancy: "Deadeye",
+              classStart: "Ranger",
+              summary: "Projectile pathing with evasion keystone coverage.",
+            },
             equipment: [
               {
                 slot: "Gloves",
@@ -538,6 +556,10 @@ describe("api routes", () => {
         id: "deadeye-1",
         character: "CalandraTest",
         passiveSkillIds: ["keystone-1", "notable-2"],
+        passiveTree: expect.objectContaining({
+          keystones: ["Acrobatics"],
+          notables: ["Gathering Winds", "Far Shot"],
+        }),
         equipment: [
           expect.objectContaining({
             slot: "Gloves",
@@ -901,22 +923,18 @@ describe("api routes", () => {
       },
     };
 
-    await expectJson(
-      "/items?league=Dawn%20of%20the%20Hunt&patch=latest",
-      env,
-      {
-        league: "Dawn of the Hunt",
-        patch: "0.2.0",
-        items: [
-          {
-            id: "expert-siphoning-wand",
-            name: "Expert Siphoning Wand",
-            category: "wand",
-            rarity: "magic",
-          },
-        ],
-      },
-    );
+    await expectJson("/items?league=Dawn%20of%20the%20Hunt&patch=latest", env, {
+      league: "Dawn of the Hunt",
+      patch: "0.2.0",
+      items: [
+        {
+          id: "expert-siphoning-wand",
+          name: "Expert Siphoning Wand",
+          category: "wand",
+          rarity: "magic",
+        },
+      ],
+    });
 
     expect(requestedKeys).toEqual([
       "datasets/Dawn of the Hunt/latest.json",

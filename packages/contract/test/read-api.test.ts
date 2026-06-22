@@ -273,6 +273,15 @@ describe("phase 1 read API contract", () => {
             passiveTreeUrl:
               "https://poe.ninja/poe2/builds/dawn/character/example/CalandraTest/passive-tree",
             passiveSkillIds: ["keystone-1", "notable-2"],
+            passiveTree: {
+              url: "https://poe.ninja/poe2/builds/dawn/character/example/CalandraTest/passive-tree",
+              allocatedCount: 2,
+              keystones: ["Acrobatics"],
+              notables: ["Gathering Winds", "Far Shot"],
+              ascendancy: "Deadeye",
+              classStart: "Ranger",
+              summary: "Projectile pathing with evasion keystone coverage.",
+            },
             updatedAt: "2026-06-22T00:00:00.000Z",
           },
         ],
@@ -296,6 +305,11 @@ describe("phase 1 read API contract", () => {
             passiveTreeUrl:
               "https://poe.ninja/poe2/builds/dawn/character/example/CalandraTest/passive-tree",
             passiveSkillIds: ["keystone-1", "notable-2"],
+            passiveTree: {
+              allocatedCount: 2,
+              keystones: ["Acrobatics"],
+              notables: ["Gathering Winds", "Far Shot"],
+            },
             updatedAt: "2026-06-22T00:00:00.000Z",
           },
         ],
@@ -304,6 +318,10 @@ describe("phase 1 read API contract", () => {
       rank: 42,
       mainSkill: "Lightning Arrow",
       passiveSkillIds: ["keystone-1", "notable-2"],
+      passiveTree: expect.objectContaining({
+        keystones: ["Acrobatics"],
+        notables: ["Gathering Winds", "Far Shot"],
+      }),
     });
     expect(
       ladderBuildSchema.parse({
@@ -380,12 +398,10 @@ describe("phase 1 read API contract", () => {
     );
     expect(openApiDocument.paths["/builds/ladder"]).toBeDefined();
     expect(openApiDocument.paths["/builds/ladder/{id}"]).toBeDefined();
-    expect(
-      openApiDocument.paths["/builds/ladder/{id}"]?.get?.operationId,
-    ).toBe("getLadderBuild");
-    expect(
-      openApiDocument.paths["/builds/ladder"]?.get?.parameters,
-    ).toEqual(
+    expect(openApiDocument.paths["/builds/ladder/{id}"]?.get?.operationId).toBe(
+      "getLadderBuild",
+    );
+    expect(openApiDocument.paths["/builds/ladder"]?.get?.parameters).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: "className", in: "query" }),
         expect.objectContaining({ name: "skill", in: "query" }),
@@ -404,6 +420,9 @@ describe("phase 1 read API contract", () => {
       type: "array",
       items: { type: "string", minLength: 1 },
     });
+    expect(
+      openApiDocument.components.schemas.LadderBuild.properties.passiveTree,
+    ).toEqual({ $ref: "#/components/schemas/PassiveTreeSummary" });
     expect(
       openApiDocument.components.schemas.LadderBuild.properties.equipment,
     ).toEqual({

@@ -129,6 +129,16 @@ export const accountSnapshotGearItemSchema = z.object({
   stats: z.record(z.number()).optional(),
 });
 
+export const passiveTreeSummarySchema = z.object({
+  url: z.string().url().optional(),
+  allocatedCount: z.number().int().nonnegative(),
+  keystones: z.array(z.string().min(1)),
+  notables: z.array(z.string().min(1)),
+  ascendancy: z.string().min(1).optional(),
+  classStart: z.string().min(1).optional(),
+  summary: z.string().min(1).optional(),
+});
+
 export const ladderBuildSchema = z.object({
   id: z.string().min(1),
   account: z.string().min(1),
@@ -140,6 +150,7 @@ export const ladderBuildSchema = z.object({
   profileUrl: z.string().url().optional(),
   passiveTreeUrl: z.string().url().optional(),
   passiveSkillIds: z.array(z.string().min(1)).optional(),
+  passiveTree: passiveTreeSummarySchema.optional(),
   equipment: z.array(accountSnapshotGearItemSchema).optional(),
   updatedAt: z.string().datetime().optional(),
 });
@@ -1554,11 +1565,31 @@ export const openApiDocument = {
             type: "array",
             items: { type: "string", minLength: 1 },
           },
+          passiveTree: { $ref: "#/components/schemas/PassiveTreeSummary" },
           equipment: {
             type: "array",
             items: { $ref: "#/components/schemas/AccountSnapshotGearItem" },
           },
           updatedAt: { type: "string", format: "date-time" },
+        },
+      },
+      PassiveTreeSummary: {
+        type: "object",
+        required: ["allocatedCount", "keystones", "notables"],
+        properties: {
+          url: { type: "string", format: "uri" },
+          allocatedCount: { type: "integer", minimum: 0 },
+          keystones: {
+            type: "array",
+            items: { type: "string", minLength: 1 },
+          },
+          notables: {
+            type: "array",
+            items: { type: "string", minLength: 1 },
+          },
+          ascendancy: { type: "string", minLength: 1 },
+          classStart: { type: "string", minLength: 1 },
+          summary: { type: "string", minLength: 1 },
         },
       },
       LadderBuildCollection: {
@@ -2244,6 +2275,7 @@ export type EconomyCollection = z.infer<typeof economyCollectionSchema>;
 export type PriceCheckMatchType = z.infer<typeof priceCheckMatchTypeSchema>;
 export type PriceCheckRequest = z.infer<typeof priceCheckRequestSchema>;
 export type PriceCheckResponse = z.infer<typeof priceCheckResponseSchema>;
+export type PassiveTreeSummary = z.infer<typeof passiveTreeSummarySchema>;
 export type LadderBuild = z.infer<typeof ladderBuildSchema>;
 export type LadderBuildCollection = z.infer<typeof ladderBuildCollectionSchema>;
 export type DatasetSearchResponse = z.infer<typeof datasetSearchResponseSchema>;
