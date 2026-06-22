@@ -414,15 +414,32 @@ export async function getDashboardSnapshotDiff(
 }
 
 function fallbackSearchResults(query: string): DashboardSearchResults {
+  const normalizedQuery = query.toLowerCase();
+  const matchedItems = normalizedQuery
+    ? fallbackDataset.items.filter((item) =>
+        [item.id, item.name, item.category, item.rarity].some((value) =>
+          value.toLowerCase().includes(normalizedQuery),
+        ),
+      )
+    : [];
+
   return {
     source: "fallback",
     ...dashboardDatasetVersion,
     query,
-    items: [],
-    uniques: [],
+    items: matchedItems.filter((item) => !isUniqueItem(item)),
+    uniques: matchedItems.filter(isUniqueItem),
     mods: [],
     gems: [],
   };
+}
+
+function isUniqueItem(item: Item | UniqueItem): item is UniqueItem {
+  return (
+    item.rarity === "unique" &&
+    typeof item.iconUrl === "string" &&
+    typeof item.iconAttribution === "string"
+  );
 }
 
 function fallbackLatestSnapshot(

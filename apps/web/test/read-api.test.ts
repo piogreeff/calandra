@@ -305,22 +305,48 @@ describe("dashboard read API client", () => {
     expect(JSON.stringify(completed)).not.toContain("access_token");
   });
 
-  it("returns empty fallback search results for blank or unavailable searches", async () => {
-    const blank = await getDashboardSearch(
-      "   ",
+  it("searches the demo dataset when the temporary search API is unavailable", async () => {
+    const unavailableAmulet = await getDashboardSearch(
+      "amulet",
       "https://calandra-api.piogreeff.workers.dev",
-      vi.fn(),
+      vi.fn(async () => new Response(null, { status: 503 })),
     );
-    const unavailable = await getDashboardSearch(
+    const unavailableDemo = await getDashboardSearch(
       "demo",
       "https://calandra-api.piogreeff.workers.dev",
       vi.fn(async () => new Response(null, { status: 503 })),
     );
 
+    expect(unavailableAmulet).toMatchObject({
+      source: "fallback",
+      query: "amulet",
+      items: [],
+      uniques: [
+        {
+          id: "calandra-demo-amulet",
+          name: "Calandra Demo Amulet",
+          iconUrl: "https://calandra.pages.dev/demo-unique-placeholder.png",
+        },
+      ],
+    });
+    expect(unavailableDemo.items.map((item) => item.name)).toEqual([
+      "Calandra Demo Wand",
+      "Calandra Demo Robe",
+    ]);
+    expect(unavailableDemo.uniques.map((item) => item.name)).toEqual([
+      "Calandra Demo Amulet",
+    ]);
+  });
+
+  it("returns an empty fallback search result for blank searches", async () => {
+    const blank = await getDashboardSearch(
+      "   ",
+      "https://calandra-api.piogreeff.workers.dev",
+      vi.fn(),
+    );
+
     expect(blank).toMatchObject({ source: "fallback", query: "" });
-    expect(unavailable).toMatchObject({ source: "fallback", query: "demo" });
     expect(blank.items).toEqual([]);
-    expect(unavailable.gems).toEqual([]);
   });
 
   it("loads account snapshot restore metadata from the typed API", async () => {
