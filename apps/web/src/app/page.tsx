@@ -17,7 +17,10 @@ import {
   Swords,
   WalletCards,
 } from "lucide-react";
-import type { UpgradeAdvisorResponse } from "@calandra/contract";
+import type {
+  AccountSnapshot,
+  UpgradeAdvisorResponse,
+} from "@calandra/contract";
 import { defaultTheme } from "../lib/theme";
 import { DatasetSearchPanel } from "../components/DatasetSearchPanel";
 import { DesktopPathsPanel } from "../components/DesktopPathsPanel";
@@ -28,6 +31,7 @@ import {
   defaultApiBaseUrl,
   getDashboardDataset,
   getDashboardGggOAuthStatus,
+  getDashboardLatestSnapshot,
   getDashboardSnapshotDiff,
   getDashboardSnapshots,
 } from "../lib/read-api";
@@ -90,7 +94,30 @@ const gggDisclaimer =
 const passiveTreeReferenceUrl =
   "https://poe.ninja/poe2/builds/runesofaldur/character/heygyus-0416/ResurrectGodAura/passive-tree";
 
-const visualLoadoutPreview = {
+type VisualLoadoutPreview = {
+  character: {
+    name: string;
+    className: string;
+    level: number;
+    league: string;
+  };
+  stats: Array<{ label: string; value: string }>;
+  equipment: Array<{
+    slot: string;
+    name: string;
+    rarity: string;
+    iconUrl: string;
+    stats: string[];
+  }>;
+  passiveTree: {
+    allocated: number;
+    focus: string;
+    source: string;
+    referenceUrl: string;
+  };
+};
+
+const fallbackVisualLoadoutPreview: VisualLoadoutPreview = {
   character: {
     name: "ResurrectGodAura",
     className: "Martial Artist",
@@ -161,10 +188,10 @@ export default async function Home() {
     getDashboardGggOAuthStatus(),
     getDashboardSnapshots("example"),
   ]);
-  const snapshotDiff = await getDashboardSnapshotDiff(
-    snapshotList.account,
-    snapshotList.snapshots,
-  );
+  const [snapshotDiff, latestSnapshotDetail] = await Promise.all([
+    getDashboardSnapshotDiff(snapshotList.account, snapshotList.snapshots),
+    getDashboardLatestSnapshot(snapshotList.account, snapshotList.snapshots),
+  ]);
   const endpointLabel = new URL(defaultApiBaseUrl).hostname;
   const datasetSource =
     dataset.source === "api" ? "Published R2 artifact" : "Demo fallback";
@@ -180,6 +207,9 @@ export default async function Home() {
   const latestSnapshot =
     snapshotList.snapshots[snapshotList.snapshots.length - 1];
   const latestDiff = snapshotDiff.diff;
+  const visualLoadoutPreview = createVisualLoadoutPreview(
+    latestSnapshotDetail.snapshot,
+  );
 
   return (
     <main className="min-h-screen">
@@ -634,7 +664,7 @@ export default async function Home() {
 function CharacterBuildPreviewPanel({
   loadout,
 }: {
-  loadout: typeof visualLoadoutPreview;
+  loadout: VisualLoadoutPreview;
 }) {
   return (
     <Panel
@@ -751,6 +781,85 @@ function CharacterBuildPreviewPanel({
   );
 }
 
+function createVisualLoadoutPreview(
+  snapshot: AccountSnapshot | null,
+): VisualLoadoutPreview {
+  const character = snapshot?.characters[0];
+
+  if (!character) {
+    return fallbackVisualLoadoutPreview;
+  }
+
+  return {
+    character: {
+      name: character.name,
+      className: character.className,
+      level: character.level,
+      league: character.league,
+    },
+    stats: buildSnapshotStatRows(snapshot),
+    equipment:
+      character.equipment.length > 0
+        ? character.equipment.map((item) => ({
+            slot: item.slot,
+            name: item.name,
+            rarity: item.rarity ?? "normal",
+            iconUrl:
+              item.iconUrl ?? demoItemIcon(item.slot, "#67e8f9", "#0e7490"),
+            stats: item.stats
+              ? Object.entries(item.stats)
+                  .slice(0, 2)
+                  .map(([key, value]) => `${formatStatLabel(key)} ${value}`)
+              : ["Snapshot gear item"],
+          }))
+        : fallbackVisualLoadoutPreview.equipment,
+    passiveTree: {
+      allocated: character.passiveSkillIds?.length ?? 0,
+      focus:
+        character.passiveSkillIds && character.passiveSkillIds.length > 0
+          ? "Latest account snapshot passive allocation"
+          : "No passive allocation data captured yet",
+      source: fallbackVisualLoadoutPreview.passiveTree.source,
+      referenceUrl: fallbackVisualLoadoutPreview.passiveTree.referenceUrl,
+    },
+  };
+}
+
+function buildSnapshotStatRows(snapshot: AccountSnapshot) {
+  const character = snapshot.characters[0];
+  const totals = new Map<string, number>();
+
+  for (const item of character?.equipment ?? []) {
+    for (const [key, value] of Object.entries(item.stats ?? {})) {
+      totals.set(key, (totals.get(key) ?? 0) + value);
+    }
+  }
+
+  const statRows = Array.from(totals.entries())
+    .slice(0, 4)
+    .map(([key, value]) => ({
+      label: formatStatLabel(key),
+      value: String(value),
+    }));
+
+  if (statRows.length > 0) {
+    return statRows;
+  }
+
+  return [
+    {
+      label: "Equipment items",
+      value: String(character?.equipment.length ?? 0),
+    },
+    {
+      label: "Passive nodes",
+      value: String(character?.passiveSkillIds?.length ?? 0),
+    },
+    { label: "Snapshot source", value: snapshot.source },
+    { label: "Captured", value: formatSnapshotTimestamp(snapshot.capturedAt) },
+  ];
+}
+
 function formatSnapshotTimestamp(value: string | undefined) {
   if (!value) {
     return "Pending";
@@ -805,6 +914,13 @@ function formatSnapshotDiffEmptyState(
   }
 
   return "Snapshot diff is unavailable from the temporary API.";
+}
+
+function formatStatLabel(value: string) {
+  return value
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[_-]/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function demoItemIcon(label: string, accent: string, shadow: string) {

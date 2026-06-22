@@ -152,6 +152,8 @@ export const accountSnapshotGearItemSchema = z.object({
   name: z.string().min(1),
   itemId: z.string().min(1).optional(),
   rarity: raritySchema.optional(),
+  iconUrl: z.string().url().optional(),
+  iconAttribution: z.string().min(1).optional(),
   stats: z.record(z.number()).optional(),
 });
 
@@ -1433,6 +1435,8 @@ export const openApiDocument = {
             type: "string",
             enum: ["normal", "magic", "rare", "unique", "gem", "currency"],
           },
+          iconUrl: { type: "string", format: "uri" },
+          iconAttribution: { type: "string", minLength: 1 },
           stats: { type: "object", additionalProperties: { type: "number" } },
         },
       },

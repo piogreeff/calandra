@@ -1,6 +1,7 @@
 import {
   accountSnapshotDiffSchema,
   accountSnapshotListResponseSchema,
+  accountSnapshotSchema,
   accountSnapshotStoredDiffRequestSchema,
   datasetManifestSchema,
   datasetSearchResponseSchema,
@@ -12,6 +13,7 @@ import {
   gggOAuthTokenExchangeResponseSchema,
   itemCollectionSchema,
   uniqueCollectionSchema,
+  type AccountSnapshot,
   type AccountSnapshotDiff,
   type AccountSnapshotListItem,
   type DatasetManifest,
@@ -52,6 +54,13 @@ export type DashboardSnapshotDiff = {
   reason: "ready" | "insufficient-snapshots" | "unavailable";
   account: string;
   diff: AccountSnapshotDiff | null;
+};
+
+export type DashboardLatestSnapshot = {
+  source: "api" | "fallback";
+  reason: "ready" | "no-snapshots" | "unavailable";
+  account: string;
+  snapshot: AccountSnapshot | null;
 };
 
 export type DashboardGggOAuthStatus = Omit<GggOAuthStatusResponse, "source"> & {
@@ -250,6 +259,38 @@ export async function getDashboardGggOAuthStatus(
   }
 }
 
+export async function getDashboardLatestSnapshot(
+  account: string,
+  snapshots: AccountSnapshotListItem[],
+  apiBaseUrl = defaultApiBaseUrl,
+  fetchImplementation: typeof fetch = fetch,
+): Promise<DashboardLatestSnapshot> {
+  const latestSnapshot = snapshots[snapshots.length - 1];
+
+  if (!latestSnapshot) {
+    return fallbackLatestSnapshot(account, "no-snapshots");
+  }
+
+  try {
+    const snapshot = await fetchJson(
+      fetchImplementation,
+      `${apiBaseUrl}/snapshots/${encodeURIComponent(
+        account,
+      )}/${encodeURIComponent(latestSnapshot.snapshotId)}`,
+      accountSnapshotSchema.parse,
+    );
+
+    return {
+      source: "api",
+      reason: "ready",
+      account,
+      snapshot,
+    };
+  } catch {
+    return fallbackLatestSnapshot(account, "unavailable");
+  }
+}
+
 export async function startDashboardGggOAuthLink(
   account: string,
   apiBaseUrl = defaultApiBaseUrl,
@@ -370,6 +411,18 @@ function fallbackSearchResults(query: string): DashboardSearchResults {
     uniques: [],
     mods: [],
     gems: [],
+  };
+}
+
+function fallbackLatestSnapshot(
+  account: string,
+  reason: Exclude<DashboardLatestSnapshot["reason"], "ready">,
+): DashboardLatestSnapshot {
+  return {
+    source: "fallback",
+    reason,
+    account,
+    snapshot: null,
   };
 }
 

@@ -25,11 +25,13 @@ describe("home dashboard", () => {
     expect(html).toContain("Character build preview");
     expect(html).toContain("Visual equipment");
     expect(html).toContain("Passive tree");
-    expect(html).toContain("95 passive nodes tracked");
+    expect(html).toContain("Level 45 Monk");
+    expect(html).toContain("2 passive nodes tracked");
     expect(html).toContain("Open passive tree reference");
     expect(html).toContain("Link-out reference only");
     expect(html).toContain("Duskthread Grips");
     expect(html).toContain('alt="Duskthread Grips"');
+    expect(html).toContain("https://calandra.pages.dev/demo-gloves.svg");
     expect(html).toContain('alt="Calandra Demo Amulet"');
     expect(html).toContain(
       "https://poe.ninja/poe2/builds/runesofaldur/character/heygyus-0416/ResurrectGodAura/passive-tree",
@@ -265,7 +267,26 @@ function mockDashboardFetch() {
             className: "Monk",
             level: 45,
             league: "Dawn of the Hunt",
-            equipment: [{ slot: "Gloves", name: "Duskthread Grips" }],
+            passiveSkillIds: ["passive-1", "passive-2"],
+            equipment: [
+              {
+                slot: "Gloves",
+                name: "Duskthread Grips",
+                rarity: "rare",
+                iconUrl: "https://calandra.pages.dev/demo-gloves.svg",
+                iconAttribution:
+                  "Synthetic Calandra demo icon; no game art is bundled.",
+                stats: { life: 65, fireResistance: 18 },
+              },
+              {
+                slot: "Amulet",
+                name: "Calandra Demo Amulet",
+                rarity: "unique",
+                iconUrl: "https://calandra.pages.dev/demo-amulet.svg",
+                iconAttribution:
+                  "Synthetic Calandra demo icon; no game art is bundled.",
+              },
+            ],
           },
         ],
         stashes: [

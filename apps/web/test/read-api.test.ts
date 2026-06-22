@@ -4,6 +4,7 @@ import {
   getDashboardDataset,
   getDashboardGggOAuthStatus,
   getDashboardSearch,
+  getDashboardLatestSnapshot,
   getDashboardSnapshotDiff,
   getDashboardSnapshots,
   startDashboardGggOAuthLink,
@@ -353,6 +354,63 @@ describe("dashboard read API client", () => {
     expect(snapshots.snapshots[0]?.snapshotId).toBe(
       "snapshot-2026-06-21T10-00-00Z",
     );
+  });
+
+  it("loads the latest account snapshot detail with visual gear metadata", async () => {
+    const fetchImplementation = vi.fn(async (input: RequestInfo | URL) => {
+      expect(String(input)).toBe(
+        "https://calandra-api.piogreeff.workers.dev/snapshots/example/snapshot-2026-06-21T10-00-00Z",
+      );
+
+      return Response.json({
+        id: "snapshot-2026-06-21T10-00-00Z",
+        account: "example",
+        capturedAt: "2026-06-21T10:00:00.000Z",
+        source: "manual-import",
+        capabilities: { characters: true, stashes: true },
+        characters: [
+          {
+            id: "char-1",
+            name: "Monkette",
+            className: "Monk",
+            level: 45,
+            league: "Dawn of the Hunt",
+            passiveSkillIds: ["passive-1", "passive-2"],
+            equipment: [
+              {
+                slot: "Gloves",
+                name: "Duskthread Grips",
+                rarity: "rare",
+                iconUrl: "https://calandra.pages.dev/demo-gloves.svg",
+                iconAttribution:
+                  "Synthetic Calandra demo icon; no game art is bundled.",
+                stats: { life: 65, fireResistance: 18 },
+              },
+            ],
+          },
+        ],
+        stashes: [],
+      });
+    });
+
+    const snapshot = await getDashboardLatestSnapshot(
+      "example",
+      [
+        {
+          account: "example",
+          snapshotId: "snapshot-2026-06-21T10-00-00Z",
+          objectKey: "snapshots/example/snapshot-2026-06-21T10-00-00Z.json",
+        },
+      ],
+      "https://calandra-api.piogreeff.workers.dev",
+      fetchImplementation,
+    );
+
+    expect(snapshot.source).toBe("api");
+    expect(snapshot.snapshot?.characters[0]?.equipment[0]?.iconUrl).toBe(
+      "https://calandra.pages.dev/demo-gloves.svg",
+    );
+    expect(snapshot.snapshot?.characters[0]?.passiveSkillIds).toHaveLength(2);
   });
 
   it("falls back to empty snapshot restore metadata when the API is unavailable", async () => {

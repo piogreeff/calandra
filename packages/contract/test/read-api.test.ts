@@ -546,6 +546,9 @@ describe("account snapshot contract", () => {
               slot: "gloves",
               name: "Duskthread Grips",
               rarity: "rare",
+              iconUrl: "https://calandra.pages.dev/demo-gloves.svg",
+              iconAttribution:
+                "Synthetic Calandra demo icon; no game art is bundled.",
               stats: {
                 life: 65,
                 fireResistance: 18,
@@ -562,6 +565,12 @@ describe("account snapshot contract", () => {
       characters: true,
       stashes: false,
     });
+    expect(snapshot.characters[0]?.equipment[0]?.iconUrl).toBe(
+      "https://calandra.pages.dev/demo-gloves.svg",
+    );
+    expect(snapshot.characters[0]?.equipment[0]?.iconAttribution).toContain(
+      "Synthetic Calandra demo icon",
+    );
     expect(snapshot.stashes).toBeUndefined();
   });
 
@@ -647,6 +656,14 @@ describe("account snapshot contract", () => {
     ).toEqual({
       $ref: "#/components/schemas/AccountSnapshotCapabilities",
     });
+    expect(
+      openApiDocument.components.schemas.AccountSnapshotGearItem.properties
+        .iconUrl,
+    ).toEqual({ type: "string", format: "uri" });
+    expect(
+      openApiDocument.components.schemas.AccountSnapshotGearItem.properties
+        .iconAttribution,
+    ).toEqual({ type: "string", minLength: 1 });
   });
 
   it("models persisted account snapshot write responses", () => {
