@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import {
   type DashboardGggOAuthStatus,
   startDashboardGggOAuthLink,
@@ -19,6 +19,10 @@ export function GggOAuthLinkPanel({
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const canLink = status.features.accountLinking;
+
+  useEffect(() => {
+    setAccount(resolveInitialGggAccount(defaultAccount, window.location.search));
+  }, [defaultAccount]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -112,4 +116,13 @@ export function GggOAuthLinkPanel({
 
 function formatBooleanReady(value: boolean) {
   return value ? "Ready" : "Pending";
+}
+
+export function resolveInitialGggAccount(
+  defaultAccount: string,
+  search: string | undefined,
+) {
+  const account = new URLSearchParams(search).get("account")?.trim();
+
+  return account || defaultAccount;
 }
