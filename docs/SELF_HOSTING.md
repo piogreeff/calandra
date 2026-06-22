@@ -9,7 +9,7 @@ Calandra is open source and you can run your own backend. Note the split:
 
 You **do** run: the API (Workers), the web UI, and optionally a Neon database for your own account snapshots.
 
-You **do not** run: scrapers. Game data is published by the maintainer as a versioned dataset per `{league, patch}`; your instance downloads and imports it. Please do not point your own scrapers at poe2db or poe.ninja — that's both unnecessary and against the project's rules.
+You **do not** run: scrapers. Game data is published by the maintainer as a versioned dataset per `{league, patch}`; your instance downloads and imports it. The maintainer ingestion allowlist is poe2db for game data and poe.ninja for economy data; Mobalytics and Maxroll are never used. Please do not point your own scrapers at poe2db or poe.ninja — that's both unnecessary and against the project's rules.
 
 ## Prerequisites
 

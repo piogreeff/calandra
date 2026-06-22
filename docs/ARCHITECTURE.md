@@ -35,7 +35,7 @@ Crucially, the agent stays within Grinding Gear Games' third-party policy: it is
 
 ## Data layer
 
-The maintainer runs the ingest pipeline (game data from poe2db, economy from poe.ninja) on a schedule and publishes a **versioned dataset per `{league, patch}`**. Item images are cached and served with attribution. Self-hosters and clients consume the published dataset rather than scraping — this keeps upstream sites unburdened and self-hosting simple. Economy prices are cached hot in KV (~4h, matching the in-game refresh) with history in Postgres.
+The maintainer runs the ingest pipeline (game data from poe2db, economy from poe.ninja) on a schedule and publishes a **versioned dataset per `{league, patch}`**. Mobalytics and Maxroll are never ingestion sources. Item images are cached and served with attribution. Self-hosters and clients consume the published dataset rather than scraping — this keeps upstream sites unburdened and self-hosting simple. Economy prices are cached hot in KV (~4h, matching the in-game refresh) with history in Postgres.
 
 ## AI layer
 
