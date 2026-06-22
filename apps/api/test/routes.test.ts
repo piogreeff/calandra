@@ -589,6 +589,44 @@ describe("api routes", () => {
     );
   });
 
+  it("serves cached item images from the dataset R2 bucket", async () => {
+    const requestedKeys: string[] = [];
+    const pngBytes = Uint8Array.from([137, 80, 78, 71]);
+    const response = await api.request(
+      "/images/Dawn%20of%20the%20Hunt/0.2.0/uniques/choir-of-the-storm.png",
+      undefined,
+      {
+        DATA_BUCKET: {
+          async get(key: string) {
+            requestedKeys.push(key);
+
+            return {
+              httpMetadata: { contentType: "image/png" },
+              async arrayBuffer() {
+                return pngBytes.buffer;
+              },
+              async text() {
+                return "";
+              },
+            };
+          },
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("image/png");
+    expect(response.headers.get("cache-control")).toBe(
+      "public, max-age=31536000, immutable",
+    );
+    expect(requestedKeys).toEqual([
+      "images/Dawn of the Hunt/0.2.0/uniques/choir-of-the-storm.png",
+    ]);
+    expect([...new Uint8Array(await response.arrayBuffer())]).toEqual([
+      137, 80, 78, 71,
+    ]);
+  });
+
   it("returns one ladder build detail with equipment and passive tree data", async () => {
     await expectJson(
       "/builds/ladder/deadeye-1?league=Dawn%20of%20the%20Hunt&patch=0.2.0",

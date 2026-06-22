@@ -448,6 +448,19 @@ describe("phase 1 read API contract", () => {
       openApiDocument.components.schemas.DatasetManifest.properties
         .qualityGates,
     ).toEqual({ $ref: "#/components/schemas/DatasetQualityGates" });
+    expect(openApiDocument.paths["/images/{key}"]?.get?.operationId).toBe(
+      "getDatasetImage",
+    );
+    expect(
+      openApiDocument.paths["/images/{key}"]?.get?.responses["200"],
+    ).toEqual({
+      description: "Cached item image bytes",
+      content: {
+        "image/png": {
+          schema: { type: "string", format: "binary" },
+        },
+      },
+    });
   });
 
   it("models deterministic upgrade advisor requests and responses", () => {

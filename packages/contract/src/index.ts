@@ -912,6 +912,35 @@ export const openApiDocument = {
         },
       },
     },
+    "/images/{key}": {
+      get: {
+        operationId: "getDatasetImage",
+        summary: "Get one cached dataset image",
+        parameters: [
+          {
+            name: "key",
+            in: "path",
+            required: true,
+            schema: { type: "string", minLength: 1 },
+            description:
+              "Path below the images prefix, for example Dawn of the Hunt/0.2.0/uniques/choir-of-the-storm.png",
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Cached item image bytes",
+            content: {
+              "image/png": {
+                schema: { type: "string", format: "binary" },
+              },
+            },
+          },
+          "404": {
+            description: "Cached image not found",
+          },
+        },
+      },
+    },
     "/snapshots/diff": {
       post: {
         operationId: "diffAccountSnapshots",
@@ -2649,7 +2678,5 @@ export type UniqueImageCoverage = z.infer<typeof uniqueImageCoverageSchema>;
 export type DatasetQualityGates = z.infer<typeof datasetQualityGatesSchema>;
 export type DatasetManifest = z.infer<typeof datasetManifestSchema>;
 export type DatasetVisualItem = z.infer<typeof datasetVisualItemSchema>;
-export type DatasetVisualCategory = z.infer<
-  typeof datasetVisualCategorySchema
->;
+export type DatasetVisualCategory = z.infer<typeof datasetVisualCategorySchema>;
 export type DatasetVisualSummary = z.infer<typeof datasetVisualSummarySchema>;

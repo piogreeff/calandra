@@ -131,6 +131,28 @@ api.get("/openapi.json", (context) => {
   return context.json(openApiDocument);
 });
 
+api.get("/images/*", async (context) => {
+  const imageKey = getImageObjectKey(context.req.path);
+
+  if (!imageKey.ok) {
+    return context.json({ error: "invalid image key" }, 400);
+  }
+
+  const object = await context.env.DATA_BUCKET?.get(imageKey.key);
+
+  if (!object?.arrayBuffer) {
+    return context.json({ error: "image not found" }, 404);
+  }
+
+  context.header(
+    "Content-Type",
+    object.httpMetadata?.contentType ?? "application/octet-stream",
+  );
+  context.header("Cache-Control", "public, max-age=31536000, immutable");
+
+  return context.body(await object.arrayBuffer());
+});
+
 api.get("/auth/ggg/status", (context) => {
   const accountLinking = isGggOAuthExchangeConfigured(context);
   const snapshotCapture = isGggOAuthSnapshotCaptureConfigured(context);
@@ -1346,8 +1368,7 @@ api.post("/price/check-text", async (context) => {
       item,
       parsedItem,
       price: priceMatch?.price ?? baseTypePriceMatch?.price ?? null,
-      matchedBy:
-        priceMatch?.matchedBy ?? baseTypePriceMatch?.matchedBy ?? null,
+      matchedBy: priceMatch?.matchedBy ?? baseTypePriceMatch?.matchedBy ?? null,
     }),
   );
 });
@@ -2396,6 +2417,32 @@ function getCorsHeaders() {
   };
 }
 
+function getImageObjectKey(path: string) {
+  const prefix = "/images/";
+
+  if (!path.startsWith(prefix)) {
+    return { ok: false as const };
+  }
+
+  const encodedKey = path.slice(prefix.length);
+
+  if (!encodedKey) {
+    return { ok: false as const };
+  }
+
+  const decodedKey = decodeURIComponent(encodedKey);
+  const parts = decodedKey.split("/");
+
+  if (
+    decodedKey.includes("\\") ||
+    parts.some((part) => part === "" || part === "..")
+  ) {
+    return { ok: false as const };
+  }
+
+  return { ok: true as const, key: `${prefix.slice(1)}${decodedKey}` };
+}
+
 type DatasetBucket = {
   get(key: string): Promise<DatasetObject | null>;
 };
@@ -2419,6 +2466,8 @@ type SnapshotBucket = {
 };
 
 type DatasetObject = {
+  httpMetadata?: { contentType?: string };
+  arrayBuffer?(): Promise<ArrayBuffer>;
   text(): Promise<string>;
 };
 
