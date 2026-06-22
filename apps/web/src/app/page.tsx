@@ -18,7 +18,11 @@ import {
   Trophy,
   WalletCards,
 } from "lucide-react";
-import type { AccountSnapshot } from "@calandra/contract";
+import type {
+  AccountSnapshot,
+  AccountSnapshotGearItem,
+  LadderBuild,
+} from "@calandra/contract";
 import { defaultTheme } from "../lib/theme";
 import { DatasetSearchPanel } from "../components/DatasetSearchPanel";
 import { DesktopPathsPanel } from "../components/DesktopPathsPanel";
@@ -56,6 +60,7 @@ const passiveTreeReferenceUrl =
   "https://poe.ninja/poe2/builds/runesofaldur/character/heygyus-0416/ResurrectGodAura/passive-tree";
 
 type VisualLoadoutPreview = {
+  sourceLabel: string;
   character: {
     name: string;
     className: string;
@@ -94,6 +99,7 @@ const equipmentSlots = [
 ] as const;
 
 const fallbackVisualLoadoutPreview: VisualLoadoutPreview = {
+  sourceLabel: "Reference build",
   character: {
     name: "ResurrectGodAura",
     className: "Martial Artist",
@@ -244,6 +250,7 @@ export default async function Home({
   const latestDiff = snapshotDiff.diff;
   const visualLoadoutPreview = createVisualLoadoutPreview(
     latestSnapshotDetail.snapshot,
+    ladderBuildDetail.source === "api" ? ladderBuildDetail.build : null,
   );
 
   return (
@@ -941,7 +948,7 @@ function CharacterBuildPreviewPanel({
               </p>
             </div>
             <p className="rounded-md border border-info/35 bg-info/10 px-3 py-2 text-xs font-medium text-info">
-              Preview loadout
+              {loadout.sourceLabel}
             </p>
           </div>
 
@@ -1079,7 +1086,12 @@ function CharacterBuildPreviewPanel({
 
 function createVisualLoadoutPreview(
   snapshot: AccountSnapshot | null,
+  ladderBuild: LadderBuild | null,
 ): VisualLoadoutPreview {
+  if (ladderBuild && hasVisualBuildGear(ladderBuild)) {
+    return createLadderBuildLoadoutPreview(ladderBuild);
+  }
+
   const character = snapshot?.characters[0];
 
   if (!character) {
@@ -1087,6 +1099,7 @@ function createVisualLoadoutPreview(
   }
 
   return {
+    sourceLabel: "Latest account snapshot",
     character: {
       name: character.name,
       className: character.className,
@@ -1096,18 +1109,7 @@ function createVisualLoadoutPreview(
     stats: buildSnapshotStatRows(snapshot),
     equipment:
       character.equipment.length > 0
-        ? character.equipment.map((item) => ({
-            slot: item.slot,
-            name: item.name,
-            rarity: item.rarity ?? "normal",
-            iconUrl:
-              item.iconUrl ?? demoItemIcon(item.slot, "#67e8f9", "#0e7490"),
-            stats: item.stats
-              ? Object.entries(item.stats)
-                  .slice(0, 2)
-                  .map(([key, value]) => `${formatStatLabel(key)} ${value}`)
-              : ["Snapshot gear item"],
-          }))
+        ? toVisualEquipment(character.equipment, "Snapshot gear item")
         : fallbackVisualLoadoutPreview.equipment,
     passiveTree: {
       allocated: character.passiveSkillIds?.length ?? 0,
@@ -1120,6 +1122,66 @@ function createVisualLoadoutPreview(
       referenceUrl: fallbackVisualLoadoutPreview.passiveTree.referenceUrl,
     },
   };
+}
+
+function createLadderBuildLoadoutPreview(
+  ladderBuild: LadderBuild,
+): VisualLoadoutPreview {
+  const equipment = ladderBuild.equipment ?? [];
+  const passiveTree = ladderBuild.passiveTree;
+  const passiveNodeIds =
+    ladderBuild.passiveSkillIds ??
+    [...(passiveTree?.keystones ?? []), ...(passiveTree?.notables ?? [])].map(
+      (name) => name.toLowerCase().replace(/\s+/g, "-"),
+    );
+
+  return {
+    sourceLabel: "Published ladder build",
+    character: {
+      name: ladderBuild.character,
+      className: ladderBuild.className,
+      level: ladderBuild.level,
+      league: dashboardDatasetVersion.league,
+    },
+    stats: buildGearStatRows(equipment),
+    equipment: toVisualEquipment(equipment, "Ladder gear item"),
+    passiveTree: {
+      allocated: passiveTree?.allocatedCount ?? passiveNodeIds.length,
+      focus:
+        passiveTree?.summary ??
+        ([...(passiveTree?.keystones ?? []), ...(passiveTree?.notables ?? [])]
+          .slice(0, 4)
+          .join(", ") ||
+          "Published build passive allocation"),
+      nodeIds: passiveNodeIds,
+      source: "Published poe.ninja ladder passive summary",
+      referenceUrl:
+        passiveTree?.url ??
+        ladderBuild.passiveTreeUrl ??
+        fallbackVisualLoadoutPreview.passiveTree.referenceUrl,
+    },
+  };
+}
+
+function hasVisualBuildGear(ladderBuild: LadderBuild) {
+  return Boolean(ladderBuild.equipment?.some((item) => item.iconUrl));
+}
+
+function toVisualEquipment(
+  equipment: AccountSnapshotGearItem[],
+  fallbackStat: string,
+): VisualLoadoutPreview["equipment"] {
+  return equipment.map((item) => ({
+    slot: item.slot,
+    name: item.name,
+    rarity: item.rarity ?? "normal",
+    iconUrl: item.iconUrl ?? demoItemIcon(item.slot, "#67e8f9", "#0e7490"),
+    stats: item.stats
+      ? Object.entries(item.stats)
+          .slice(0, 2)
+          .map(([key, value]) => `${formatStatLabel(key)} ${value}`)
+      : [fallbackStat],
+  }));
 }
 
 function findEquipmentSlot(
@@ -1147,20 +1209,7 @@ function resolveSelectedAccount(searchParams: HomeSearchParams | undefined) {
 
 function buildSnapshotStatRows(snapshot: AccountSnapshot) {
   const character = snapshot.characters[0];
-  const totals = new Map<string, number>();
-
-  for (const item of character?.equipment ?? []) {
-    for (const [key, value] of Object.entries(item.stats ?? {})) {
-      totals.set(key, (totals.get(key) ?? 0) + value);
-    }
-  }
-
-  const statRows = Array.from(totals.entries())
-    .slice(0, 4)
-    .map(([key, value]) => ({
-      label: formatStatLabel(key),
-      value: String(value),
-    }));
+  const statRows = buildGearStatRows(character?.equipment ?? []);
 
   if (statRows.length > 0) {
     return statRows;
@@ -1178,6 +1227,23 @@ function buildSnapshotStatRows(snapshot: AccountSnapshot) {
     { label: "Snapshot source", value: snapshot.source },
     { label: "Captured", value: formatSnapshotTimestamp(snapshot.capturedAt) },
   ];
+}
+
+function buildGearStatRows(equipment: AccountSnapshotGearItem[]) {
+  const totals = new Map<string, number>();
+
+  for (const item of equipment) {
+    for (const [key, value] of Object.entries(item.stats ?? {})) {
+      totals.set(key, (totals.get(key) ?? 0) + value);
+    }
+  }
+
+  return Array.from(totals.entries())
+    .slice(0, 4)
+    .map(([key, value]) => ({
+      label: formatStatLabel(key),
+      value: String(value),
+    }));
 }
 
 function formatSnapshotTimestamp(value: string | undefined) {

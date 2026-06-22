@@ -55,20 +55,28 @@ describe("home dashboard", () => {
     expect(html).toContain("Deterministic upgrade rankings");
     expect(html).toContain("Character build preview");
     expect(html).toContain("Visual equipment");
-    expect(html).toContain("Weapon slot empty");
+    expect(html).toContain("Published ladder build");
+    expect(html).toContain("Level 92 Deadeye");
+    expect(html).toContain("Weapon equipped");
+    expect(html).toContain("Stormneedle Spear");
+    expect(html).toContain(
+      "https://calandra-assets.example/images/Dawn%20of%20the%20Hunt/0.2.0/builds/deadeye-1/weapon.png",
+    );
     expect(html).toContain("Helmet slot empty");
     expect(html).toContain("Gloves equipped");
     expect(html).toContain("Passive tree");
-    expect(html).toContain("Level 45 Monk");
     expect(html).toContain("2 passive nodes tracked");
     expect(html).toContain("Open passive tree reference");
-    expect(html).toContain("Link-out reference only");
+    expect(html).toContain("Published poe.ninja ladder passive summary");
     expect(html).toContain("Duskthread Grips");
     expect(html).toContain('alt="Duskthread Grips"');
     expect(html).toContain("https://calandra.pages.dev/demo-gloves.svg");
-    expect(html).toContain('alt="Calandra Demo Amulet"');
+    expect(html).toContain("Calandra Demo Amulet");
     expect(html).toContain(
-      "https://poe.ninja/poe2/builds/runesofaldur/character/heygyus-0416/ResurrectGodAura/passive-tree",
+      "https://calandra-assets.example/images/Dawn%20of%20the%20Hunt/0.2.0/builds/deadeye-1/amulet.png",
+    );
+    expect(html).toContain(
+      "https://poe.ninja/poe2/builds/dawn/character/example/CalandraTest/passive-tree",
     );
     expect(html).toContain("Duskthread Grips");
     expect(html).toContain("Snapshot advisor");
@@ -126,7 +134,7 @@ describe("home dashboard", () => {
     expect(html).toContain("Level 92 Deadeye");
     expect(html).toContain("#42");
     expect(html).toContain("Lightning Arrow");
-    expect(html).toContain("1 gear item tracked");
+    expect(html).toContain("3 gear items tracked");
     expect(html).toContain("Passive highlights");
     expect(html).toContain("Acrobatics");
     expect(html).toContain("Gathering Winds");
@@ -341,12 +349,32 @@ function mockDashboardFetch() {
         },
         equipment: [
           {
+            slot: "Weapon",
+            name: "Stormneedle Spear",
+            rarity: "rare",
+            iconUrl:
+              "https://calandra-assets.example/images/Dawn%20of%20the%20Hunt/0.2.0/builds/deadeye-1/weapon.png",
+            iconAttribution:
+              "Item art is property of Grinding Gear Games and is cached for attribution-preserving display.",
+            stats: { attackSpeed: 18, lightningDamage: 42 },
+          },
+          {
             slot: "Gloves",
             name: "Duskthread Grips",
             rarity: "rare",
             iconUrl: "https://calandra.pages.dev/demo-gloves.svg",
             iconAttribution:
               "Synthetic Calandra demo icon; no game art is bundled.",
+          },
+          {
+            slot: "Amulet",
+            name: "Calandra Demo Amulet",
+            rarity: "unique",
+            iconUrl:
+              "https://calandra-assets.example/images/Dawn%20of%20the%20Hunt/0.2.0/builds/deadeye-1/amulet.png",
+            iconAttribution:
+              "Item art is property of Grinding Gear Games and is cached for attribution-preserving display.",
+            stats: { spirit: 30 },
           },
         ],
       });
