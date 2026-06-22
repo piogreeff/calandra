@@ -67,6 +67,7 @@ type Bindings = {
   DATASET_R2_PREFIX?: string;
   DATA_BUCKET?: DatasetBucket;
   SNAPSHOT_R2_PREFIX?: string;
+  SNAPSHOT_READ_TOKEN?: string;
   SNAPSHOT_WRITE_TOKEN?: string;
   SNAPSHOT_BUCKET?: SnapshotBucket;
   GGG_USER_AGENT?: string;
@@ -173,6 +174,10 @@ api.post("/snapshots/diff", async (context) => {
 });
 
 api.get("/snapshots/:account/diff", async (context) => {
+  if (!isSnapshotReadAuthorized(context)) {
+    return context.json({ error: "snapshot read is unauthorized" }, 401);
+  }
+
   const parsed = accountSnapshotStoredDiffRequestSchema.safeParse({
     account: context.req.param("account"),
     beforeSnapshotId: context.req.query("beforeSnapshotId"),
@@ -212,6 +217,10 @@ api.get("/snapshots/:account/diff", async (context) => {
 });
 
 api.get("/snapshots/:account/:snapshotId", async (context) => {
+  if (!isSnapshotReadAuthorized(context)) {
+    return context.json({ error: "snapshot read is unauthorized" }, 401);
+  }
+
   const account = context.req.param("account");
   const snapshotId = context.req.param("snapshotId");
   const result = await getStoredAccountSnapshot(context, {
@@ -318,6 +327,10 @@ async function writeStoredAccountSnapshot(
 }
 
 api.get("/snapshots/:account", async (context) => {
+  if (!isSnapshotReadAuthorized(context)) {
+    return context.json({ error: "snapshot read is unauthorized" }, 401);
+  }
+
   const snapshotBucket = context.env.SNAPSHOT_BUCKET;
 
   if (!snapshotBucket?.list) {
@@ -1545,20 +1558,38 @@ function getSnapshotAccountPrefix(
 }
 
 function isSnapshotWriteAuthorized(context: Context<{ Bindings: Bindings }>) {
-  const writeToken = context.env.SNAPSHOT_WRITE_TOKEN;
+  return isBearerTokenAuthorized(
+    context.req.header("authorization"),
+    context.env.SNAPSHOT_WRITE_TOKEN,
+  );
+}
 
-  if (!writeToken) {
+function isSnapshotReadAuthorized(context: Context<{ Bindings: Bindings }>) {
+  return isBearerTokenAuthorized(
+    context.req.header("authorization"),
+    context.env.SNAPSHOT_READ_TOKEN,
+  );
+}
+
+function isBearerTokenAuthorized(
+  authorizationHeader: string | undefined,
+  configuredToken: string | undefined,
+) {
+  if (!configuredToken) {
     return true;
   }
 
-  const authorization = context.req.header("authorization") ?? "";
+  const authorization = authorizationHeader ?? "";
   const bearerPrefix = "Bearer ";
 
   if (!authorization.startsWith(bearerPrefix)) {
     return false;
   }
 
-  return timingSafeEqual(authorization.slice(bearerPrefix.length), writeToken);
+  return timingSafeEqual(
+    authorization.slice(bearerPrefix.length),
+    configuredToken,
+  );
 }
 
 function timingSafeEqual(left: string, right: string) {

@@ -426,6 +426,28 @@ describe("dashboard read API client", () => {
     );
   });
 
+  it("sends the server snapshot read token when loading snapshot metadata", async () => {
+    const fetchImplementation = vi.fn(async () =>
+      Response.json({
+        source: "snapshot-store",
+        account: "example",
+        snapshots: [],
+      }),
+    );
+
+    await getDashboardSnapshots(
+      "example",
+      "https://calandra-api.piogreeff.workers.dev",
+      fetchImplementation,
+      { snapshotReadToken: "snapshot-read-token" },
+    );
+
+    expect(fetchImplementation).toHaveBeenCalledWith(
+      "https://calandra-api.piogreeff.workers.dev/snapshots/example",
+      { headers: { authorization: "Bearer snapshot-read-token" } },
+    );
+  });
+
   it("loads the latest account snapshot detail with visual gear metadata", async () => {
     const fetchImplementation = vi.fn(async (input: RequestInfo | URL) => {
       expect(String(input)).toBe(
@@ -481,6 +503,39 @@ describe("dashboard read API client", () => {
       "https://calandra.pages.dev/demo-gloves.svg",
     );
     expect(snapshot.snapshot?.characters[0]?.passiveSkillIds).toHaveLength(2);
+  });
+
+  it("sends the server snapshot read token when loading snapshot detail", async () => {
+    const fetchImplementation = vi.fn(async () =>
+      Response.json({
+        id: "snapshot-2026-06-21T10-00-00Z",
+        account: "example",
+        capturedAt: "2026-06-21T10:00:00.000Z",
+        source: "manual-import",
+        capabilities: { characters: true, stashes: true },
+        characters: [],
+        stashes: [],
+      }),
+    );
+
+    await getDashboardLatestSnapshot(
+      "example",
+      [
+        {
+          account: "example",
+          snapshotId: "snapshot-2026-06-21T10-00-00Z",
+          objectKey: "snapshots/example/snapshot-2026-06-21T10-00-00Z.json",
+        },
+      ],
+      "https://calandra-api.piogreeff.workers.dev",
+      fetchImplementation,
+      { snapshotReadToken: "snapshot-read-token" },
+    );
+
+    expect(fetchImplementation).toHaveBeenCalledWith(
+      "https://calandra-api.piogreeff.workers.dev/snapshots/example/snapshot-2026-06-21T10-00-00Z",
+      { headers: { authorization: "Bearer snapshot-read-token" } },
+    );
   });
 
   it("falls back to demo snapshot restore metadata when the API is unavailable", async () => {
@@ -586,6 +641,43 @@ describe("dashboard read API client", () => {
     expect(diff.diff?.characterChanges[0]?.levelDelta).toBe(2);
     expect(diff.diff?.stashChanges[0]?.itemCountDelta).toBe(1);
     expect(fetchImplementation).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends the server snapshot read token when loading snapshot diffs", async () => {
+    const fetchImplementation = vi.fn(async () =>
+      Response.json({
+        beforeSnapshotId: "snapshot-before",
+        afterSnapshotId: "snapshot-after",
+        beforeCapturedAt: "2026-06-21T09:00:00.000Z",
+        afterCapturedAt: "2026-06-21T10:00:00.000Z",
+        characterChanges: [],
+        stashChanges: [],
+      }),
+    );
+
+    await getDashboardSnapshotDiff(
+      "example",
+      [
+        {
+          account: "example",
+          snapshotId: "snapshot-before",
+          objectKey: "snapshots/example/snapshot-before.json",
+        },
+        {
+          account: "example",
+          snapshotId: "snapshot-after",
+          objectKey: "snapshots/example/snapshot-after.json",
+        },
+      ],
+      "https://calandra-api.piogreeff.workers.dev",
+      fetchImplementation,
+      { snapshotReadToken: "snapshot-read-token" },
+    );
+
+    expect(fetchImplementation).toHaveBeenCalledWith(
+      "https://calandra-api.piogreeff.workers.dev/snapshots/example/diff?beforeSnapshotId=snapshot-before&afterSnapshotId=snapshot-after",
+      { headers: { authorization: "Bearer snapshot-read-token" } },
+    );
   });
 
   it("does not request a snapshot diff until two snapshots are available", async () => {

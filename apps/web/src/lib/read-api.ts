@@ -78,6 +78,10 @@ export type DashboardLadderBuilds = {
   builds: LadderBuild[];
 };
 
+type DashboardSnapshotReadOptions = {
+  snapshotReadToken?: string;
+};
+
 const fallbackDataset: DashboardDataset = {
   source: "fallback",
   items: [
@@ -244,6 +248,7 @@ export async function getDashboardSnapshots(
   account: string,
   apiBaseUrl = defaultApiBaseUrl,
   fetchImplementation: typeof fetch = fetch,
+  options: DashboardSnapshotReadOptions = {},
 ): Promise<DashboardSnapshots> {
   try {
     const snapshotList = accountSnapshotListResponseSchema.parse(
@@ -251,6 +256,7 @@ export async function getDashboardSnapshots(
         fetchImplementation,
         `${apiBaseUrl}/snapshots/${encodeURIComponent(account)}`,
         (value) => value,
+        getSnapshotReadRequestInit(options),
       ),
     );
 
@@ -292,6 +298,7 @@ export async function getDashboardLatestSnapshot(
   snapshots: AccountSnapshotListItem[],
   apiBaseUrl = defaultApiBaseUrl,
   fetchImplementation: typeof fetch = fetch,
+  options: DashboardSnapshotReadOptions = {},
 ): Promise<DashboardLatestSnapshot> {
   const latestSnapshot = snapshots[snapshots.length - 1];
 
@@ -306,6 +313,7 @@ export async function getDashboardLatestSnapshot(
         account,
       )}/${encodeURIComponent(latestSnapshot.snapshotId)}`,
       accountSnapshotSchema.parse,
+      getSnapshotReadRequestInit(options),
     );
 
     return {
@@ -417,6 +425,7 @@ export async function getDashboardSnapshotDiff(
   snapshots: AccountSnapshotListItem[],
   apiBaseUrl = defaultApiBaseUrl,
   fetchImplementation: typeof fetch = fetch,
+  options: DashboardSnapshotReadOptions = {},
 ): Promise<DashboardSnapshotDiff> {
   const [beforeSnapshot, afterSnapshot] = snapshots.slice(-2);
 
@@ -441,6 +450,7 @@ export async function getDashboardSnapshotDiff(
         request.account,
       )}/diff?${query.toString()}`,
       accountSnapshotDiffSchema.parse,
+      getSnapshotReadRequestInit(options),
     );
 
     return {
@@ -473,6 +483,16 @@ function fallbackSearchResults(query: string): DashboardSearchResults {
     mods: [],
     gems: [],
   };
+}
+
+function getSnapshotReadRequestInit({
+  snapshotReadToken,
+}: DashboardSnapshotReadOptions): RequestInit | undefined {
+  const token = snapshotReadToken?.trim();
+
+  return token
+    ? { headers: { authorization: `Bearer ${token}` } }
+    : undefined;
 }
 
 function isUniqueItem(item: Item | UniqueItem): item is UniqueItem {

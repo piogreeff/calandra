@@ -59,6 +59,7 @@ Every environment variable is documented in [`.env.example`](../.env.example) â€
 | `DATASET_VERSION`          | Published `{league, patch}` dataset version to import; `latest` follows the newest published artifact.                           |
 | `DATASET_R2_PREFIX`        | R2 object prefix for published artifacts; the API reads `${DATASET_R2_PREFIX}/{league}/{patch}.json`.                            |
 | `SNAPSHOT_R2_PREFIX`       | R2 object prefix for persisted account snapshots; the Worker writes `${SNAPSHOT_R2_PREFIX}/{account}/{snapshot}.json`.           |
+| `SNAPSHOT_READ_TOKEN`      | Optional bearer token required before stored snapshot reads; set it as a Worker secret on hosted/self-hosted APIs.               |
 | `SNAPSHOT_WRITE_TOKEN`     | Optional bearer token required before `POST /snapshots` accepts writes; set it as a Worker secret on hosted/self-hosted APIs.    |
 | `DATASET_ARTIFACT_JSON`    | Optional dev/self-host Worker binding for a published artifact JSON payload; production should load published artifacts from R2. |
 | `OPENAI_API_KEY`           | OpenAI key used through Cloudflare AI Gateway for advisor explanations.                                                          |

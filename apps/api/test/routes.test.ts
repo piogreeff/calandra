@@ -2479,6 +2479,62 @@ describe("api routes", () => {
     ]);
   });
 
+  it("requires snapshot read authorization before restoring protected snapshots", async () => {
+    const response = await api.request(
+      "/snapshots/example/snapshot-2026-06-21T10-00-00Z",
+      undefined,
+      {
+        APP_URL: "https://calandra.pages.dev",
+        SNAPSHOT_READ_TOKEN: "snapshot-read-token",
+        SNAPSHOT_BUCKET: {
+          async get() {
+            throw new Error("unauthorized reads must stop before R2 access");
+          },
+        },
+      },
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      error: "snapshot read is unauthorized",
+    });
+  });
+
+  it("restores protected snapshots with snapshot read authorization", async () => {
+    const snapshot = {
+      id: "snapshot-2026-06-21T10-00-00Z",
+      account: "example",
+      capturedAt: "2026-06-21T10:00:00.000Z",
+      source: "manual-import",
+      capabilities: { characters: true, stashes: true },
+      characters: [],
+      stashes: [],
+    };
+
+    const response = await api.request(
+      "/snapshots/example/snapshot-2026-06-21T10-00-00Z",
+      {
+        headers: { authorization: "Bearer snapshot-read-token" },
+      },
+      {
+        APP_URL: "https://calandra.pages.dev",
+        SNAPSHOT_READ_TOKEN: "snapshot-read-token",
+        SNAPSHOT_BUCKET: {
+          async get() {
+            return {
+              async text() {
+                return JSON.stringify(snapshot);
+              },
+            };
+          },
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(snapshot);
+  });
+
   it("returns 404 when a persisted account snapshot is missing", async () => {
     const response = await api.request(
       "/snapshots/example/missing-snapshot",
@@ -2592,6 +2648,23 @@ describe("api routes", () => {
       ],
     });
     expect(requestedPrefixes).toEqual(["snapshots/example/"]);
+  });
+
+  it("requires snapshot read authorization before listing protected snapshots", async () => {
+    const response = await api.request("/snapshots/example", undefined, {
+      APP_URL: "https://calandra.pages.dev",
+      SNAPSHOT_READ_TOKEN: "snapshot-read-token",
+      SNAPSHOT_BUCKET: {
+        async list() {
+          throw new Error("unauthorized reads must stop before R2 access");
+        },
+      },
+    });
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      error: "snapshot read is unauthorized",
+    });
   });
 
   it("returns an empty account snapshot list when none exist", async () => {
@@ -2761,6 +2834,27 @@ describe("api routes", () => {
       "snapshots/example/snapshot-before.json",
       "snapshots/example/snapshot-after.json",
     ]);
+  });
+
+  it("requires snapshot read authorization before diffing protected snapshots", async () => {
+    const response = await api.request(
+      "/snapshots/example/diff?beforeSnapshotId=snapshot-before&afterSnapshotId=snapshot-after",
+      undefined,
+      {
+        APP_URL: "https://calandra.pages.dev",
+        SNAPSHOT_READ_TOKEN: "snapshot-read-token",
+        SNAPSHOT_BUCKET: {
+          async get() {
+            throw new Error("unauthorized reads must stop before R2 access");
+          },
+        },
+      },
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      error: "snapshot read is unauthorized",
+    });
   });
 
   it("diffs account snapshots with deterministic engine output", async () => {

@@ -194,16 +194,35 @@ const fallbackVisualLoadoutPreview: VisualLoadoutPreview = {
 };
 
 export default async function Home() {
+  const snapshotReadToken = process.env["SNAPSHOT_READ_TOKEN"]?.trim();
+  const snapshotReadOptions = snapshotReadToken ? { snapshotReadToken } : {};
   const [dataset, gggOAuthStatus, snapshotList, ladderBuilds] =
     await Promise.all([
     getDashboardDataset(),
     getDashboardGggOAuthStatus(),
-    getDashboardSnapshots("example"),
+    getDashboardSnapshots(
+      "example",
+      defaultApiBaseUrl,
+      fetch,
+      snapshotReadOptions,
+    ),
     getDashboardLadderBuilds(),
   ]);
   const [snapshotDiff, latestSnapshotDetail] = await Promise.all([
-    getDashboardSnapshotDiff(snapshotList.account, snapshotList.snapshots),
-    getDashboardLatestSnapshot(snapshotList.account, snapshotList.snapshots),
+    getDashboardSnapshotDiff(
+      snapshotList.account,
+      snapshotList.snapshots,
+      defaultApiBaseUrl,
+      fetch,
+      snapshotReadOptions,
+    ),
+    getDashboardLatestSnapshot(
+      snapshotList.account,
+      snapshotList.snapshots,
+      defaultApiBaseUrl,
+      fetch,
+      snapshotReadOptions,
+    ),
   ]);
   const endpointLabel = new URL(defaultApiBaseUrl).hostname;
   const datasetSource =
