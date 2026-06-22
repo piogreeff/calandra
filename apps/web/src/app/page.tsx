@@ -41,6 +41,7 @@ import {
   getDashboardSnapshotAdvisor,
   getDashboardSnapshotDiff,
   getDashboardSnapshots,
+  type DashboardLadderBuildFilters,
 } from "../lib/read-api";
 
 const navItems = [
@@ -174,6 +175,9 @@ const fallbackVisualLoadoutPreview: VisualLoadoutPreview = {
 
 type HomeSearchParams = {
   account?: string | string[];
+  buildId?: string | string[];
+  className?: string | string[];
+  skill?: string | string[];
 };
 
 export default async function Home({
@@ -181,7 +185,9 @@ export default async function Home({
 }: {
   searchParams?: Promise<HomeSearchParams>;
 }) {
-  const selectedAccount = resolveSelectedAccount(await searchParams);
+  const resolvedSearchParams = await searchParams;
+  const selectedAccount = resolveSelectedAccount(resolvedSearchParams);
+  const ladderBuildFilters = resolveLadderBuildFilters(resolvedSearchParams);
   const snapshotReadToken = process.env["SNAPSHOT_READ_TOKEN"]?.trim();
   const snapshotReadOptions = snapshotReadToken ? { snapshotReadToken } : {};
   const [
@@ -200,12 +206,16 @@ export default async function Home({
       fetch,
       snapshotReadOptions,
     ),
-    getDashboardLadderBuilds(),
+    getDashboardLadderBuilds(defaultApiBaseUrl, fetch, ladderBuildFilters),
     getDashboardCraftingEstimate(),
     getDashboardPriceCheck(),
   ]);
   const latestSnapshot =
     snapshotList.snapshots[snapshotList.snapshots.length - 1];
+  const selectedLadderBuildId = resolveSelectedLadderBuildId(
+    resolvedSearchParams,
+    ladderBuilds.builds[0]?.id,
+  );
   const [
     snapshotDiff,
     latestSnapshotDetail,
@@ -226,7 +236,7 @@ export default async function Home({
       fetch,
       snapshotReadOptions,
     ),
-    getDashboardLadderBuild(ladderBuilds.builds[0]?.id),
+    getDashboardLadderBuild(selectedLadderBuildId),
     getDashboardSnapshotAdvisor(
       snapshotList.account,
       latestSnapshot?.snapshotId,
@@ -707,6 +717,37 @@ export default async function Home({
                 title="Ladder builds"
                 icon={<Trophy className="size-4" aria-hidden="true" />}
               >
+                <form
+                  action="/"
+                  className="mb-3 grid grid-cols-[minmax(0,1fr)] gap-2 rounded-md border border-base-300/70 bg-base-100/45 p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+                >
+                  <input type="hidden" name="account" value={selectedAccount} />
+                  <label className="min-w-0">
+                    <span className="mb-1 block text-xs font-medium uppercase text-base-content/55">
+                      Ladder filters
+                    </span>
+                    <input
+                      className="input input-sm w-full"
+                      name="className"
+                      placeholder="Class"
+                      defaultValue={ladderBuildFilters.className ?? ""}
+                    />
+                  </label>
+                  <label className="min-w-0">
+                    <span className="mb-1 block text-xs font-medium uppercase text-base-content/55">
+                      Skill
+                    </span>
+                    <input
+                      className="input input-sm w-full"
+                      name="skill"
+                      placeholder="Main skill"
+                      defaultValue={ladderBuildFilters.skill ?? ""}
+                    />
+                  </label>
+                  <button className="btn btn-primary btn-sm self-end">
+                    Filter
+                  </button>
+                </form>
                 <div className="mb-3 rounded-md border border-base-300/70 bg-base-100/45 p-3 text-xs font-medium text-base-content/65">
                   {ladderBuilds.source === "api"
                     ? "Published ladder artifact"
@@ -731,7 +772,11 @@ export default async function Home({
                       return (
                         <article
                           key={build.id}
-                          className="rounded-md border border-base-300/70 bg-base-100/45 p-3"
+                          className={`rounded-md border bg-base-100/45 p-3 ${
+                            buildDetail.id === ladderBuildDetail.build?.id
+                              ? "border-primary/60"
+                              : "border-base-300/70"
+                          }`}
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
@@ -809,6 +854,20 @@ export default async function Home({
                               />
                             </a>
                           ) : null}
+                          <a
+                            href={buildLadderBuildHref(
+                              selectedAccount,
+                              ladderBuildFilters,
+                              build.id,
+                            )}
+                            className="btn btn-primary btn-xs mt-2 w-full"
+                          >
+                            Inspect build
+                            <ChevronRight
+                              className="size-3"
+                              aria-hidden="true"
+                            />
+                          </a>
                         </article>
                       );
                     })}
@@ -1200,11 +1259,47 @@ function normalizeEquipmentSlot(slot: string) {
 }
 
 function resolveSelectedAccount(searchParams: HomeSearchParams | undefined) {
-  const account = Array.isArray(searchParams?.account)
-    ? searchParams.account[0]
-    : searchParams?.account;
+  const account = firstSearchParam(searchParams?.account);
 
   return account?.trim() || "example";
+}
+
+function resolveLadderBuildFilters(
+  searchParams: HomeSearchParams | undefined,
+): DashboardLadderBuildFilters {
+  const filters: DashboardLadderBuildFilters = { limit: 8 };
+  const className = firstSearchParam(searchParams?.className)?.trim();
+  const skill = firstSearchParam(searchParams?.skill)?.trim();
+
+  if (className) filters.className = className;
+  if (skill) filters.skill = skill;
+
+  return filters;
+}
+
+function resolveSelectedLadderBuildId(
+  searchParams: HomeSearchParams | undefined,
+  fallbackBuildId: string | undefined,
+) {
+  return firstSearchParam(searchParams?.buildId)?.trim() || fallbackBuildId;
+}
+
+function buildLadderBuildHref(
+  account: string,
+  filters: DashboardLadderBuildFilters,
+  buildId: string,
+) {
+  const query = new URLSearchParams({ account });
+
+  if (filters.className) query.set("className", filters.className);
+  if (filters.skill) query.set("skill", filters.skill);
+  query.set("buildId", buildId);
+
+  return `?${query.toString()}`;
+}
+
+function firstSearchParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
 }
 
 function buildSnapshotStatRows(snapshot: AccountSnapshot) {

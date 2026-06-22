@@ -47,6 +47,51 @@ describe("home dashboard", () => {
     expect(html).toContain("snapshots/RealAccount/");
   });
 
+  it("filters ladder builds and previews the selected build from query params", async () => {
+    const fetchImplementation = mockDashboardFetch();
+    vi.stubGlobal("fetch", fetchImplementation);
+
+    const html = renderToStaticMarkup(
+      await Home({
+        searchParams: Promise.resolve({
+          account: "RealAccount",
+          className: "Deadeye",
+          skill: "Lightning",
+          buildId: "stormweaver-2",
+        }),
+      }),
+    );
+
+    const requestedUrls = fetchImplementation.mock.calls.map(([input]) =>
+      String(input),
+    );
+
+    expect(requestedUrls).toContain(
+      "https://calandra-api.piogreeff.workers.dev/builds/ladder?league=Dawn+of+the+Hunt&patch=0.2.0&className=Deadeye&skill=Lightning&limit=8",
+    );
+    expect(requestedUrls).toContain(
+      "https://calandra-api.piogreeff.workers.dev/builds/ladder/stormweaver-2?league=Dawn+of+the+Hunt&patch=0.2.0",
+    );
+    expect(html).toContain("Ladder filters");
+    expect(html).toContain('name="className"');
+    expect(html).toContain('value="Deadeye"');
+    expect(html).toContain('name="skill"');
+    expect(html).toContain('value="Lightning"');
+    expect(html).toContain("Published ladder build");
+    expect(html).toContain("StormWeaverTwo");
+    expect(html).toContain("Level 94 Deadeye");
+    expect(html).toContain("Galvanic Shards");
+    expect(html).toContain("Galvanic Bow");
+    expect(html).toContain(
+      "https://calandra-assets.example/images/Dawn%20of%20the%20Hunt/0.2.0/builds/stormweaver-2/weapon.png",
+    );
+    expect(html).toContain("Resonance");
+    expect(html).toContain("Inspect build");
+    expect(html).toContain(
+      "?account=RealAccount&amp;className=Deadeye&amp;skill=Lightning&amp;buildId=stormweaver-2",
+    );
+  });
+
   it("shows deterministic advisor rankings and temporary endpoints", async () => {
     vi.stubGlobal("fetch", mockDashboardFetch());
 
@@ -231,6 +276,37 @@ function mockDashboardFetch() {
       });
     }
 
+    if (
+      url.includes("/builds/ladder?") &&
+      url.includes("className=Deadeye") &&
+      url.includes("skill=Lightning")
+    ) {
+      return Response.json({
+        league: "Dawn of the Hunt",
+        patch: "0.2.0",
+        builds: [
+          {
+            id: "stormweaver-2",
+            account: "example",
+            character: "StormWeaverTwo",
+            className: "Deadeye",
+            level: 94,
+            rank: 12,
+            mainSkill: "Galvanic Shards",
+            passiveTreeUrl:
+              "https://poe.ninja/poe2/builds/dawn/character/example/StormWeaverTwo/passive-tree",
+            passiveSkillIds: ["resonance", "far-shot"],
+            passiveTree: {
+              allocatedCount: 2,
+              keystones: ["Resonance"],
+              notables: ["Far Shot"],
+              summary: "Lightning projectile routing with bow scaling.",
+            },
+          },
+        ],
+      });
+    }
+
     if (url.includes("/builds/ladder?")) {
       return Response.json({
         league: "Dawn of the Hunt",
@@ -375,6 +451,39 @@ function mockDashboardFetch() {
             iconAttribution:
               "Item art is property of Grinding Gear Games and is cached for attribution-preserving display.",
             stats: { spirit: 30 },
+          },
+        ],
+      });
+    }
+
+    if (url.includes("/builds/ladder/stormweaver-2?")) {
+      return Response.json({
+        id: "stormweaver-2",
+        account: "example",
+        character: "StormWeaverTwo",
+        className: "Deadeye",
+        level: 94,
+        rank: 12,
+        mainSkill: "Galvanic Shards",
+        passiveTreeUrl:
+          "https://poe.ninja/poe2/builds/dawn/character/example/StormWeaverTwo/passive-tree",
+        passiveSkillIds: ["resonance", "far-shot"],
+        passiveTree: {
+          allocatedCount: 2,
+          keystones: ["Resonance"],
+          notables: ["Far Shot"],
+          summary: "Lightning projectile routing with bow scaling.",
+        },
+        equipment: [
+          {
+            slot: "Weapon",
+            name: "Galvanic Bow",
+            rarity: "rare",
+            iconUrl:
+              "https://calandra-assets.example/images/Dawn%20of%20the%20Hunt/0.2.0/builds/stormweaver-2/weapon.png",
+            iconAttribution:
+              "Item art is property of Grinding Gear Games and is cached for attribution-preserving display.",
+            stats: { lightningDamage: 81, attackSpeed: 22 },
           },
         ],
       });
