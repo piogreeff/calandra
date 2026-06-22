@@ -37,6 +37,9 @@ describe("home dashboard", () => {
     expect(requestedUrls).toContain(
       "https://calandra-api.piogreeff.workers.dev/advisor/snapshots/RealAccount/snapshot-2026-06-21T10-00-00Z?league=Dawn+of+the+Hunt&patch=0.2.0",
     );
+    expect(requestedUrls).toContain(
+      "https://calandra-api.piogreeff.workers.dev/crafting/estimate-from-dataset?league=Dawn+of+the+Hunt&patch=0.2.0",
+    );
     expect(requestedUrls.some((url) => url.includes("/snapshots/example"))).toBe(
       false,
     );
@@ -72,6 +75,11 @@ describe("home dashboard", () => {
     expect(html).toContain("+60.0");
     expect(html).toContain("5.00 / chaos");
     expect(html).toContain("No LLM values");
+    expect(html).toContain("Crafting calculator");
+    expect(html).toContain("Dataset mod pool");
+    expect(html).toContain("25.0%");
+    expect(html).toContain("8 chaos");
+    expect(html).toContain("Craft");
     expect(html).toContain("calandra-api.piogreeff.workers.dev");
     expect(html).toContain("calandra.pages.dev");
     expect(html).toContain("Calandra Demo Wand");
@@ -218,6 +226,44 @@ function mockDashboardFetch() {
             passiveSkillIds: ["keystone-1", "notable-2"],
           },
         ],
+      });
+    }
+
+    if (url.includes("/crafting/estimate-from-dataset?")) {
+      return Response.json({
+        source: "published-dataset",
+        league: "Dawn of the Hunt",
+        patch: "0.2.0",
+        estimate: {
+          source: "deterministic-engine",
+          itemLevel: 68,
+          currencyCostChaos: 2,
+          eligibleModCount: 2,
+          totalEligibleWeight: 400,
+          eligibleTargetModIds: ["life-t2"],
+          blockedTargetModIds: [],
+          hitProbability: 0.25,
+          expectedAttempts: 4,
+          expectedCostChaos: 8,
+        },
+        comparison: {
+          source: "deterministic-engine",
+          recommendation: "craft",
+          marketPriceChaos: 12,
+          expectedCraftCostChaos: 8,
+          savingsChaos: 4,
+          estimate: {
+            itemLevel: 68,
+            currencyCostChaos: 2,
+            eligibleModCount: 2,
+            totalEligibleWeight: 400,
+            eligibleTargetModIds: ["life-t2"],
+            blockedTargetModIds: [],
+            hitProbability: 0.25,
+            expectedAttempts: 4,
+            expectedCostChaos: 8,
+          },
+        },
       });
     }
 

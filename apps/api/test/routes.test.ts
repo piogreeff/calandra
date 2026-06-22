@@ -1516,6 +1516,100 @@ describe("api routes", () => {
     });
   });
 
+  it("estimates crafting from patch-versioned dataset mod pools", async () => {
+    const response = await api.request(
+      "/crafting/estimate-from-dataset?league=Dawn%20of%20the%20Hunt&patch=0.2.0",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          itemLevel: 68,
+          currencyCostChaos: 2,
+          targetModIds: ["life-t2"],
+          marketPriceChaos: 12,
+        }),
+      },
+      {
+        APP_URL: "https://calandra.pages.dev",
+        DATASET_ARTIFACT_JSON: JSON.stringify({
+          league: "Dawn of the Hunt",
+          patch: "0.2.0",
+          generatedAt: "2026-06-21T00:00:00.000Z",
+          source: "published-artifact",
+          sources: datasetSources,
+          items: [],
+          uniques: [],
+          mods: [
+            {
+              id: "life-t2",
+              name: "+# to maximum Life",
+              domain: "item",
+              generationType: "prefix",
+              minItemLevel: 60,
+              weight: 100,
+            },
+            {
+              id: "mana-t2",
+              name: "+# to maximum Mana",
+              domain: "item",
+              generationType: "prefix",
+              minItemLevel: 60,
+              weight: 300,
+            },
+            {
+              id: "life-t1",
+              name: "+# to maximum Life",
+              domain: "item",
+              generationType: "prefix",
+              minItemLevel: 75,
+              weight: 50,
+            },
+          ],
+          gems: [],
+          economy: [],
+          ladderBuilds: [],
+        }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      source: "published-dataset",
+      league: "Dawn of the Hunt",
+      patch: "0.2.0",
+      estimate: {
+        source: "deterministic-engine",
+        itemLevel: 68,
+        currencyCostChaos: 2,
+        eligibleModCount: 2,
+        totalEligibleWeight: 400,
+        eligibleTargetModIds: ["life-t2"],
+        blockedTargetModIds: [],
+        hitProbability: 0.25,
+        expectedAttempts: 4,
+        expectedCostChaos: 8,
+      },
+      comparison: {
+        source: "deterministic-engine",
+        recommendation: "craft",
+        marketPriceChaos: 12,
+        expectedCraftCostChaos: 8,
+        savingsChaos: 4,
+        estimate: {
+          itemLevel: 68,
+          currencyCostChaos: 2,
+          eligibleModCount: 2,
+          totalEligibleWeight: 400,
+          eligibleTargetModIds: ["life-t2"],
+          blockedTargetModIds: [],
+          hitProbability: 0.25,
+          expectedAttempts: 4,
+          expectedCostChaos: 8,
+        },
+      },
+    });
+  });
+
   it("compares buying and crafting with deterministic engine output", async () => {
     const response = await api.request(
       "/crafting/buy-vs-craft",

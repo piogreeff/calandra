@@ -29,6 +29,7 @@ import { ThemeSelector } from "../components/ThemeSelector";
 import {
   dashboardDatasetVersion,
   defaultApiBaseUrl,
+  getDashboardCraftingEstimate,
   getDashboardDataset,
   getDashboardGggOAuthStatus,
   getDashboardLadderBuild,
@@ -178,7 +179,7 @@ export default async function Home({
   const selectedAccount = resolveSelectedAccount(await searchParams);
   const snapshotReadToken = process.env["SNAPSHOT_READ_TOKEN"]?.trim();
   const snapshotReadOptions = snapshotReadToken ? { snapshotReadToken } : {};
-  const [dataset, gggOAuthStatus, snapshotList, ladderBuilds] =
+  const [dataset, gggOAuthStatus, snapshotList, ladderBuilds, craftingEstimate] =
     await Promise.all([
       getDashboardDataset(),
       getDashboardGggOAuthStatus(),
@@ -189,6 +190,7 @@ export default async function Home({
         snapshotReadOptions,
       ),
       getDashboardLadderBuilds(),
+      getDashboardCraftingEstimate(),
     ]);
   const latestSnapshot =
     snapshotList.snapshots[snapshotList.snapshots.length - 1];
@@ -448,6 +450,49 @@ export default async function Home({
                       </div>
                     </article>
                   ))}
+                </div>
+              </Panel>
+
+              <Panel
+                title="Crafting calculator"
+                icon={<Hammer className="size-4" aria-hidden="true" />}
+              >
+                <div className="mb-3 rounded-md border border-info/30 bg-info/10 p-3 text-xs font-medium text-info">
+                  Dataset mod pool - {craftingEstimate.response.source}
+                  {craftingEstimate.source === "fallback" ? " fallback" : ""}
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="rounded-md bg-base-100/45 p-3">
+                    <p className="text-xs text-base-content/55">Hit chance</p>
+                    <p className="mt-1 text-lg font-semibold text-base-content">
+                      {formatPercent(
+                        craftingEstimate.response.estimate.hitProbability,
+                      )}
+                    </p>
+                  </div>
+                  <div className="rounded-md bg-base-100/45 p-3">
+                    <p className="text-xs text-base-content/55">
+                      Expected cost
+                    </p>
+                    <p className="mt-1 text-lg font-semibold text-base-content">
+                      {formatChaos(
+                        craftingEstimate.response.estimate.expectedCostChaos,
+                      )}
+                    </p>
+                  </div>
+                  <div className="rounded-md bg-base-100/45 p-3">
+                    <p className="text-xs text-base-content/55">Eligible</p>
+                    <p className="mt-1 text-lg font-semibold text-base-content">
+                      {craftingEstimate.response.estimate.eligibleModCount}
+                    </p>
+                  </div>
+                  <div className="rounded-md bg-base-100/45 p-3">
+                    <p className="text-xs text-base-content/55">Decision</p>
+                    <p className="mt-1 text-lg font-semibold capitalize text-primary">
+                      {craftingEstimate.response.comparison?.recommendation ??
+                        "Estimate"}
+                    </p>
+                  </div>
                 </div>
               </Panel>
 
@@ -1061,6 +1106,14 @@ function formatBytes(value: number | undefined) {
 
 function formatCoveragePercent(value: number) {
   return `${(value * 100).toFixed(1)}%`;
+}
+
+function formatPercent(value: number) {
+  return `${(value * 100).toFixed(1)}%`;
+}
+
+function formatChaos(value: number | undefined) {
+  return value === undefined ? "Unknown" : `${value} chaos`;
 }
 
 function formatLevelDelta(delta: number) {

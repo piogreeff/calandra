@@ -9,6 +9,8 @@ import {
   buyVsCraftResponseSchema,
   craftingEstimateRequestSchema,
   craftingEstimateResponseSchema,
+  datasetCraftingEstimateRequestSchema,
+  datasetCraftingEstimateResponseSchema,
   datasetArtifactSchema,
   datasetManifestSchema,
   datasetSearchResponseSchema,
@@ -1102,6 +1104,61 @@ api.post("/crafting/buy-vs-craft", async (context) => {
   );
 });
 
+api.post("/crafting/estimate-from-dataset", async (context) => {
+  const version = getVersionedQuery(context);
+  if (!version.ok) return context.json(version.body, 400);
+
+  const rawBody = await readJsonBody(context);
+  const parsed = datasetCraftingEstimateRequestSchema.safeParse(rawBody);
+
+  if (!parsed.success) {
+    return context.json(
+      { error: "invalid dataset crafting estimate request" },
+      400,
+    );
+  }
+
+  const artifact = await getMatchingArtifact(context, version);
+  if (!artifact) {
+    return context.json({ error: "dataset artifact not found" }, 404);
+  }
+
+  const modPool = toCraftingModPool(artifact.mods);
+  if (modPool.length === 0) {
+    return context.json({ error: "weighted mod pool not found" }, 404);
+  }
+
+  const crafting = craftingEstimateRequestSchema.parse({
+    itemLevel: parsed.data.itemLevel,
+    currencyCostChaos: parsed.data.currencyCostChaos,
+    targetModIds: parsed.data.targetModIds,
+    modPool,
+  });
+  const estimate = craftingEstimateResponseSchema.parse({
+    source: "deterministic-engine",
+    ...estimateCraftingPlan(crafting),
+  });
+  const comparison =
+    parsed.data.marketPriceChaos === undefined
+      ? undefined
+      : buyVsCraftResponseSchema.parse({
+          source: "deterministic-engine",
+          ...compareBuyVsCraft({
+            marketPriceChaos: parsed.data.marketPriceChaos,
+            crafting,
+          }),
+        });
+
+  return context.json(
+    datasetCraftingEstimateResponseSchema.parse({
+      source: "published-dataset",
+      ...getDatasetResponseVersion(artifact, version),
+      estimate,
+      ...(comparison ? { comparison } : {}),
+    }),
+  );
+});
+
 api.get("/items", async (context) => {
   const version = getVersionedQuery(context);
   if (!version.ok) return context.json(version.body, 400);
@@ -1951,6 +2008,21 @@ function findPriceMatch(
   );
 
   return nameMatch ? { price: nameMatch, matchedBy: "name" as const } : null;
+}
+
+function toCraftingModPool(mods: DatasetArtifact["mods"]) {
+  return mods.filter(hasCraftingWeight).map((mod) => ({
+    id: mod.id,
+    name: mod.name,
+    minItemLevel: mod.minItemLevel,
+    weight: mod.weight,
+  }));
+}
+
+function hasCraftingWeight(
+  mod: DatasetArtifact["mods"][number],
+): mod is DatasetArtifact["mods"][number] & { weight: number } {
+  return typeof mod.weight === "number" && mod.weight > 0;
 }
 
 function toAdvisorGearItems(equipment: GearWithStats[]) {

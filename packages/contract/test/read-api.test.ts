@@ -8,6 +8,8 @@ import {
   accountSnapshotSchema,
   buyVsCraftRequestSchema,
   buyVsCraftResponseSchema,
+  datasetCraftingEstimateRequestSchema,
+  datasetCraftingEstimateResponseSchema,
   craftingEstimateRequestSchema,
   craftingEstimateResponseSchema,
   datasetArtifactSchema,
@@ -523,6 +525,50 @@ describe("phase 1 read API contract", () => {
     ).toBeDefined();
     expect(
       openApiDocument.components.schemas.CraftingEstimateResponse,
+    ).toBeDefined();
+    expect(
+      datasetCraftingEstimateRequestSchema.parse({
+        itemLevel: 68,
+        currencyCostChaos: 2,
+        targetModIds: ["life-t2"],
+        marketPriceChaos: 12,
+      }).marketPriceChaos,
+    ).toBe(12);
+    expect(
+      datasetCraftingEstimateResponseSchema.parse({
+        source: "published-dataset",
+        league: "Dawn of the Hunt",
+        patch: "0.2.0",
+        estimate: response,
+        comparison: {
+          source: "deterministic-engine",
+          recommendation: "craft",
+          marketPriceChaos: 12,
+          expectedCraftCostChaos: 8,
+          savingsChaos: 4,
+          estimate: {
+            itemLevel: 68,
+            currencyCostChaos: 2,
+            eligibleModCount: 2,
+            totalEligibleWeight: 400,
+            eligibleTargetModIds: ["life-t2"],
+            blockedTargetModIds: [],
+            hitProbability: 0.25,
+            expectedAttempts: 4,
+            expectedCostChaos: 8,
+          },
+        },
+      }).comparison?.recommendation,
+    ).toBe("craft");
+    expect(
+      openApiDocument.paths["/crafting/estimate-from-dataset"]?.post
+        ?.operationId,
+    ).toBe("estimateDatasetCraftingPlan");
+    expect(
+      openApiDocument.components.schemas.DatasetCraftingEstimateRequest,
+    ).toBeDefined();
+    expect(
+      openApiDocument.components.schemas.DatasetCraftingEstimateResponse,
     ).toBeDefined();
   });
 

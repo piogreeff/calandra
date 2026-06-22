@@ -4,6 +4,8 @@ import {
   accountSnapshotSchema,
   accountSnapshotStoredDiffRequestSchema,
   datasetManifestSchema,
+  datasetCraftingEstimateRequestSchema,
+  datasetCraftingEstimateResponseSchema,
   datasetSearchResponseSchema,
   economyCollectionSchema,
   gggOAuthCompleteRequestSchema,
@@ -21,6 +23,7 @@ import {
   type AccountSnapshotDiff,
   type AccountSnapshotListItem,
   type DatasetManifest,
+  type DatasetCraftingEstimateResponse,
   type DatasetSearchResponse,
   type EconomyPrice,
   type GggOAuthCompleteRequest,
@@ -90,6 +93,11 @@ export type DashboardLadderBuild = {
 export type DashboardSnapshotAdvisor = {
   source: "api" | "fallback";
   response: UpgradeAdvisorResponse;
+};
+
+export type DashboardCraftingEstimate = {
+  source: "api" | "fallback";
+  response: DatasetCraftingEstimateResponse;
 };
 
 export type DashboardLadderBuildFilters = {
@@ -202,6 +210,13 @@ const dashboardAdvisorRequest = snapshotUpgradeAdvisorRequestSchema.parse({
   maxBudgetChaos: 20,
 });
 
+const dashboardCraftingRequest = datasetCraftingEstimateRequestSchema.parse({
+  itemLevel: 68,
+  currencyCostChaos: 2,
+  targetModIds: ["life-t2"],
+  marketPriceChaos: 12,
+});
+
 const fallbackAdvisorResponse: UpgradeAdvisorResponse = {
   source: "deterministic-engine",
   upgrades: [
@@ -242,6 +257,42 @@ const fallbackAdvisorResponse: UpgradeAdvisorResponse = {
       candidateMissingStats: [],
     },
   ],
+};
+
+const fallbackCraftingEstimateResponse: DatasetCraftingEstimateResponse = {
+  source: "published-dataset",
+  league: dashboardDatasetVersion.league,
+  patch: dashboardDatasetVersion.patch,
+  estimate: {
+    source: "deterministic-engine",
+    itemLevel: 68,
+    currencyCostChaos: 2,
+    eligibleModCount: 2,
+    totalEligibleWeight: 400,
+    eligibleTargetModIds: ["life-t2"],
+    blockedTargetModIds: [],
+    hitProbability: 0.25,
+    expectedAttempts: 4,
+    expectedCostChaos: 8,
+  },
+  comparison: {
+    source: "deterministic-engine",
+    recommendation: "craft",
+    marketPriceChaos: 12,
+    expectedCraftCostChaos: 8,
+    savingsChaos: 4,
+    estimate: {
+      itemLevel: 68,
+      currencyCostChaos: 2,
+      eligibleModCount: 2,
+      totalEligibleWeight: 400,
+      eligibleTargetModIds: ["life-t2"],
+      blockedTargetModIds: [],
+      hitProbability: 0.25,
+      expectedAttempts: 4,
+      expectedCostChaos: 8,
+    },
+  },
 };
 
 function fallbackSnapshots(account: string): DashboardSnapshots {
@@ -374,6 +425,32 @@ export async function getDashboardGggOAuthStatus(
     };
   } catch {
     return fallbackGggOAuthStatus();
+  }
+}
+
+export async function getDashboardCraftingEstimate(
+  apiBaseUrl = defaultApiBaseUrl,
+  fetchImplementation: typeof fetch = fetch,
+): Promise<DashboardCraftingEstimate> {
+  try {
+    const query = new URLSearchParams(dashboardDatasetVersion);
+    const response = await fetchJson(
+      fetchImplementation,
+      `${apiBaseUrl}/crafting/estimate-from-dataset?${query.toString()}`,
+      datasetCraftingEstimateResponseSchema.parse,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(dashboardCraftingRequest),
+      },
+    );
+
+    return { source: "api", response };
+  } catch {
+    return {
+      source: "fallback",
+      response: fallbackCraftingEstimateResponse,
+    };
   }
 }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   completeDashboardGggOAuthLink,
+  getDashboardCraftingEstimate,
   getDashboardDataset,
   getDashboardGggOAuthStatus,
   getDashboardLadderBuild,
@@ -121,6 +122,81 @@ describe("dashboard read API client", () => {
     expect(dataset.items.length).toBeGreaterThan(0);
     expect(dataset.prices.length).toBeGreaterThan(0);
     expect(dataset.manifest.artifactKey).toBe("fallback/demo-dataset.json");
+  });
+
+  it("loads a dataset-backed crafting estimate from the typed API", async () => {
+    const fetchImplementation = vi.fn(
+      async (input: RequestInfo | URL, init) => {
+        expect(String(input)).toBe(
+          "https://calandra-api.piogreeff.workers.dev/crafting/estimate-from-dataset?league=Dawn+of+the+Hunt&patch=0.2.0",
+        );
+        expect(init).toMatchObject({
+          method: "POST",
+          headers: { "content-type": "application/json" },
+        });
+        expect(JSON.parse(String(init?.body))).toEqual({
+          itemLevel: 68,
+          currencyCostChaos: 2,
+          targetModIds: ["life-t2"],
+          marketPriceChaos: 12,
+        });
+
+        return Response.json({
+          source: "published-dataset",
+          league: "Dawn of the Hunt",
+          patch: "0.2.0",
+          estimate: {
+            source: "deterministic-engine",
+            itemLevel: 68,
+            currencyCostChaos: 2,
+            eligibleModCount: 2,
+            totalEligibleWeight: 400,
+            eligibleTargetModIds: ["life-t2"],
+            blockedTargetModIds: [],
+            hitProbability: 0.25,
+            expectedAttempts: 4,
+            expectedCostChaos: 8,
+          },
+          comparison: {
+            source: "deterministic-engine",
+            recommendation: "craft",
+            marketPriceChaos: 12,
+            expectedCraftCostChaos: 8,
+            savingsChaos: 4,
+            estimate: {
+              itemLevel: 68,
+              currencyCostChaos: 2,
+              eligibleModCount: 2,
+              totalEligibleWeight: 400,
+              eligibleTargetModIds: ["life-t2"],
+              blockedTargetModIds: [],
+              hitProbability: 0.25,
+              expectedAttempts: 4,
+              expectedCostChaos: 8,
+            },
+          },
+        });
+      },
+    );
+
+    const crafting = await getDashboardCraftingEstimate(
+      "https://calandra-api.piogreeff.workers.dev",
+      fetchImplementation,
+    );
+
+    expect(crafting.source).toBe("api");
+    expect(crafting.response.estimate.hitProbability).toBe(0.25);
+    expect(crafting.response.comparison?.recommendation).toBe("craft");
+  });
+
+  it("falls back to demo crafting estimates when the temporary API is unavailable", async () => {
+    const crafting = await getDashboardCraftingEstimate(
+      "https://calandra-api.piogreeff.workers.dev",
+      vi.fn(async () => new Response(null, { status: 503 })),
+    );
+
+    expect(crafting.source).toBe("fallback");
+    expect(crafting.response.estimate.expectedCostChaos).toBe(8);
   });
 
   it("loads grouped dataset search results from the typed search endpoint", async () => {

@@ -61,6 +61,7 @@ export const modSchema = z.object({
   family: z.string().min(1).optional(),
   minItemLevel: z.number().int().nonnegative(),
   tier: z.number().int().positive().optional(),
+  weight: z.number().positive().optional(),
   tags: z.array(z.string().min(1)).optional(),
   stats: z.array(modStatSchema).optional(),
 });
@@ -415,6 +416,20 @@ export const buyVsCraftResponseSchema = z.object({
   expectedCraftCostChaos: z.number().nonnegative().optional(),
   savingsChaos: z.number().nonnegative(),
   estimate: craftingEstimateResponseSchema.omit({ source: true }),
+});
+
+export const datasetCraftingEstimateRequestSchema = z.object({
+  itemLevel: z.number().int().nonnegative(),
+  currencyCostChaos: z.number().nonnegative(),
+  targetModIds: z.array(z.string().min(1)).min(1),
+  marketPriceChaos: z.number().nonnegative().optional(),
+});
+
+export const datasetCraftingEstimateResponseSchema = z.object({
+  source: z.literal("published-dataset"),
+  ...versionedCollectionFields,
+  estimate: craftingEstimateResponseSchema,
+  comparison: buyVsCraftResponseSchema.optional(),
 });
 
 export const datasetSourceKindSchema = z.enum([
@@ -1295,6 +1310,42 @@ export const openApiDocument = {
         },
       },
     },
+    "/crafting/estimate-from-dataset": {
+      post: {
+        operationId: "estimateDatasetCraftingPlan",
+        summary:
+          "Estimate crafting odds from the published patch-versioned mod dataset",
+        parameters: versionedQueryParameters,
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                $ref: "#/components/schemas/DatasetCraftingEstimateRequest",
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Dataset-backed deterministic crafting estimate",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/DatasetCraftingEstimateResponse",
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Invalid dataset crafting estimate request",
+          },
+          "404": {
+            description: "Dataset artifact or weighted mod pool not found",
+          },
+        },
+      },
+    },
   },
   components: {
     schemas: {
@@ -1374,6 +1425,7 @@ export const openApiDocument = {
           family: { type: "string", minLength: 1 },
           minItemLevel: { type: "integer", minimum: 0 },
           tier: { type: "integer", minimum: 1 },
+          weight: { type: "number", exclusiveMinimum: 0 },
           tags: {
             type: "array",
             items: { type: "string", minLength: 1 },
@@ -2072,6 +2124,31 @@ export const openApiDocument = {
           expectedCostChaos: { type: "number", minimum: 0 },
         },
       },
+      DatasetCraftingEstimateRequest: {
+        type: "object",
+        required: ["itemLevel", "currencyCostChaos", "targetModIds"],
+        properties: {
+          itemLevel: { type: "integer", minimum: 0 },
+          currencyCostChaos: { type: "number", minimum: 0 },
+          targetModIds: {
+            type: "array",
+            minItems: 1,
+            items: { type: "string", minLength: 1 },
+          },
+          marketPriceChaos: { type: "number", minimum: 0 },
+        },
+      },
+      DatasetCraftingEstimateResponse: {
+        type: "object",
+        required: ["source", "league", "patch", "estimate"],
+        properties: {
+          source: { type: "string", enum: ["published-dataset"] },
+          league: { type: "string", minLength: 1 },
+          patch: { type: "string", minLength: 1 },
+          estimate: { $ref: "#/components/schemas/CraftingEstimateResponse" },
+          comparison: { $ref: "#/components/schemas/BuyVsCraftResponse" },
+        },
+      },
       DatasetCounts: {
         type: "object",
         required: [
@@ -2253,6 +2330,12 @@ export type AcquisitionRecommendation = z.infer<
 >;
 export type BuyVsCraftRequest = z.infer<typeof buyVsCraftRequestSchema>;
 export type BuyVsCraftResponse = z.infer<typeof buyVsCraftResponseSchema>;
+export type DatasetCraftingEstimateRequest = z.infer<
+  typeof datasetCraftingEstimateRequestSchema
+>;
+export type DatasetCraftingEstimateResponse = z.infer<
+  typeof datasetCraftingEstimateResponseSchema
+>;
 export type DatasetSourceKind = z.infer<typeof datasetSourceKindSchema>;
 export type DatasetSource = z.infer<typeof datasetSourceSchema>;
 export type DatasetArtifact = z.infer<typeof datasetArtifactSchema>;
