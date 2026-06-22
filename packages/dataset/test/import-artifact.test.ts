@@ -235,7 +235,7 @@ describe("dataset artifact import", () => {
     ).rejects.toThrow("Unique image coverage 90.00% is below required 95.00%");
   });
 
-  it("counts only uniques with HTTPS icon URLs as resolved image coverage", async () => {
+  it("counts only uniques with cached image keys as resolved image coverage", async () => {
     const directory = await mkdtemp(
       join(tmpdir(), "calandra-dataset-icon-coverage-"),
     );
@@ -253,11 +253,12 @@ describe("dataset artifact import", () => {
         uniques: [
           ...makeUniques(18),
           {
-            id: "unique-with-insecure-icon",
-            name: "Unique With Insecure Icon",
+            id: "unique-with-source-only-icon",
+            name: "Unique With Source Only Icon",
             category: "amulet",
             rarity: "unique",
-            iconUrl: "http://web.poecdn.com/image/insecure-unique.png",
+            iconUrl: "https://web.poecdn.com/image/source-only-unique.png",
+            iconSourceUrl: "https://web.poecdn.com/image/source-only-unique.png",
             iconAttribution:
               "Game art and item data are property of Grinding Gear Games.",
           },
@@ -846,7 +847,9 @@ function makeUniques(count: number) {
     name: `Unique ${index + 1}`,
     category: "amulet",
     rarity: "unique",
-    iconUrl: `https://web.poecdn.com/image/unique-${index + 1}.png`,
+    iconUrl: `https://calandra-assets.example/images/Dawn%20of%20the%20Hunt/0.2.0/uniques/unique-${index + 1}.png`,
+    iconSourceUrl: `https://web.poecdn.com/image/unique-${index + 1}.png`,
+    iconCacheKey: `images/Dawn of the Hunt/0.2.0/uniques/unique-${index + 1}.png`,
     iconAttribution:
       "Game art and item data are property of Grinding Gear Games.",
   }));

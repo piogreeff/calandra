@@ -1849,7 +1849,7 @@ function validateUniqueImageCoverageGate(
 }
 
 function hasResolvedUniqueImage(unique: DatasetArtifact["uniques"][number]) {
-  return unique.iconUrl.startsWith("https://");
+  return unique.iconUrl.startsWith("https://") && Boolean(unique.iconCacheKey);
 }
 
 function findPriceMatch(

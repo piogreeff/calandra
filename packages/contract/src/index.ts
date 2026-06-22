@@ -15,6 +15,8 @@ export const itemSchema = z.object({
   category: z.string().min(1),
   rarity: raritySchema,
   iconUrl: z.string().url().optional(),
+  iconSourceUrl: z.string().url().optional(),
+  iconCacheKey: z.string().min(1).optional(),
   iconAttribution: z.string().min(1).optional(),
 });
 
@@ -32,6 +34,8 @@ const versionedCollectionFields = {
 export const uniqueItemSchema = itemSchema.extend({
   rarity: z.literal("unique"),
   iconUrl: z.string().url(),
+  iconSourceUrl: z.string().url().optional(),
+  iconCacheKey: z.string().min(1).optional(),
   iconAttribution: z.string().min(1),
 });
 
@@ -1195,6 +1199,8 @@ export const openApiDocument = {
             enum: ["normal", "magic", "rare", "unique", "gem", "currency"],
           },
           iconUrl: { type: "string", format: "uri" },
+          iconSourceUrl: { type: "string", format: "uri" },
+          iconCacheKey: { type: "string", minLength: 1 },
           iconAttribution: { type: "string", minLength: 1 },
         },
       },
@@ -1226,6 +1232,8 @@ export const openApiDocument = {
           category: { type: "string", minLength: 1 },
           rarity: { type: "string", enum: ["unique"] },
           iconUrl: { type: "string", format: "uri" },
+          iconSourceUrl: { type: "string", format: "uri" },
+          iconCacheKey: { type: "string", minLength: 1 },
           iconAttribution: { type: "string", minLength: 1 },
         },
       },

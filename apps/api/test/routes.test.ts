@@ -54,8 +54,14 @@ const uniqueCoverageArtifact = JSON.stringify({
     rarity: "unique",
     iconUrl:
       index < 19
-        ? `https://web.poecdn.com/image/unique-${index + 1}.png`
+        ? `https://calandra-assets.example/images/Dawn%20of%20the%20Hunt/0.2.0/uniques/unique-${index + 1}.png`
         : "http://web.poecdn.com/image/unresolved-unique.png",
+    ...(index < 19
+      ? {
+          iconSourceUrl: `https://web.poecdn.com/image/unique-${index + 1}.png`,
+          iconCacheKey: `images/Dawn of the Hunt/0.2.0/uniques/unique-${index + 1}.png`,
+        }
+      : {}),
     iconAttribution:
       "Game art and item data are property of Grinding Gear Games.",
   })),
