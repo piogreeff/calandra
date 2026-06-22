@@ -60,6 +60,11 @@ describe("home dashboard", () => {
     expect(html).toContain("Desktop shell");
     expect(html).toContain("Checking desktop shell");
     expect(html).toContain("Loot filters, BuildPlanner files");
+    expect(html).toContain("About Calandra");
+    expect(html).toContain("Unofficial fan tool");
+    expect(html).toContain(
+      "not affiliated with, endorsed by, or associated with Grinding Gear Games",
+    );
   });
 });
 

@@ -81,6 +81,9 @@ const advisorPreview = {
   ],
 } satisfies UpgradeAdvisorResponse;
 
+const gggDisclaimer =
+  "Unofficial fan tool. Calandra is not affiliated with, endorsed by, or associated with Grinding Gear Games. Path of Exile 2 and related content are the property of Grinding Gear Games.";
+
 export default async function Home() {
   const [dataset, gggOAuthStatus, snapshotList] = await Promise.all([
     getDashboardDataset(),
@@ -532,8 +535,21 @@ export default async function Home() {
               </Panel>
 
               <DesktopPathsPanel />
+
+              <Panel
+                title="About Calandra"
+                icon={<Sparkles className="size-4" aria-hidden="true" />}
+              >
+                <p className="text-sm leading-6 text-base-content/70">
+                  {gggDisclaimer}
+                </p>
+              </Panel>
             </aside>
           </div>
+
+          <footer className="border-t border-base-300/60 px-4 py-5 text-xs leading-5 text-base-content/55 lg:px-6">
+            {gggDisclaimer}
+          </footer>
         </section>
       </div>
     </main>
