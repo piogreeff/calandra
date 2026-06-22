@@ -14,10 +14,13 @@ import {
   buyVsCraftResponseSchema,
   craftingEstimateRequestSchema,
   craftingEstimateResponseSchema,
+  datasetCraftingEstimateRequestSchema,
+  datasetCraftingEstimateResponseSchema,
   datasetSearchResponseSchema,
   economyCollectionSchema,
   priceCheckRequestSchema,
   priceCheckResponseSchema,
+  snapshotUpgradeAdvisorRequestSchema,
   upgradeAdvisorRequestSchema,
   upgradeAdvisorResponseSchema,
 } from "@calandra/contract";
@@ -27,7 +30,9 @@ export type CalandraMcpToolName =
   | "search_items"
   | "price_item"
   | "recommend_upgrade"
+  | "recommend_snapshot_upgrade"
   | "estimate_crafting"
+  | "estimate_dataset_crafting"
   | "compare_buy_vs_craft"
   | "diff_snapshots"
   | "list_snapshots"
@@ -82,6 +87,20 @@ const getSnapshotInputSchema = listSnapshotsInputSchema.extend({
   snapshotId: z.string().min(1),
 });
 
+const snapshotUpgradeInputSchema = snapshotUpgradeAdvisorRequestSchema.extend({
+  account: z.string().min(1),
+  snapshotId: z.string().min(1),
+  league: z.string().min(1),
+  patch: z.string().min(1),
+  snapshotReadToken: z.string().min(1).optional(),
+});
+
+const datasetCraftingEstimateInputSchema =
+  datasetCraftingEstimateRequestSchema.extend({
+    league: z.string().min(1),
+    patch: z.string().min(1),
+  });
+
 export function listCalandraMcpTools(): CalandraMcpTool[] {
   return [
     {
@@ -126,6 +145,23 @@ export function listCalandraMcpTools(): CalandraMcpTool[] {
       },
     },
     {
+      name: "recommend_snapshot_upgrade",
+      description:
+        "Rank upgrade candidates for a stored account snapshot using Calandra's published dataset.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          ...versionedToolProperties,
+          account: { type: "string", minLength: 1 },
+          snapshotId: { type: "string", minLength: 1 },
+          weights: { type: "object", additionalProperties: { type: "number" } },
+          maxBudgetChaos: { type: "number", minimum: 0 },
+          snapshotReadToken: { type: "string", minLength: 1 },
+        },
+        required: ["league", "patch", "account", "snapshotId", "weights"],
+      },
+    },
+    {
       name: "estimate_crafting",
       description:
         "Estimate crafting odds and expected chaos cost with Calandra's deterministic engine.",
@@ -138,6 +174,28 @@ export function listCalandraMcpTools(): CalandraMcpTool[] {
           modPool: { type: "array" },
         },
         required: ["itemLevel", "currencyCostChaos", "targetModIds", "modPool"],
+      },
+    },
+    {
+      name: "estimate_dataset_crafting",
+      description:
+        "Estimate crafting odds and buy-vs-craft from Calandra's published patch-versioned dataset.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          ...versionedToolProperties,
+          itemLevel: { type: "number", minimum: 0 },
+          currencyCostChaos: { type: "number", minimum: 0 },
+          targetModIds: { type: "array" },
+          marketPriceChaos: { type: "number", minimum: 0 },
+        },
+        required: [
+          "league",
+          "patch",
+          "itemLevel",
+          "currencyCostChaos",
+          "targetModIds",
+        ],
       },
     },
     {
@@ -239,9 +297,25 @@ export function createCalandraMcpServer(options: CalandraMcpServerOptions) {
           return jsonToolResult(
             await recommendUpgrade(apiBaseUrl, fetchImplementation, input),
           );
+        case "recommend_snapshot_upgrade":
+          return jsonToolResult(
+            await recommendSnapshotUpgrade(
+              apiBaseUrl,
+              fetchImplementation,
+              input,
+            ),
+          );
         case "estimate_crafting":
           return jsonToolResult(
             await estimateCrafting(apiBaseUrl, fetchImplementation, input),
+          );
+        case "estimate_dataset_crafting":
+          return jsonToolResult(
+            await estimateDatasetCrafting(
+              apiBaseUrl,
+              fetchImplementation,
+              input,
+            ),
           );
         case "compare_buy_vs_craft":
           return jsonToolResult(
@@ -352,6 +426,34 @@ async function recommendUpgrade(
   );
 }
 
+async function recommendSnapshotUpgrade(
+  apiBaseUrl: string,
+  fetchImplementation: FetchLike,
+  input: unknown,
+) {
+  const parsed = snapshotUpgradeInputSchema.parse(input);
+  const { account, snapshotId, league, patch, snapshotReadToken, ...request } =
+    parsed;
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+  };
+  if (snapshotReadToken) {
+    headers["x-calandra-snapshot-read-token"] = snapshotReadToken;
+  }
+
+  return upgradeAdvisorResponseSchema.parse(
+    await fetchJson(
+      fetchImplementation,
+      `${apiBaseUrl}/advisor/snapshots/${encodeURIComponent(account)}/${encodeURIComponent(snapshotId)}?${versionedQuery({ league, patch })}`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify(request),
+      },
+    ),
+  );
+}
+
 async function estimateCrafting(
   apiBaseUrl: string,
   fetchImplementation: FetchLike,
@@ -365,6 +467,27 @@ async function estimateCrafting(
       headers: { "content-type": "application/json" },
       body: JSON.stringify(request),
     }),
+  );
+}
+
+async function estimateDatasetCrafting(
+  apiBaseUrl: string,
+  fetchImplementation: FetchLike,
+  input: unknown,
+) {
+  const parsed = datasetCraftingEstimateInputSchema.parse(input);
+  const { league, patch, ...request } = parsed;
+
+  return datasetCraftingEstimateResponseSchema.parse(
+    await fetchJson(
+      fetchImplementation,
+      `${apiBaseUrl}/crafting/estimate-from-dataset?${versionedQuery({ league, patch })}`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(request),
+      },
+    ),
   );
 }
 

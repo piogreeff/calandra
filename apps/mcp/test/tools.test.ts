@@ -13,7 +13,9 @@ describe("Calandra MCP tools", () => {
       "search_items",
       "price_item",
       "recommend_upgrade",
+      "recommend_snapshot_upgrade",
       "estimate_crafting",
+      "estimate_dataset_crafting",
       "compare_buy_vs_craft",
       "diff_snapshots",
       "list_snapshots",
@@ -193,6 +195,74 @@ describe("Calandra MCP tools", () => {
     });
   });
 
+  it("routes stored snapshot upgrade recommendations to the dataset-backed advisor endpoint", async () => {
+    const fetch = vi.fn(async () =>
+      jsonResponse({
+        source: "deterministic-engine",
+        upgrades: [
+          {
+            slot: "boots",
+            currentName: "Current Boots",
+            candidateName: "Fast Boots",
+            currentScore: 40,
+            candidateScore: 100,
+            scoreDelta: 60,
+            estimatedCostChaos: 50,
+            valuePerChaos: 1.2,
+            currentMissingStats: ["movementSpeed"],
+            candidateMissingStats: [],
+          },
+        ],
+      }),
+    );
+    const server = createCalandraMcpServer({
+      apiBaseUrl: "https://calandra-api.workers.dev",
+      fetch,
+    });
+
+    const result = await server.callTool("recommend_snapshot_upgrade", {
+      account: "example account",
+      snapshotId: "snapshot-2026-06-21T10-00-00Z",
+      league: "Dawn of the Hunt",
+      patch: "0.2.0",
+      weights: { life: 1, movementSpeed: 2 },
+      maxBudgetChaos: 60,
+      snapshotReadToken: "read-token",
+    });
+
+    expect(fetch).toHaveBeenCalledWith(
+      "https://calandra-api.workers.dev/advisor/snapshots/example%20account/snapshot-2026-06-21T10-00-00Z?league=Dawn+of+the+Hunt&patch=0.2.0",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-calandra-snapshot-read-token": "read-token",
+        },
+        body: JSON.stringify({
+          weights: { life: 1, movementSpeed: 2 },
+          maxBudgetChaos: 60,
+        }),
+      },
+    );
+    expect(parseToolJson(result)).toEqual({
+      source: "deterministic-engine",
+      upgrades: [
+        {
+          slot: "boots",
+          currentName: "Current Boots",
+          candidateName: "Fast Boots",
+          currentScore: 40,
+          candidateScore: 100,
+          scoreDelta: 60,
+          estimatedCostChaos: 50,
+          valuePerChaos: 1.2,
+          currentMissingStats: ["movementSpeed"],
+          candidateMissingStats: [],
+        },
+      ],
+    });
+  });
+
   it("routes crafting estimates to the deterministic crafting endpoint", async () => {
     const fetch = vi.fn(async () =>
       jsonResponse({
@@ -282,6 +352,108 @@ describe("Calandra MCP tools", () => {
       hitProbability: 0.25,
       expectedAttempts: 4,
       expectedCostChaos: 8,
+    });
+  });
+
+  it("routes dataset-backed crafting estimates to the published dataset endpoint", async () => {
+    const fetch = vi.fn(async () =>
+      jsonResponse({
+        source: "published-dataset",
+        league: "Dawn of the Hunt",
+        patch: "0.2.0",
+        estimate: {
+          source: "deterministic-engine",
+          itemLevel: 68,
+          currencyCostChaos: 2,
+          eligibleModCount: 2,
+          totalEligibleWeight: 400,
+          eligibleTargetModIds: ["life-t2"],
+          blockedTargetModIds: ["life-t1"],
+          hitProbability: 0.25,
+          expectedAttempts: 4,
+          expectedCostChaos: 8,
+        },
+        comparison: {
+          source: "deterministic-engine",
+          recommendation: "craft",
+          marketPriceChaos: 12,
+          expectedCraftCostChaos: 8,
+          savingsChaos: 4,
+          estimate: {
+            itemLevel: 68,
+            currencyCostChaos: 2,
+            eligibleModCount: 2,
+            totalEligibleWeight: 400,
+            eligibleTargetModIds: ["life-t2"],
+            blockedTargetModIds: ["life-t1"],
+            hitProbability: 0.25,
+            expectedAttempts: 4,
+            expectedCostChaos: 8,
+          },
+        },
+      }),
+    );
+    const server = createCalandraMcpServer({
+      apiBaseUrl: "https://calandra-api.workers.dev",
+      fetch,
+    });
+
+    const result = await server.callTool("estimate_dataset_crafting", {
+      league: "Dawn of the Hunt",
+      patch: "0.2.0",
+      itemLevel: 68,
+      currencyCostChaos: 2,
+      targetModIds: ["life-t2", "life-t1"],
+      marketPriceChaos: 12,
+    });
+
+    expect(fetch).toHaveBeenCalledWith(
+      "https://calandra-api.workers.dev/crafting/estimate-from-dataset?league=Dawn+of+the+Hunt&patch=0.2.0",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          itemLevel: 68,
+          currencyCostChaos: 2,
+          targetModIds: ["life-t2", "life-t1"],
+          marketPriceChaos: 12,
+        }),
+      },
+    );
+    expect(parseToolJson(result)).toEqual({
+      source: "published-dataset",
+      league: "Dawn of the Hunt",
+      patch: "0.2.0",
+      estimate: {
+        source: "deterministic-engine",
+        itemLevel: 68,
+        currencyCostChaos: 2,
+        eligibleModCount: 2,
+        totalEligibleWeight: 400,
+        eligibleTargetModIds: ["life-t2"],
+        blockedTargetModIds: ["life-t1"],
+        hitProbability: 0.25,
+        expectedAttempts: 4,
+        expectedCostChaos: 8,
+      },
+      comparison: {
+        source: "deterministic-engine",
+        recommendation: "craft",
+        marketPriceChaos: 12,
+        expectedCraftCostChaos: 8,
+        savingsChaos: 4,
+        estimate: {
+          itemLevel: 68,
+          currencyCostChaos: 2,
+          eligibleModCount: 2,
+          totalEligibleWeight: 400,
+          eligibleTargetModIds: ["life-t2"],
+          blockedTargetModIds: ["life-t1"],
+          hitProbability: 0.25,
+          expectedAttempts: 4,
+          expectedCostChaos: 8,
+        },
+      },
     });
   });
 
@@ -710,7 +882,9 @@ describe("Calandra MCP tools", () => {
         "search_items",
         "price_item",
         "recommend_upgrade",
+        "recommend_snapshot_upgrade",
         "estimate_crafting",
+        "estimate_dataset_crafting",
         "compare_buy_vs_craft",
         "diff_snapshots",
         "list_snapshots",
