@@ -57,6 +57,25 @@ describe("dataset CLI args", () => {
     });
   });
 
+  it("parses maintainer icon cache options", () => {
+    expect(
+      parseDatasetCliArgs([
+        "--cache-icons",
+        "--artifact",
+        "artifact.json",
+        "--icon-cache-dir",
+        "dist/icons",
+        "--execution-context",
+        "maintainer",
+      ]),
+    ).toEqual({
+      mode: "cache-icons",
+      artifactPath: "artifact.json",
+      iconCacheDirectory: "dist/icons",
+      executionContext: "maintainer",
+    });
+  });
+
   it("rejects scraper-like flags", () => {
     expect(() =>
       parseDatasetCliArgs([

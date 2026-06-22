@@ -17,9 +17,17 @@ export type MaintainerArtifactBuildCliOptions = {
   sourceUrls: string[];
 };
 
+export type MaintainerIconCacheCliOptions = {
+  mode: "cache-icons";
+  artifactPath: string;
+  iconCacheDirectory: string;
+  executionContext: "maintainer" | "client" | "self-host";
+};
+
 export type DatasetCliOptions =
   | DatasetArtifactCliOptions
-  | MaintainerArtifactBuildCliOptions;
+  | MaintainerArtifactBuildCliOptions
+  | MaintainerIconCacheCliOptions;
 
 export function parseDatasetCliArgs(args: string[]): DatasetCliOptions {
   const scrapeFlag = args.find(
@@ -55,6 +63,31 @@ export function parseDatasetCliArgs(args: string[]): DatasetCliOptions {
       outputArtifactPath,
       executionContext,
       sourceUrls,
+    };
+  }
+
+  if (args.includes("--cache-icons")) {
+    const artifactPath = getFlagValue(args, "--artifact");
+    const iconCacheDirectory = getFlagValue(args, "--icon-cache-dir");
+    const executionContext = getFlagValue(args, "--execution-context");
+
+    if (!artifactPath || !iconCacheDirectory || !executionContext) {
+      throw new Error(
+        "Usage: pnpm dataset:import -- --cache-icons --artifact <path> --icon-cache-dir <dir> --execution-context maintainer",
+      );
+    }
+
+    if (!isDatasetExecutionContext(executionContext)) {
+      throw new Error(
+        "--execution-context must be maintainer, client, or self-host",
+      );
+    }
+
+    return {
+      mode: "cache-icons",
+      artifactPath,
+      iconCacheDirectory,
+      executionContext,
     };
   }
 
