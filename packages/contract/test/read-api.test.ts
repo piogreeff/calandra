@@ -20,6 +20,7 @@ import {
   gggOAuthStartResponseSchema,
   gggOAuthStatusResponseSchema,
   ladderBuildCollectionSchema,
+  ladderBuildSchema,
   modCollectionSchema,
   openApiDocument,
   gggOAuthTokenExchangeRequestSchema,
@@ -301,6 +302,26 @@ describe("phase 1 read API contract", () => {
       mainSkill: "Lightning Arrow",
       passiveSkillIds: ["keystone-1", "notable-2"],
     });
+    expect(
+      ladderBuildSchema.parse({
+        id: "deadeye-1",
+        account: "example",
+        character: "CalandraTest",
+        className: "Deadeye",
+        level: 92,
+        equipment: [
+          {
+            slot: "Gloves",
+            name: "Duskthread Grips",
+            rarity: "rare",
+            iconUrl: "https://calandra.pages.dev/demo-gloves.svg",
+            iconAttribution:
+              "Synthetic Calandra demo icon; no game art is bundled.",
+            stats: { life: 65, fireResistance: 18 },
+          },
+        ],
+      }).equipment?.[0],
+    ).toMatchObject({ slot: "Gloves", name: "Duskthread Grips" });
   });
 
   it("models grouped dataset search results for the patch-versioned item database", () => {
@@ -355,6 +376,10 @@ describe("phase 1 read API contract", () => {
       "searchDataset",
     );
     expect(openApiDocument.paths["/builds/ladder"]).toBeDefined();
+    expect(openApiDocument.paths["/builds/ladder/{id}"]).toBeDefined();
+    expect(
+      openApiDocument.paths["/builds/ladder/{id}"]?.get?.operationId,
+    ).toBe("getLadderBuild");
     expect(
       openApiDocument.paths["/builds/ladder"]?.get?.parameters,
     ).toEqual(
@@ -375,6 +400,12 @@ describe("phase 1 read API contract", () => {
     ).toEqual({
       type: "array",
       items: { type: "string", minLength: 1 },
+    });
+    expect(
+      openApiDocument.components.schemas.LadderBuild.properties.equipment,
+    ).toEqual({
+      type: "array",
+      items: { $ref: "#/components/schemas/AccountSnapshotGearItem" },
     });
     expect(openApiDocument.paths["/datasets/manifest"]).toBeDefined();
     expect(openApiDocument.components.schemas.ModStat).toBeDefined();

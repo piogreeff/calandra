@@ -189,6 +189,17 @@ describe("api routes", () => {
           passiveTreeUrl:
             "https://poe.ninja/poe2/builds/dawn/character/example/CalandraTest/passive-tree",
           passiveSkillIds: ["keystone-1", "notable-2"],
+          equipment: [
+            {
+              slot: "Gloves",
+              name: "Duskthread Grips",
+              rarity: "rare",
+              iconUrl: "https://calandra.pages.dev/demo-gloves.svg",
+              iconAttribution:
+                "Synthetic Calandra demo icon; no game art is bundled.",
+              stats: { life: 65, fireResistance: 18 },
+            },
+          ],
           updatedAt: "2026-06-22T00:00:00.000Z",
         },
       ],
@@ -501,10 +512,40 @@ describe("api routes", () => {
             passiveTreeUrl:
               "https://poe.ninja/poe2/builds/dawn/character/example/CalandraTest/passive-tree",
             passiveSkillIds: ["keystone-1", "notable-2"],
+            equipment: [
+              {
+                slot: "Gloves",
+                name: "Duskthread Grips",
+                rarity: "rare",
+                iconUrl: "https://calandra.pages.dev/demo-gloves.svg",
+                iconAttribution:
+                  "Synthetic Calandra demo icon; no game art is bundled.",
+                stats: { life: 65, fireResistance: 18 },
+              },
+            ],
             updatedAt: "2026-06-22T00:00:00.000Z",
           },
         ],
       },
+    );
+  });
+
+  it("returns one ladder build detail with equipment and passive tree data", async () => {
+    await expectJson(
+      "/builds/ladder/deadeye-1?league=Dawn%20of%20the%20Hunt&patch=0.2.0",
+      datasetEnv,
+      expect.objectContaining({
+        id: "deadeye-1",
+        character: "CalandraTest",
+        passiveSkillIds: ["keystone-1", "notable-2"],
+        equipment: [
+          expect.objectContaining({
+            slot: "Gloves",
+            name: "Duskthread Grips",
+            iconUrl: "https://calandra.pages.dev/demo-gloves.svg",
+          }),
+        ],
+      }),
     );
   });
 

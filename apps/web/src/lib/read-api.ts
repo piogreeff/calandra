@@ -13,6 +13,7 @@ import {
   gggOAuthTokenExchangeResponseSchema,
   itemCollectionSchema,
   ladderBuildCollectionSchema,
+  ladderBuildSchema,
   uniqueCollectionSchema,
   type AccountSnapshot,
   type AccountSnapshotDiff,
@@ -76,6 +77,11 @@ export type DashboardSearchResults = DatasetSearchResponse & {
 export type DashboardLadderBuilds = {
   source: "api" | "fallback";
   builds: LadderBuild[];
+};
+
+export type DashboardLadderBuild = {
+  source: "api" | "fallback";
+  build: LadderBuild | null;
 };
 
 export type DashboardLadderBuildFilters = {
@@ -168,6 +174,17 @@ const fallbackLadderBuilds: LadderBuild[] = [
     passiveTreeUrl:
       "https://poe.ninja/poe2/builds/runesofaldur/character/heygyus-0416/ResurrectGodAura/passive-tree",
     passiveSkillIds: ["aura-wheel", "spirit-path", "reservation"],
+    equipment: [
+      {
+        slot: "Gloves",
+        name: "Duskthread Grips",
+        rarity: "rare",
+        iconUrl: "https://calandra.pages.dev/demo-gloves.svg",
+        iconAttribution:
+          "Synthetic Calandra demo icon; no game art is bundled.",
+        stats: { life: 65, fireResistance: 18 },
+      },
+    ],
     updatedAt: "2026-06-21T13:15:00.000Z",
   },
 ];
@@ -432,6 +449,30 @@ export async function getDashboardLadderBuilds(
     return {
       source: "fallback",
       builds: fallbackLadderBuilds,
+    };
+  }
+}
+
+export async function getDashboardLadderBuild(
+  id: string | undefined,
+  apiBaseUrl = defaultApiBaseUrl,
+  fetchImplementation: typeof fetch = fetch,
+): Promise<DashboardLadderBuild> {
+  if (!id) return { source: "fallback", build: null };
+
+  try {
+    const query = new URLSearchParams(dashboardDatasetVersion);
+    const build = await fetchJson(
+      fetchImplementation,
+      `${apiBaseUrl}/builds/ladder/${encodeURIComponent(id)}?${query.toString()}`,
+      ladderBuildSchema.parse,
+    );
+
+    return { source: "api", build };
+  } catch {
+    return {
+      source: "fallback",
+      build: fallbackLadderBuilds.find((build) => build.id === id) ?? null,
     };
   }
 }

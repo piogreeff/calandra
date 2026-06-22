@@ -106,6 +106,7 @@ describe("home dashboard", () => {
     expect(html).toContain("Level 92 Deadeye");
     expect(html).toContain("#42");
     expect(html).toContain("Lightning Arrow");
+    expect(html).toContain("1 gear item tracked");
     expect(html).toContain("Open passive tree");
     expect(html).toContain(
       "https://poe.ninja/poe2/builds/dawn/character/example/CalandraTest/passive-tree",
@@ -211,6 +212,31 @@ function mockDashboardFetch() {
             passiveTreeUrl:
               "https://poe.ninja/poe2/builds/dawn/character/example/CalandraTest/passive-tree",
             passiveSkillIds: ["keystone-1", "notable-2"],
+          },
+        ],
+      });
+    }
+
+    if (url.includes("/builds/ladder/deadeye-1?")) {
+      return Response.json({
+        id: "deadeye-1",
+        account: "example",
+        character: "CalandraTest",
+        className: "Deadeye",
+        level: 92,
+        rank: 42,
+        mainSkill: "Lightning Arrow",
+        passiveTreeUrl:
+          "https://poe.ninja/poe2/builds/dawn/character/example/CalandraTest/passive-tree",
+        passiveSkillIds: ["keystone-1", "notable-2"],
+        equipment: [
+          {
+            slot: "Gloves",
+            name: "Duskthread Grips",
+            rarity: "rare",
+            iconUrl: "https://calandra.pages.dev/demo-gloves.svg",
+            iconAttribution:
+              "Synthetic Calandra demo icon; no game art is bundled.",
           },
         ],
       });

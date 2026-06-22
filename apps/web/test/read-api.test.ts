@@ -3,6 +3,7 @@ import {
   completeDashboardGggOAuthLink,
   getDashboardDataset,
   getDashboardGggOAuthStatus,
+  getDashboardLadderBuild,
   getDashboardLadderBuilds,
   getDashboardSearch,
   getDashboardLatestSnapshot,
@@ -224,6 +225,45 @@ describe("dashboard read API client", () => {
     });
   });
 
+  it("loads one patch-versioned ladder build detail with equipment", async () => {
+    const fetchImplementation = vi.fn(async () =>
+      Response.json({
+        id: "deadeye-1",
+        account: "example",
+        character: "CalandraTest",
+        className: "Deadeye",
+        level: 92,
+        passiveSkillIds: ["keystone-1", "notable-2"],
+        equipment: [
+          {
+            slot: "Gloves",
+            name: "Duskthread Grips",
+            rarity: "rare",
+            iconUrl: "https://calandra.pages.dev/demo-gloves.svg",
+            iconAttribution:
+              "Synthetic Calandra demo icon; no game art is bundled.",
+            stats: { life: 65, fireResistance: 18 },
+          },
+        ],
+      }),
+    );
+
+    const build = await getDashboardLadderBuild(
+      "deadeye-1",
+      "https://calandra-api.piogreeff.workers.dev",
+      fetchImplementation,
+    );
+
+    expect(fetchImplementation).toHaveBeenCalledWith(
+      "https://calandra-api.piogreeff.workers.dev/builds/ladder/deadeye-1?league=Dawn+of+the+Hunt&patch=0.2.0",
+    );
+    expect(build.source).toBe("api");
+    expect(build.build?.equipment?.[0]).toMatchObject({
+      slot: "Gloves",
+      name: "Duskthread Grips",
+    });
+  });
+
   it("falls back to demo ladder builds when the temporary API is unavailable", async () => {
     const builds = await getDashboardLadderBuilds(
       "https://calandra-api.piogreeff.workers.dev",
@@ -232,6 +272,17 @@ describe("dashboard read API client", () => {
 
     expect(builds.source).toBe("fallback");
     expect(builds.builds[0]?.character).toBe("ResurrectGodAura");
+  });
+
+  it("falls back to demo ladder build detail when the temporary API is unavailable", async () => {
+    const build = await getDashboardLadderBuild(
+      "demo-resurrect-god-aura",
+      "https://calandra-api.piogreeff.workers.dev",
+      vi.fn(async () => new Response(null, { status: 503 })),
+    );
+
+    expect(build.source).toBe("fallback");
+    expect(build.build?.character).toBe("ResurrectGodAura");
   });
 
   it("loads safe GGG OAuth status for account linking", async () => {

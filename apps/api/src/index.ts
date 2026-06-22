@@ -18,6 +18,7 @@ import {
   economyCollectionSchema,
   gemCollectionSchema,
   itemCollectionSchema,
+  ladderBuildSchema,
   ladderBuildCollectionSchema,
   modCollectionSchema,
   openApiDocument,
@@ -1209,6 +1210,18 @@ api.get("/builds/ladder", async (context) => {
       }),
     }),
   );
+});
+
+api.get("/builds/ladder/:id", async (context) => {
+  const version = getVersionedQuery(context);
+  if (!version.ok) return context.json(version.body, 400);
+  const artifact = await getMatchingArtifact(context, version);
+  const id = context.req.param("id");
+  const build = artifact?.ladderBuilds.find((candidate) => candidate.id === id);
+
+  if (build) return context.json(ladderBuildSchema.parse(build));
+
+  return context.json({ error: "ladder build not found", id }, 404);
 });
 
 api.get("/datasets/manifest", async (context) => {

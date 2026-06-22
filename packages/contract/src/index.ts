@@ -118,6 +118,16 @@ export const priceCheckResponseSchema = z.object({
   matchedBy: priceCheckMatchTypeSchema.nullable(),
 });
 
+export const accountSnapshotGearItemSchema = z.object({
+  slot: z.string().min(1),
+  name: z.string().min(1),
+  itemId: z.string().min(1).optional(),
+  rarity: raritySchema.optional(),
+  iconUrl: z.string().url().optional(),
+  iconAttribution: z.string().min(1).optional(),
+  stats: z.record(z.number()).optional(),
+});
+
 export const ladderBuildSchema = z.object({
   id: z.string().min(1),
   account: z.string().min(1),
@@ -129,6 +139,7 @@ export const ladderBuildSchema = z.object({
   profileUrl: z.string().url().optional(),
   passiveTreeUrl: z.string().url().optional(),
   passiveSkillIds: z.array(z.string().min(1)).optional(),
+  equipment: z.array(accountSnapshotGearItemSchema).optional(),
   updatedAt: z.string().datetime().optional(),
 });
 
@@ -155,16 +166,6 @@ export const accountSnapshotSourceSchema = z.enum([
 export const accountSnapshotCapabilitiesSchema = z.object({
   characters: z.boolean(),
   stashes: z.boolean(),
-});
-
-export const accountSnapshotGearItemSchema = z.object({
-  slot: z.string().min(1),
-  name: z.string().min(1),
-  itemId: z.string().min(1).optional(),
-  rarity: raritySchema.optional(),
-  iconUrl: z.string().url().optional(),
-  iconAttribution: z.string().min(1).optional(),
-  stats: z.record(z.number()).optional(),
 });
 
 export const accountSnapshotCharacterSchema = z.object({
@@ -713,6 +714,34 @@ export const openApiDocument = {
                 schema: { $ref: "#/components/schemas/LadderBuildCollection" },
               },
             },
+          },
+        },
+      },
+    },
+    "/builds/ladder/{id}": {
+      get: {
+        operationId: "getLadderBuild",
+        summary: "Get one patch-versioned ladder build snapshot",
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string", minLength: 1 },
+          },
+          ...versionedQueryParameters,
+        ],
+        responses: {
+          "200": {
+            description: "Ladder build detail",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/LadderBuild" },
+              },
+            },
+          },
+          "404": {
+            description: "Ladder build not found for league and patch",
           },
         },
       },
@@ -1416,6 +1445,10 @@ export const openApiDocument = {
           passiveSkillIds: {
             type: "array",
             items: { type: "string", minLength: 1 },
+          },
+          equipment: {
+            type: "array",
+            items: { $ref: "#/components/schemas/AccountSnapshotGearItem" },
           },
           updatedAt: { type: "string", format: "date-time" },
         },

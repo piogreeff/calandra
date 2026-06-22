@@ -32,6 +32,7 @@ import {
   defaultApiBaseUrl,
   getDashboardDataset,
   getDashboardGggOAuthStatus,
+  getDashboardLadderBuild,
   getDashboardLadderBuilds,
   getDashboardLatestSnapshot,
   getDashboardSnapshotDiff,
@@ -221,32 +222,34 @@ export default async function Home({
   const snapshotReadOptions = snapshotReadToken ? { snapshotReadToken } : {};
   const [dataset, gggOAuthStatus, snapshotList, ladderBuilds] =
     await Promise.all([
-    getDashboardDataset(),
-    getDashboardGggOAuthStatus(),
-    getDashboardSnapshots(
-      selectedAccount,
-      defaultApiBaseUrl,
-      fetch,
-      snapshotReadOptions,
-    ),
-    getDashboardLadderBuilds(),
-  ]);
-  const [snapshotDiff, latestSnapshotDetail] = await Promise.all([
-    getDashboardSnapshotDiff(
-      snapshotList.account,
-      snapshotList.snapshots,
-      defaultApiBaseUrl,
-      fetch,
-      snapshotReadOptions,
-    ),
-    getDashboardLatestSnapshot(
-      snapshotList.account,
-      snapshotList.snapshots,
-      defaultApiBaseUrl,
-      fetch,
-      snapshotReadOptions,
-    ),
-  ]);
+      getDashboardDataset(),
+      getDashboardGggOAuthStatus(),
+      getDashboardSnapshots(
+        selectedAccount,
+        defaultApiBaseUrl,
+        fetch,
+        snapshotReadOptions,
+      ),
+      getDashboardLadderBuilds(),
+    ]);
+  const [snapshotDiff, latestSnapshotDetail, ladderBuildDetail] =
+    await Promise.all([
+      getDashboardSnapshotDiff(
+        snapshotList.account,
+        snapshotList.snapshots,
+        defaultApiBaseUrl,
+        fetch,
+        snapshotReadOptions,
+      ),
+      getDashboardLatestSnapshot(
+        snapshotList.account,
+        snapshotList.snapshots,
+        defaultApiBaseUrl,
+        fetch,
+        snapshotReadOptions,
+      ),
+      getDashboardLadderBuild(ladderBuilds.builds[0]?.id),
+    ]);
   const endpointLabel = new URL(defaultApiBaseUrl).hostname;
   const datasetSource =
     dataset.source === "api" ? "Published R2 artifact" : "Demo fallback";
@@ -628,55 +631,72 @@ export default async function Home({
                 </div>
                 {ladderBuilds.builds.length > 0 ? (
                   <div className="space-y-3">
-                    {ladderBuilds.builds.slice(0, 4).map((build) => (
-                      <article
-                        key={build.id}
-                        className="rounded-md border border-base-300/70 bg-base-100/45 p-3"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="truncate text-xs uppercase text-base-content/55">
-                              {build.account}
-                            </p>
-                            <h3 className="truncate text-sm font-semibold text-base-content">
-                              {build.character}
-                            </h3>
+                    {ladderBuilds.builds.slice(0, 4).map((build) => {
+                      const buildDetail =
+                        ladderBuildDetail.build?.id === build.id
+                          ? ladderBuildDetail.build
+                          : build;
+
+                      return (
+                        <article
+                          key={build.id}
+                          className="rounded-md border border-base-300/70 bg-base-100/45 p-3"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-xs uppercase text-base-content/55">
+                                {build.account}
+                              </p>
+                              <h3 className="truncate text-sm font-semibold text-base-content">
+                                {build.character}
+                              </h3>
+                            </div>
+                            <span className="shrink-0 rounded-md bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
+                              {build.rank
+                                ? `#${build.rank}`
+                                : `Level ${build.level}`}
+                            </span>
                           </div>
-                          <span className="shrink-0 rounded-md bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
-                            {build.rank
-                              ? `#${build.rank}`
-                              : `Level ${build.level}`}
-                          </span>
-                        </div>
-                        <p className="mt-2 text-sm text-base-content/65">
-                          Level {build.level} {build.className}
-                        </p>
-                        {build.mainSkill ? (
-                          <p className="mt-1 text-sm font-medium text-base-content">
-                            {build.mainSkill}
+                          <p className="mt-2 text-sm text-base-content/65">
+                            Level {build.level} {build.className}
                           </p>
-                        ) : null}
-                        {build.passiveSkillIds?.length ? (
-                          <p className="mt-1 text-xs text-base-content/55">
-                            {build.passiveSkillIds.length} passive nodes tracked
-                          </p>
-                        ) : null}
-                        {build.passiveTreeUrl ? (
-                          <a
-                            href={build.passiveTreeUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="btn btn-outline btn-xs mt-3 w-full"
-                          >
-                            Open passive tree
-                            <ExternalLink
-                              className="size-3"
-                              aria-hidden="true"
-                            />
-                          </a>
-                        ) : null}
-                      </article>
-                    ))}
+                          {build.mainSkill ? (
+                            <p className="mt-1 text-sm font-medium text-base-content">
+                              {build.mainSkill}
+                            </p>
+                          ) : null}
+                          {buildDetail.passiveSkillIds?.length ? (
+                            <p className="mt-1 text-xs text-base-content/55">
+                              {buildDetail.passiveSkillIds.length} passive
+                              nodes tracked
+                            </p>
+                          ) : null}
+                          {buildDetail.equipment?.length ? (
+                            <p className="mt-1 text-xs text-base-content/55">
+                              {buildDetail.equipment.length} gear{" "}
+                              {buildDetail.equipment.length === 1
+                                ? "item"
+                                : "items"}{" "}
+                              tracked
+                            </p>
+                          ) : null}
+                          {build.passiveTreeUrl ? (
+                            <a
+                              href={build.passiveTreeUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="btn btn-outline btn-xs mt-3 w-full"
+                            >
+                              Open passive tree
+                              <ExternalLink
+                                className="size-3"
+                                aria-hidden="true"
+                              />
+                            </a>
+                          ) : null}
+                        </article>
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="rounded-md border border-base-300/70 bg-base-100/45 p-3 text-sm text-base-content/70">
